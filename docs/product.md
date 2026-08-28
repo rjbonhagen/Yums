@@ -7,10 +7,10 @@ Full spec lives in the original handoff doc; this file tracks what's
 actually built vs. planned. See `docs/architecture.md` for how it's built
 and `docs/data-sources.md` for what's live vs. mocked.
 
-## MVP scope (V1, UC San Diego only)
+## MVP scope (V1, UC Berkeley only)
 
 - [x] Campus/budget/preferences onboarding form (`/`)
-- [x] Free food event discovery — **mocked** (3 UCSD events)
+- [x] Free food event discovery — **mocked** (3 Berkeley events)
 - [x] Nearby student deals — **mocked** (3 deals)
 - [x] Grocery price comparison + optimizer (multi-store cheapest vs.
       single-store convenience tradeoff) — **mocked** catalog

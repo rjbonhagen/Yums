@@ -4,7 +4,7 @@ import { freeFoodEvents, studentDeals } from "./mock-data"
 
 // Deterministic distance stand-in until real geocoding/routing is wired up:
 // derives a rough "minutes away" from lat/lng deltas around campus center.
-const CAMPUS_CENTER = { lat: 32.8801, lng: -117.234 }
+const CAMPUS_CENTER = { lat: 37.8719, lng: -122.2585 }
 function estimatedMinutesAway(lat?: number, lng?: number): number {
   if (lat == null || lng == null) return 15
   const dLat = lat - CAMPUS_CENTER.lat

@@ -177,5 +177,5 @@ create policy "users manage own recommendations" on recommendations
 
 -- Seed: one university for the MVP.
 insert into universities (name, slug, latitude, longitude)
-values ('UC San Diego', 'ucsd', 32.8801, -117.2340)
+values ('UC Berkeley', 'berkeley', 37.8719, -122.2585)
 on conflict (slug) do nothing;

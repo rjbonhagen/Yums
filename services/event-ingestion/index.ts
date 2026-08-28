@@ -1,11 +1,11 @@
 import type { CampusEventSource } from "./types"
 import { extractDeterministic, type ExtractedFoodEvent } from "./extract"
-import { ucsdMockSource } from "./sources/ucsd-mock"
+import { berkeleyMockSource } from "./sources/berkeley-mock"
 
 export * from "./types"
 export * from "./extract"
 
-export const sources: CampusEventSource[] = [ucsdMockSource]
+export const sources: CampusEventSource[] = [berkeleyMockSource]
 
 export async function ingestAll(): Promise<ExtractedFoodEvent[]> {
   const results = await Promise.all(sources.map((s) => s.fetchEvents()))

@@ -1,119 +1,174 @@
-"use client"
+import Link from "next/link"
+import { Badge } from "@/components/ui/badge"
+import { Card, CardContent } from "@/components/ui/card"
+import { Nav } from "@/components/nav"
+import { buildRecommendations } from "@/lib/recommendations"
 
-import { useRouter } from "next/navigation"
-import { useState } from "react"
-import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
+const STATS = [
+  { value: "$24", label: "avg. weekly savings found" },
+  { value: "3", label: "free food events near you today" },
+  { value: "12 min", label: "typical walk to free food" },
+]
 
-const OPTIMIZE_OPTIONS = [
-  { value: "cheapest", label: "Cheapest" },
-  { value: "healthy", label: "Healthy" },
-  { value: "high_protein", label: "High Protein" },
-  { value: "fast", label: "Fast" },
-] as const
+const FEATURES = [
+  {
+    title: "Free Food Radar",
+    body: "Club meetings, speaker series, and campus events with food, ranked by how close they are to your next class.",
+  },
+  {
+    title: "Local Student Deals",
+    body: "Student-ID discounts and happy-hour pricing at restaurants and cafes near campus, surfaced before they expire.",
+  },
+  {
+    title: "Grocery Optimizer",
+    body: "Compares prices across nearby stores and tells you when splitting a trip is actually worth the extra stop.",
+  },
+  {
+    title: "Meal Plan Pacing",
+    body: "Tracks swipes and dining dollars against days left in the term so nothing goes unused.",
+  },
+  {
+    title: "Schedule Awareness",
+    body: "Weighs opportunities against your class schedule — a 3-minute walk beats a 25-minute one, even if the food's the same.",
+  },
+  {
+    title: "Save Money vs. Save Time",
+    body: "One slider tunes every recommendation toward the cheapest option or the fewest trips, your call.",
+  },
+]
 
-const TRANSPORT_OPTIONS = [
-  { value: "walking", label: "Walking" },
-  { value: "bike", label: "Bike" },
-  { value: "car", label: "Car" },
-  { value: "transit", label: "Transit" },
-] as const
+const STEPS = [
+  { n: "01", title: "Tell it your week", body: "Budget, dietary needs, transportation, how far you'll walk." },
+  { n: "02", title: "It scans campus", body: "Free food events, local deals, dining hall value, and grocery prices near you." },
+  { n: "03", title: "You get a plan", body: "A day-by-day plan with exact costs, plus a ready-to-buy grocery basket." },
+]
 
 export default function HomePage() {
-  const router = useRouter()
-  const [budget, setBudget] = useState(60)
-  const [optimizeFor, setOptimizeFor] = useState<(typeof OPTIMIZE_OPTIONS)[number]["value"]>("cheapest")
-  const [transportation, setTransportation] = useState<(typeof TRANSPORT_OPTIONS)[number]["value"]>("walking")
-  const [maxTravelMinutes, setMaxTravelMinutes] = useState(20)
-
-  function buildMyWeek() {
-    const params = new URLSearchParams({
-      budget: String(budget),
-      optimizeFor,
-      transportation,
-      maxTravelMinutes: String(maxTravelMinutes),
-    })
-    router.push(`/dashboard?${params.toString()}`)
-  }
+  const preview = buildRecommendations({ maxTravelMinutes: 20 }).slice(0, 3)
 
   return (
-    <main className="flex flex-1 items-center justify-center px-4 py-12">
-      <Card className="w-full max-w-md">
-        <CardHeader>
-          <CardTitle className="text-2xl">CampusSaver</CardTitle>
-          <p className="text-muted-foreground text-sm">
-            The cheapest way to live around campus.
+    <div className="flex flex-1 flex-col">
+      <Nav />
+      <main className="flex-1">
+      {/* Hero */}
+      <section className="border-b">
+        <div className="mx-auto flex max-w-5xl flex-col items-center px-4 py-24 text-center">
+          <Badge variant="secondary" className="mb-6 border-[#fdb515]/40 bg-[#fdb515]/15 text-[#003262] dark:text-[#fdb515]">
+            Built for UC Berkeley
+          </Badge>
+          <h1 className="max-w-3xl text-5xl font-semibold tracking-tight text-balance sm:text-6xl">
+            The cheapest way to eat and live around campus
+          </h1>
+          <p className="text-muted-foreground mt-6 max-w-xl text-lg text-balance">
+            CampusSaver finds free food, student deals, and cheap groceries near you, and
+            turns them into a plan built around your schedule and your budget.
           </p>
-        </CardHeader>
-        <CardContent className="space-y-6">
-          <div className="space-y-2">
-            <Label htmlFor="budget">How much do you want to spend this week?</Label>
-            <Input
-              id="budget"
-              type="number"
-              min={0}
-              value={budget}
-              onChange={(e) => setBudget(Number(e.target.value))}
-              className="text-lg"
-            />
+          <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
+            <Link
+              href="/start"
+              className="bg-primary text-primary-foreground hover:bg-primary/90 rounded-lg px-6 py-3 text-sm font-medium transition-colors"
+            >
+              Build My Week
+            </Link>
+            <Link
+              href="/feed"
+              className="hover:bg-muted rounded-lg border px-6 py-3 text-sm font-medium transition-colors"
+            >
+              See today&apos;s feed
+            </Link>
           </div>
+        </div>
+      </section>
 
-          <div className="space-y-2">
-            <Label>What are you optimizing for?</Label>
-            <div className="grid grid-cols-2 gap-2">
-              {OPTIMIZE_OPTIONS.map((opt) => (
-                <Button
-                  key={opt.value}
-                  type="button"
-                  variant={optimizeFor === opt.value ? "default" : "outline"}
-                  onClick={() => setOptimizeFor(opt.value)}
-                >
-                  {opt.label}
-                </Button>
-              ))}
+      {/* Stats */}
+      <section className="border-b">
+        <div className="mx-auto grid max-w-5xl grid-cols-1 divide-y sm:grid-cols-3 sm:divide-x sm:divide-y-0">
+          {STATS.map((stat) => (
+            <div key={stat.label} className="flex flex-col items-center gap-1 px-6 py-10 text-center">
+              <span className="text-4xl font-semibold">{stat.value}</span>
+              <span className="text-muted-foreground text-sm">{stat.label}</span>
             </div>
-          </div>
+          ))}
+        </div>
+      </section>
 
-          <div className="space-y-2">
-            <Label>University</Label>
-            <Input value="UC San Diego" disabled />
-            <p className="text-muted-foreground text-xs">More campuses coming soon.</p>
-          </div>
+      {/* Features */}
+      <section className="mx-auto max-w-5xl px-4 py-24">
+        <div className="mb-12 max-w-xl">
+          <h2 className="text-3xl font-semibold tracking-tight">Everything that goes into your week, in one place</h2>
+          <p className="text-muted-foreground mt-3">
+            You shouldn&apos;t have to check six apps to figure out how to eat cheap this week.
+          </p>
+        </div>
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          {FEATURES.map((f) => (
+            <Card key={f.title}>
+              <CardContent className="py-6">
+                <h3 className="mb-2 font-medium">{f.title}</h3>
+                <p className="text-muted-foreground text-sm">{f.body}</p>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      </section>
 
-          <div className="space-y-2">
-            <Label>Transportation</Label>
-            <div className="grid grid-cols-2 gap-2">
-              {TRANSPORT_OPTIONS.map((opt) => (
-                <Button
-                  key={opt.value}
-                  type="button"
-                  variant={transportation === opt.value ? "default" : "outline"}
-                  onClick={() => setTransportation(opt.value)}
-                >
-                  {opt.label}
-                </Button>
-              ))}
-            </div>
+      {/* How it works */}
+      <section className="border-t border-b bg-muted/40">
+        <div className="mx-auto max-w-5xl px-4 py-24">
+          <h2 className="mb-12 text-3xl font-semibold tracking-tight">How it works</h2>
+          <div className="grid grid-cols-1 gap-8 sm:grid-cols-3">
+            {STEPS.map((step) => (
+              <div key={step.n}>
+                <span className="text-muted-foreground text-sm font-mono">{step.n}</span>
+                <h3 className="mt-2 mb-2 font-medium">{step.title}</h3>
+                <p className="text-muted-foreground text-sm">{step.body}</p>
+              </div>
+            ))}
           </div>
+        </div>
+      </section>
 
-          <div className="space-y-2">
-            <Label htmlFor="maxTravel">Max travel time (minutes)</Label>
-            <Input
-              id="maxTravel"
-              type="number"
-              min={1}
-              value={maxTravelMinutes}
-              onChange={(e) => setMaxTravelMinutes(Number(e.target.value))}
-            />
-          </div>
+      {/* Live preview */}
+      <section className="mx-auto max-w-5xl px-4 py-24">
+        <div className="mb-8 flex items-end justify-between">
+          <h2 className="text-3xl font-semibold tracking-tight">Happening near campus today</h2>
+          <Link href="/feed" className="text-sm underline underline-offset-4">
+            View full feed →
+          </Link>
+        </div>
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+          {preview.map((r) => (
+            <Card key={r.id}>
+              <CardContent className="py-5">
+                <div className="mb-2 flex items-start justify-between gap-2">
+                  <p className="font-medium">{r.title}</p>
+                  <Badge variant={r.kind === "free_food" ? "default" : "secondary"}>
+                    {r.kind === "free_food" ? "FREE" : `$${r.estimatedSavings.toFixed(2)} off`}
+                  </Badge>
+                </div>
+                <p className="text-muted-foreground text-sm">{r.subtitle}</p>
+                <p className="text-muted-foreground mt-1 text-xs">{r.distanceMinutes} min away</p>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      </section>
 
-          <Button className="w-full" size="lg" onClick={buildMyWeek}>
+      {/* CTA */}
+      <section className="border-t">
+        <div className="mx-auto flex max-w-5xl flex-col items-center px-4 py-24 text-center">
+          <h2 className="max-w-lg text-3xl font-semibold tracking-tight text-balance">
+            Ready to see what you could save this week?
+          </h2>
+          <Link
+            href="/start"
+            className="bg-primary text-primary-foreground hover:bg-primary/90 mt-8 rounded-lg px-6 py-3 text-sm font-medium transition-colors"
+          >
             Build My Week
-          </Button>
-        </CardContent>
-      </Card>
-    </main>
+          </Link>
+        </div>
+      </section>
+      </main>
+    </div>
   )
 }

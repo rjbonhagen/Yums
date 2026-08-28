@@ -4,7 +4,7 @@
 
 ```
 apps/web              Next.js 16 (App Router) frontend + API routes
-services/event-ingestion   CampusEventSource adapter interface + mock UCSD source + food extraction
+services/event-ingestion   CampusEventSource adapter interface + mock Berkeley source + food extraction
 packages/database      Supabase/Postgres schema (schema.sql)
 packages/shared        Cross-package types + deterministic scoring math
 ```
@@ -26,7 +26,7 @@ apps/web/src/lib/mock-data.ts
 into the web app's API route) that demonstrates the real shape: a
 `CampusEventSource` adapter fetches raw `CampusEvent[]`, then
 `extractDeterministic` (or eventually an LLM call) tags each with a food
-description and confidence score. Swapping the mock UCSD source for a real
+description and confidence score. Swapping the mock Berkeley source for a real
 one, or wiring this pipeline into `/api/recommendations`, is the next step
 once a real event source is chosen (see `docs/data-sources.md`).
 
