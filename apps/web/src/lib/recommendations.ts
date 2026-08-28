@@ -196,6 +196,8 @@ export async function buildRecommendations(params: RecommendationParams): Promis
       estimatedSavings,
       distanceMinutes: minutesAway,
       distanceEstimated: hasCoords ? true : undefined,
+      latitude: event.latitude,
+      longitude: event.longitude,
       startTime: event.startTime,
       sourceUrl: event.sourceUrl,
       score,
@@ -224,6 +226,8 @@ export async function buildRecommendations(params: RecommendationParams): Promis
         estimatedSavings: 0,
         distanceMinutes: minutesAway,
         distanceEstimated: true,
+        latitude: place.latitude,
+        longitude: place.longitude,
         score,
       })
     }

@@ -110,6 +110,12 @@ export interface Recommendation {
   /** true when distanceMinutes is a haversine estimate rather than a
    * routed value; undefined when distance couldn't be computed at all. */
   distanceEstimated?: boolean
+  /** Real coordinates from the source (event location or OSM place) — never
+   * guessed. Undefined whenever the upstream source didn't provide them
+   * (e.g. some Cal Link events have no organizer-entered location); powers
+   * /feed's map view. */
+  latitude?: number
+  longitude?: number
   startTime?: string
   sourceUrl?: string
   score: number

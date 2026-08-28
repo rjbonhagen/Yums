@@ -35,7 +35,13 @@ why for each.
 - [x] Real distance/walking-time math from actual coordinates (haversine
       geometry + optional OSRM routing), replacing an earlier placeholder
       formula
-- [ ] Map view (deferred — no Mapbox/Google Maps key wired up)
+- [x] Map view — List/Map toggle on `/feed` (`components/recommendations-view.tsx`,
+      `components/feed-map.tsx`) plotting real coordinates already computed
+      for free food and nearby eats. No fabricated locations — items
+      without real coordinates are simply omitted from the map, disclosed
+      via a count of how many. Requires `NEXT_PUBLIC_MAPBOX_TOKEN`; shows
+      an honest "not configured" message in the Map tab without it, same
+      as every other optional integration in this app.
 - [x] Schedule awareness — real Google Calendar FreeBusy check once a user
       connects via `/login`; flat placeholder otherwise (see
       `docs/architecture.md`'s "Schedule awareness" section). Wired but not

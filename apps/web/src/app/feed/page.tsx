@@ -1,6 +1,7 @@
 import { Badge } from "@/components/ui/badge"
 import { Card, CardContent } from "@/components/ui/card"
 import { Nav } from "@/components/nav"
+import { RecommendationsView } from "@/components/recommendations-view"
 import { buildRecommendations } from "@/lib/recommendations"
 import { getConnectedCalendarAccessToken } from "@/lib/google-calendar"
 import { optimizeGroceryList, cheapestSingleStorePlan } from "@/lib/grocery-optimizer"
@@ -33,17 +34,6 @@ function distanceForStore(byChain: Record<string, number>, storeName: string): n
   const lower = storeName.toLowerCase()
   const match = Object.keys(byChain).find((chain) => lower.includes(chain))
   return match ? byChain[match] : undefined
-}
-
-function formatTime(iso?: string) {
-  if (!iso) return ""
-  return new Date(iso).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })
-}
-
-function kindLabel(kind: string, estimatedSavings: number): string {
-  if (kind === "free_food") return "FREE"
-  if (kind === "nearby_eats") return "Nearby"
-  return `$${estimatedSavings.toFixed(2)} off`
 }
 
 export default async function FeedPage() {
@@ -107,38 +97,7 @@ export default async function FeedPage() {
           </CardContent>
         </Card>
 
-        {recommendations.map((r) => (
-          <Card key={r.id}>
-            <CardContent className="flex items-start justify-between gap-4 py-4">
-              <div>
-                <p className="font-medium">{r.title}</p>
-                {r.subtitle && <p className="text-muted-foreground text-sm">{r.subtitle}</p>}
-                <p className="text-muted-foreground text-xs">
-                  {formatTime(r.startTime)}
-                  {r.startTime && r.distanceMinutes != null ? " · " : ""}
-                  {r.distanceMinutes != null
-                    ? `${r.distanceEstimated ? "~" : ""}${r.distanceMinutes} min away`
-                    : r.startTime
-                      ? ""
-                      : "distance unknown"}
-                </p>
-                {r.sourceUrl && (
-                  <a
-                    href={r.sourceUrl}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="text-xs underline underline-offset-4"
-                  >
-                    Source
-                  </a>
-                )}
-              </div>
-              <Badge variant={r.kind === "free_food" ? "default" : "secondary"}>
-                {kindLabel(r.kind, r.estimatedSavings)}
-              </Badge>
-            </CardContent>
-          </Card>
-        ))}
+        <RecommendationsView recommendations={recommendations} />
 
         <div id="basket" className="pt-4">
           <h2 className="mb-2 text-lg font-semibold">Your Basket</h2>

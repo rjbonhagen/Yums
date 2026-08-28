@@ -175,7 +175,10 @@ create table calendar_connections (
 create table recommendations (
   id uuid primary key default uuid_generate_v4(),
   user_id uuid references users (id) on delete cascade,
-  kind text not null check (kind in ('free_food', 'deal', 'grocery', 'dining')),
+  -- Must match packages/shared/types.ts's RecommendationKind union exactly
+  -- (that TS type is the source of truth — this table isn't written to by
+  -- any app code yet, see docs/product.md's roadmap).
+  kind text not null check (kind in ('free_food', 'nearby_eats', 'grocery', 'dining')),
   ref_id uuid, -- points at events.id / deals.id / grocery_lists.id depending on kind
   title text not null,
   subtitle text,
