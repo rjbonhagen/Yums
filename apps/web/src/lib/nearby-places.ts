@@ -12,26 +12,40 @@
 // a thrown error and degrade gracefully rather than fabricating data.
 const OVERPASS_URLS = ["https://overpass-api.de/api/interpreter", "https://overpass.kumi.systems/api/interpreter"]
 
+async function fetchFromOverpass(url: string, query: string): Promise<OverpassResponse> {
+  const res = await fetch(url, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/x-www-form-urlencoded",
+      "User-Agent": "Yums/0.1 (student project demo; no production traffic)",
+    },
+    body: `data=${encodeURIComponent(query)}`,
+    // cache:'force-cache' is required for this specific fetch (not just the
+    // outer unstable_cache in recommendations.ts/grocery-stores.ts) —
+    // empirically, a POST request without its own explicit opt-in stayed
+    // uncached even inside unstable_cache whenever the calling route was
+    // dynamically rendered (searchParams/cookies() elsewhere in the same
+    // request), while GET-based sources cached fine with unstable_cache
+    // alone. Both layers are needed together for POST. See docs/architecture.md.
+    cache: "force-cache",
+    signal: AbortSignal.timeout(6000),
+  })
+  if (!res.ok) throw new Error(`${url} returned ${res.status}`)
+  return (await res.json()) as OverpassResponse
+}
+
 async function postToOverpass(query: string): Promise<OverpassResponse> {
-  let lastError: unknown
-  for (const url of OVERPASS_URLS) {
-    try {
-      const res = await fetch(url, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/x-www-form-urlencoded",
-          "User-Agent": "CampusSaver/0.1 (student project demo; no production traffic)",
-        },
-        body: `data=${encodeURIComponent(query)}`,
-        signal: AbortSignal.timeout(6000),
-      })
-      if (!res.ok) throw new Error(`${url} returned ${res.status}`)
-      return (await res.json()) as OverpassResponse
-    } catch (err) {
-      lastError = err
-    }
-  }
-  throw lastError instanceof Error ? lastError : new Error("All Overpass endpoints failed")
+  // Race both mirrors instead of trying them one after another — a slow
+  // primary used to add its full 6s timeout before the mirror was even
+  // tried, doubling worst-case latency for no benefit.
+  const results = await Promise.allSettled(OVERPASS_URLS.map((url) => fetchFromOverpass(url, query)))
+  const fulfilled = results.find((r) => r.status === "fulfilled")
+  if (fulfilled && fulfilled.status === "fulfilled") return fulfilled.value
+
+  const lastError = results.find((r) => r.status === "rejected")
+  throw lastError && lastError.status === "rejected" && lastError.reason instanceof Error
+    ? lastError.reason
+    : new Error("All Overpass endpoints failed")
 }
 
 export interface NearbyPlace {

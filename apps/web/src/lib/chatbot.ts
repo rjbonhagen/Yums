@@ -24,7 +24,11 @@ export async function answerDeterministically(message: string): Promise<string> 
     const lines = freeFood
       .slice(0, 5)
       .map((r) => `- ${r.title}${r.subtitle ? ` at ${r.subtitle}` : ""}${r.startTime ? `, ${formatTime(r.startTime)}` : ""}`)
-    const note = meta.freeFood.source === "mock-fallback" ? " (live calendar was unreachable, showing fallback)" : ""
+    const notes = [
+      meta.freeFood.source === "mock-fallback" ? "live calendar was unreachable, showing fallback" : null,
+      meta.callink.source === "unavailable" ? "Cal Link was unreachable, club events omitted" : null,
+    ].filter((n): n is string => n != null)
+    const note = notes.length > 0 ? ` (${notes.join("; ")})` : ""
     return `Here's what's free near ${university.name} today${note}:\n${lines.join("\n")}`
   }
 

@@ -3,9 +3,13 @@ import { Badge } from "@/components/ui/badge"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Nav } from "@/components/nav"
 import { buildRecommendations } from "@/lib/recommendations"
+import { getConnectedCalendarAccessToken } from "@/lib/google-calendar"
 import { university } from "@/lib/mock-data"
 
-export const dynamic = "force-dynamic"
+// No force-dynamic: see the same note in api/recommendations/route.ts —
+// this page already renders per-request (searchParams + cookies() via
+// getConnectedCalendarAccessToken), so removing it only stops the
+// per-source fetch caching from being silently overridden to no-store.
 
 function formatTime(iso?: string) {
   if (!iso) return ""
@@ -22,7 +26,8 @@ export default async function DashboardPage(props: PageProps<"/dashboard">) {
   const daysLeftInTerm = searchParams.daysLeft != null ? Number(searchParams.daysLeft) : null
   const hasMealPlanInput = mealSwipesRemaining != null && diningDollarsRemaining != null && daysLeftInTerm != null
 
-  const { recommendations, meta } = await buildRecommendations({ maxTravelMinutes })
+  const calendarAccessToken = await getConnectedCalendarAccessToken()
+  const { recommendations, meta } = await buildRecommendations({ maxTravelMinutes, calendarAccessToken: calendarAccessToken ?? undefined })
   const freeFood = recommendations.filter((r) => r.kind === "free_food")
   const projectedSpend = Math.max(0, budget - recommendations.reduce((sum, r) => sum + r.estimatedSavings, 0) * 0.4)
   const projectedSavings = Math.max(0, budget - projectedSpend)
@@ -45,6 +50,15 @@ export default async function DashboardPage(props: PageProps<"/dashboard">) {
                 title={meta.freeFood.error}
               >
                 Live calendar unreachable — showing fallback
+              </Badge>
+            )}
+            {meta.callink.source === "unavailable" && (
+              <Badge
+                variant="outline"
+                className="border-amber-300 bg-amber-50 text-amber-700 dark:border-amber-900 dark:bg-amber-950 dark:text-amber-400"
+                title={meta.callink.error}
+              >
+                Cal Link unreachable — club events omitted
               </Badge>
             )}
           </div>

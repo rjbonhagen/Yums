@@ -2,11 +2,15 @@ import { Badge } from "@/components/ui/badge"
 import { Card, CardContent } from "@/components/ui/card"
 import { Nav } from "@/components/nav"
 import { buildRecommendations } from "@/lib/recommendations"
+import { getConnectedCalendarAccessToken } from "@/lib/google-calendar"
 import { optimizeGroceryList, cheapestSingleStorePlan } from "@/lib/grocery-optimizer"
 import { fetchRealGroceryStoreLocations } from "@/lib/grocery-stores"
 import { haversineMinutes } from "@/lib/geo"
 
-export const dynamic = "force-dynamic"
+// No force-dynamic: see the same note in api/recommendations/route.ts —
+// this page reads cookies() via getConnectedCalendarAccessToken so it
+// still renders per-request; removing the flag only stops it from
+// silently forcing every underlying fetch() to no-store.
 
 const CAMPUS_CENTER = { lat: 37.8719, lng: -122.2585 }
 const BBOX: [number, number, number, number] = [37.83, -122.3, 37.9, -122.22]
@@ -43,8 +47,9 @@ function kindLabel(kind: string, estimatedSavings: number): string {
 }
 
 export default async function FeedPage() {
+  const calendarAccessToken = await getConnectedCalendarAccessToken()
   const [{ recommendations, meta }, storeDistances] = await Promise.all([
-    buildRecommendations({ maxTravelMinutes: 20 }),
+    buildRecommendations({ maxTravelMinutes: 20, calendarAccessToken: calendarAccessToken ?? undefined }),
     fetchStoreDistances(),
   ])
   const multiStore = optimizeGroceryList(DEFAULT_BASKET)
@@ -59,14 +64,19 @@ export default async function FeedPage() {
       <main className="mx-auto w-full max-w-3xl flex-1 space-y-4 px-4 py-8">
         <h1 className="text-2xl font-semibold">Campus Feed</h1>
         <p className="text-muted-foreground mb-2 text-sm">
-          Free food is live from events.berkeley.edu&apos;s public calendar; nearby eats are live from
-          OpenStreetMap. Grocery pricing below is a manually maintained reference, not a live feed — no
-          retailer publishes one (see docs/data-sources.md).
+          Free food is live from events.berkeley.edu&apos;s public calendar and Cal Link&apos;s club-events
+          feed; nearby eats are live from OpenStreetMap. Grocery pricing below is a manually maintained
+          reference, not a live feed — no retailer publishes one (see docs/data-sources.md).
         </p>
         {meta.freeFood.source === "mock-fallback" && (
           <p className="text-muted-foreground text-xs">
             Couldn&apos;t reach the live events calendar just now ({meta.freeFood.error}) — free food below is
             from a fallback list.
+          </p>
+        )}
+        {meta.callink.source === "unavailable" && (
+          <p className="text-muted-foreground text-xs">
+            Couldn&apos;t reach Cal Link just now ({meta.callink.error}) — club events are omitted below.
           </p>
         )}
         {meta.nearbyEats.source === "unavailable" && (

@@ -19,6 +19,30 @@ create table users (
   created_at timestamptz not null default now()
 );
 
+-- Mirrors every new Supabase auth user (magic-link sign-in, see
+-- apps/web/src/app/login) into public.users, so the FK on
+-- user_preferences/meal_plans/recommendations has a row to point at
+-- immediately after signup — without this, the first
+-- savePreferencesToSupabase() call for a brand-new user fails the FK
+-- constraint. security definer is required because auth.users insert
+-- happens outside any authenticated session's RLS context.
+create function public.handle_new_auth_user()
+returns trigger
+language plpgsql
+security definer set search_path = public
+as $$
+begin
+  insert into public.users (id, email)
+  values (new.id, new.email)
+  on conflict (id) do nothing;
+  return new;
+end;
+$$;
+
+create trigger on_auth_user_created
+  after insert on auth.users
+  for each row execute function public.handle_new_auth_user();
+
 create table user_preferences (
   user_id uuid primary key references users (id) on delete cascade,
   weekly_budget numeric(10, 2) not null default 60,
@@ -133,6 +157,21 @@ create table meal_plans (
   updated_at timestamptz not null default now()
 );
 
+-- Google Calendar connection for real schedule-awareness (replaces the
+-- flat scheduleScore placeholder in packages/shared/optimizer.ts). Tokens
+-- come from Supabase's Google OAuth provider (see /login and
+-- apps/web/src/app/auth/callback) with the calendar.freebusy scope — a
+-- user must explicitly connect, this is never on by default. access_token
+-- is short-lived; refresh_token lets the app request a new one without
+-- another consent screen (see apps/web/src/lib/google-calendar.ts).
+create table calendar_connections (
+  user_id uuid primary key references users (id) on delete cascade,
+  access_token text not null,
+  refresh_token text,
+  expires_at timestamptz not null,
+  updated_at timestamptz not null default now()
+);
+
 create table recommendations (
   id uuid primary key default uuid_generate_v4(),
   user_id uuid references users (id) on delete cascade,
@@ -155,6 +194,7 @@ alter table grocery_lists enable row level security;
 alter table grocery_list_items enable row level security;
 alter table meal_plans enable row level security;
 alter table recommendations enable row level security;
+alter table calendar_connections enable row level security;
 
 create policy "users manage own row" on users
   for all using (auth.uid() = id);
@@ -173,6 +213,8 @@ create policy "users manage own grocery list items" on grocery_list_items
 create policy "users manage own meal plan" on meal_plans
   for all using (auth.uid() = user_id);
 create policy "users manage own recommendations" on recommendations
+  for all using (auth.uid() = user_id);
+create policy "users manage own calendar connection" on calendar_connections
   for all using (auth.uid() = user_id);
 
 -- Seed: one university for the MVP.

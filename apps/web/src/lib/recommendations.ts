@@ -1,15 +1,41 @@
-import { scoreOpportunity } from "@campus/shared"
-import type { Recommendation } from "@campus/shared"
-import { berkeleyLiveSource, ingestSource, type ExtractedFoodEvent } from "@campus/event-ingestion"
+import { unstable_cache } from "next/cache"
+import { scoreOpportunity } from "@yums/shared"
+import type { Recommendation } from "@yums/shared"
+import { berkeleyLiveSource, callinkSource, ingestSource, type ExtractedFoodEvent } from "@yums/event-ingestion"
 import { fetchNearbyPlaces } from "./nearby-places"
 import { haversineMinutes } from "./geo"
 import { freeFoodEvents as fallbackFreeFoodEvents } from "./mock-data"
+import { fetchBusyIntervals, scheduleScoreFromBusyIntervals, type BusyInterval } from "./google-calendar"
+
+const PLACEHOLDER_SCHEDULE_SCORE = 0.7 // used until a calendar is connected (see RecommendationsParams.calendarAccessToken)
 
 const CAMPUS_CENTER = { lat: 37.8719, lng: -122.2585 }
 // Roughly covers Berkeley's campus + adjacent neighborhoods (Southside,
 // North Berkeley, downtown) — used for both the live events geocoding
 // context and the Overpass nearby-places query.
 const BBOX: [number, number, number, number] = [37.83, -122.3, 37.9, -122.22]
+
+// /dashboard, /feed, and /api/recommendations all read searchParams and/or
+// cookies() (calendar personalization), which are Request-time APIs — once
+// a render touches one, Next.js stops honoring per-fetch cache: 'force-cache'
+// for that render entirely (verified empirically: identical fetches went
+// from ~65ms cached to 2-6s live the moment any Request-time API was read
+// in the same request). unstable_cache is Next's documented escape hatch
+// for exactly this — it persists a function's result across requests
+// independent of whether the calling route is dynamically rendered. These
+// three live sources don't depend on the request at all (same data for
+// every visitor), so this is a correct, not just fast, use of it.
+const getCachedBerkeleyEvents = unstable_cache(() => ingestSource(berkeleyLiveSource), ["berkeley-live-events"], {
+  revalidate: 120,
+})
+const getCachedCallinkEvents = unstable_cache(() => ingestSource(callinkSource), ["callink-events"], {
+  revalidate: 120,
+})
+const getCachedNearbyPlaces = unstable_cache(
+  () => fetchNearbyPlaces(BBOX, ["cafe", "restaurant", "fast_food"]),
+  ["nearby-places", BBOX.join(",")],
+  { revalidate: 600 },
+)
 
 function proximityScore(minutesAway: number, maxTravelMinutes: number): number {
   return Math.max(0, 1 - minutesAway / Math.max(maxTravelMinutes, 1))
@@ -60,11 +86,17 @@ function normalizeFallbackEvent(e: (typeof fallbackFreeFoodEvents)[number]): Nor
 
 export interface RecommendationParams {
   maxTravelMinutes: number
+  // Real Google Calendar access token (see /login's "Connect Google
+  // Calendar" and apps/web/src/lib/google-calendar.ts). Absent for most
+  // callers — scheduleScore then stays the documented flat placeholder.
+  calendarAccessToken?: string
 }
 
 export interface RecommendationsMeta {
   freeFood: { source: "live" | "mock-fallback"; error?: string }
+  callink: { source: "live" | "unavailable"; error?: string }
   nearbyEats: { source: "live" | "unavailable"; error?: string }
+  schedule: { source: "live" | "placeholder" | "unavailable"; error?: string }
 }
 
 export interface RecommendationsResult {
@@ -73,20 +105,39 @@ export interface RecommendationsResult {
 }
 
 export async function buildRecommendations(params: RecommendationParams): Promise<RecommendationsResult> {
-  const { maxTravelMinutes } = params
+  const { maxTravelMinutes, calendarAccessToken } = params
   const recs: Recommendation[] = []
   const meta: RecommendationsMeta = {
     freeFood: { source: "live" },
+    callink: { source: "live" },
     nearbyEats: { source: "live" },
+    schedule: { source: calendarAccessToken ? "live" : "placeholder" },
   }
 
-  // Free food and nearby eats hit two unrelated third-party APIs — run
-  // them concurrently rather than back-to-back so a slow/timing-out one
-  // doesn't double the page's total latency.
-  const [foodResult, placesResult] = await Promise.allSettled([
-    ingestSource(berkeleyLiveSource),
-    fetchNearbyPlaces(BBOX, ["cafe", "restaurant", "fast_food"]),
+  // Free food (two independent live sources), Cal Link club events, nearby
+  // eats, and (when connected) the user's real calendar all hit unrelated
+  // third-party APIs — run them concurrently rather than back-to-back so a
+  // slow/timing-out one doesn't add to the others' latency.
+  const now = new Date()
+  const weekAhead = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000)
+  const [foodResult, callinkResult, placesResult, calendarResult] = await Promise.allSettled([
+    getCachedBerkeleyEvents(),
+    getCachedCallinkEvents(),
+    getCachedNearbyPlaces(),
+    calendarAccessToken
+      ? fetchBusyIntervals(calendarAccessToken, now, weekAhead)
+      : Promise.resolve<BusyInterval[]>([]),
   ])
+
+  let busyIntervals: BusyInterval[] = []
+  if (calendarAccessToken) {
+    if (calendarResult.status === "fulfilled") {
+      busyIntervals = calendarResult.value
+    } else {
+      const err = calendarResult.reason
+      meta.schedule = { source: "unavailable", error: err instanceof Error ? err.message : "fetch failed" }
+    }
+  }
 
   // Free food: live UC Berkeley events calendar, falling back to the
   // hand-written mock only if the live fetch itself fails (network error,
@@ -100,6 +151,18 @@ export async function buildRecommendations(params: RecommendationParams): Promis
     foodEvents = fallbackFreeFoodEvents.map(normalizeFallbackEvent)
   }
 
+  // Cal Link: real club/org events from callink.berkeley.edu, with real
+  // descriptions and an organizer-set "Free Food" benefit tag where
+  // present (see services/event-ingestion/sources/callink-live.ts). No
+  // mock fallback exists for this source — on failure it simply degrades
+  // to "unavailable" with the real error, same as nearbyEats below.
+  if (callinkResult.status === "fulfilled") {
+    foodEvents = foodEvents.concat(callinkResult.value.map(normalizeLiveEvent))
+  } else {
+    const err = callinkResult.reason
+    meta.callink = { source: "unavailable", error: err instanceof Error ? err.message : "fetch failed" }
+  }
+
   for (const event of foodEvents) {
     const hasCoords = event.latitude != null && event.longitude != null
     const minutesAway = hasCoords
@@ -107,10 +170,20 @@ export async function buildRecommendations(params: RecommendationParams): Promis
       : undefined
     const estimatedSavings = 8 // typical meal value; no live per-event price source exists
 
+    // Real overlap check against the connected calendar's busy blocks when
+    // available; otherwise the documented flat placeholder (see
+    // RecommendationParams.calendarAccessToken and lib/google-calendar.ts).
+    const eventStart = new Date(event.startTime)
+    const eventEnd = new Date(eventStart.getTime() + 60 * 60 * 1000) // events here have no endTime field; assume 1hr
+    const scheduleScore =
+      calendarAccessToken && meta.schedule.source === "live"
+        ? scheduleScoreFromBusyIntervals(busyIntervals, eventStart, eventEnd)
+        : PLACEHOLDER_SCHEDULE_SCORE
+
     const score = scoreOpportunity({
       savingsScore: 1, // free food = max savings score
       proximityScore: minutesAway != null ? proximityScore(minutesAway, maxTravelMinutes) : 0.5,
-      scheduleScore: 0.7, // placeholder until calendar integration lands
+      scheduleScore,
       preferenceScore: 0.6,
       confidenceScore: event.confidenceScore,
     })

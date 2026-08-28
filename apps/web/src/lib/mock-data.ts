@@ -1,7 +1,7 @@
 // FALLBACK DATA — used only where a live source doesn't exist or fails.
 // See docs/data-sources.md for exactly what's live vs. reference-only.
 
-import type { FreeFoodEvent, GroceryProduct } from "@campus/shared"
+import type { FreeFoodEvent, GroceryProduct } from "@yums/shared"
 
 const today = new Date()
 function at(hour: number, minute = 0): string {

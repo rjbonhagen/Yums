@@ -7,7 +7,15 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Nav } from "@/components/nav"
-import { loadLocalPreferences, saveLocalPreferences, type WeeklyPreferences } from "@/lib/preferences"
+import {
+  loadLocalPreferences,
+  loadPreferencesFromSupabase,
+  saveLocalPreferences,
+  savePreferencesToSupabase,
+  saveMealPlanToSupabase,
+  type WeeklyPreferences,
+} from "@/lib/preferences"
+import { createClient, isSupabaseConfigured } from "@/lib/supabase/client"
 
 const OPTIMIZE_OPTIONS = [
   { value: "cheapest", label: "Cheapest" },
@@ -33,10 +41,11 @@ export default function StartPage() {
   const [diningDollars, setDiningDollars] = useState("")
   const [daysLeft, setDaysLeft] = useState("")
   const [restored, setRestored] = useState(false)
+  const [userId, setUserId] = useState<string | null>(null)
+  const [saving, setSaving] = useState(false)
 
   useEffect(() => {
-    const saved = loadLocalPreferences()
-    if (saved) {
+    function applyPrefs(saved: WeeklyPreferences) {
       setBudget(saved.budget)
       setOptimizeFor(saved.optimizeFor)
       setTransportation(saved.transportation)
@@ -48,9 +57,34 @@ export default function StartPage() {
       }
       setRestored(true)
     }
+
+    if (!isSupabaseConfigured()) {
+      const saved = loadLocalPreferences()
+      if (saved) applyPrefs(saved)
+      return
+    }
+
+    // Signed-in users get their preferences from Supabase (synced across
+    // devices) instead of this browser's localStorage — falls back to
+    // localStorage if there's no session, same as an unconfigured deployment.
+    const supabase = createClient()
+    supabase.auth.getUser().then(async ({ data: { user } }) => {
+      if (!user) {
+        const saved = loadLocalPreferences()
+        if (saved) applyPrefs(saved)
+        return
+      }
+      setUserId(user.id)
+      try {
+        const saved = await loadPreferencesFromSupabase(supabase, user.id)
+        if (saved) applyPrefs(saved)
+      } catch {
+        // No row yet for a brand-new user — nothing to restore, not an error.
+      }
+    })
   }, [])
 
-  function buildMyWeek() {
+  async function buildMyWeek() {
     const hasMealPlan = mealSwipes !== "" && diningDollars !== "" && daysLeft !== ""
     const mealPlan = hasMealPlan
       ? {
@@ -60,7 +94,24 @@ export default function StartPage() {
         }
       : undefined
 
-    saveLocalPreferences({ budget, optimizeFor, transportation, maxTravelMinutes, mealPlan })
+    const prefs: WeeklyPreferences = { budget, optimizeFor, transportation, maxTravelMinutes, mealPlan }
+
+    if (userId && isSupabaseConfigured()) {
+      setSaving(true)
+      try {
+        const supabase = createClient()
+        await savePreferencesToSupabase(supabase, userId, prefs)
+        if (mealPlan) await saveMealPlanToSupabase(supabase, userId, mealPlan)
+      } catch {
+        // Real Supabase write failed (network, RLS, etc.) — still fall back
+        // to localStorage below so the user's input isn't lost.
+        saveLocalPreferences(prefs)
+      } finally {
+        setSaving(false)
+      }
+    } else {
+      saveLocalPreferences(prefs)
+    }
 
     const params = new URLSearchParams({
       budget: String(budget),
@@ -82,7 +133,7 @@ export default function StartPage() {
       <main className="flex flex-1 items-center justify-center px-4 py-12">
       <Card className="w-full max-w-md">
         <CardHeader>
-          <CardTitle className="text-2xl">CampusSaver</CardTitle>
+          <CardTitle className="text-2xl">Yums</CardTitle>
           <p className="text-muted-foreground text-sm">
             The cheapest way to live around campus.
           </p>
@@ -198,8 +249,8 @@ export default function StartPage() {
             </div>
           </div>
 
-          <Button className="w-full" size="lg" onClick={buildMyWeek}>
-            Build My Week
+          <Button className="w-full" size="lg" onClick={buildMyWeek} disabled={saving}>
+            {saving ? "Saving…" : "Build My Week"}
           </Button>
         </CardContent>
       </Card>

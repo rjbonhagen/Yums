@@ -1,4 +1,4 @@
-# CampusSaver
+# Yums
 
 AI savings agent for college students. See `docs/product.md` for scope,
 `docs/architecture.md` for how it's built, `docs/data-sources.md` for what's

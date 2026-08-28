@@ -14,13 +14,13 @@ export interface WeeklyPreferences {
   mealPlan?: MealPlanInput
 }
 
-const STORAGE_KEY = "campussaver.preferences"
+const STORAGE_KEY = "yums.preferences"
 
 /**
- * Client-side persistence that works today with zero configuration. This
- * is what /start actually uses right now — see savePreferencesToSupabase
- * below for the real-backend path that takes over once a Supabase project
- * and auth flow exist (docs/architecture.md).
+ * Client-side persistence with zero configuration required. /start uses
+ * this when there's no Supabase project configured or no signed-in user —
+ * see savePreferencesToSupabase below for the authenticated path, wired in
+ * at /start via the /login magic-link flow (docs/architecture.md).
  */
 export function saveLocalPreferences(prefs: WeeklyPreferences): void {
   if (typeof window === "undefined") return
@@ -40,11 +40,10 @@ export function loadLocalPreferences(): WeeklyPreferences | null {
 
 /**
  * Real Supabase write, matching packages/database/schema.sql's
- * user_preferences table. Correct and ready to call, but nothing in the
- * app invokes it yet — that requires an authenticated session, which needs
- * a login flow (magic link / OAuth) this MVP doesn't have. Wire it in once
- * auth exists: call from a server action in /start's submit handler,
- * passing the session's user id.
+ * user_preferences table. Called from /start's submit handler for signed-in
+ * users (see the /login magic-link flow and apps/web/src/middleware.ts for
+ * session handling) — requires the auth.users -> public.users sync trigger
+ * in schema.sql to have run first so the FK on user_id resolves.
  */
 export async function savePreferencesToSupabase(
   supabase: SupabaseClient,
@@ -66,25 +65,42 @@ export async function loadPreferencesFromSupabase(
   supabase: SupabaseClient,
   userId: string,
 ): Promise<WeeklyPreferences | null> {
-  const { data, error } = await supabase
-    .from("user_preferences")
-    .select("weekly_budget, transportation, max_travel_minutes, optimize_for")
-    .eq("user_id", userId)
-    .maybeSingle()
+  const [prefsResult, mealPlanResult] = await Promise.all([
+    supabase
+      .from("user_preferences")
+      .select("weekly_budget, transportation, max_travel_minutes, optimize_for")
+      .eq("user_id", userId)
+      .maybeSingle(),
+    supabase
+      .from("meal_plans")
+      .select("meal_swipes_remaining, dining_dollars_remaining, days_left_in_term")
+      .eq("user_id", userId)
+      .maybeSingle(),
+  ])
 
-  if (error) throw error
-  if (!data) return null
+  if (prefsResult.error) throw prefsResult.error
+  if (!prefsResult.data) return null
+
+  const mealPlanRow = mealPlanResult.error ? null : mealPlanResult.data
+  const mealPlan: MealPlanInput | undefined = mealPlanRow
+    ? {
+        mealSwipesRemaining: mealPlanRow.meal_swipes_remaining,
+        diningDollarsRemaining: mealPlanRow.dining_dollars_remaining,
+        daysLeftInTerm: mealPlanRow.days_left_in_term,
+      }
+    : undefined
 
   return {
-    budget: data.weekly_budget,
-    transportation: data.transportation,
-    maxTravelMinutes: data.max_travel_minutes,
-    optimizeFor: data.optimize_for,
+    budget: prefsResult.data.weekly_budget,
+    transportation: prefsResult.data.transportation,
+    maxTravelMinutes: prefsResult.data.max_travel_minutes,
+    optimizeFor: prefsResult.data.optimize_for,
+    mealPlan,
   }
 }
 
-/** Matches packages/database/schema.sql's meal_plans table. Same
- * not-wired-in-yet status as the functions above — needs an authenticated
+/** Matches packages/database/schema.sql's meal_plans table. Called
+ * alongside savePreferencesToSupabase from /start for a signed-in
  * session. */
 export async function saveMealPlanToSupabase(
   supabase: SupabaseClient,

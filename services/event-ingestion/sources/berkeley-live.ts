@@ -29,8 +29,14 @@ export const berkeleyLiveSource: CampusEventSource = {
   async fetchEvents(): Promise<CampusEvent[]> {
     const res = await fetch(LIVE_FEED_URL, {
       headers: { Accept: "application/json" },
-      // Real calendar data changes throughout the day; don't cache stale results.
-      cache: "no-store",
+      // Real calendar data changes throughout the day, but not
+      // request-to-request — a short revalidate window avoids re-fetching
+      // on every page load while still staying current within minutes.
+      // cache:'force-cache' makes the opt-in explicit (Next's fetch
+      // caching is opt-in per its docs) rather than relying on revalidate
+      // alone.
+      cache: "force-cache",
+      next: { revalidate: 120 },
       signal: AbortSignal.timeout(8000),
     })
 

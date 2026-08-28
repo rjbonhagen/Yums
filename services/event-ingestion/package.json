@@ -1,5 +1,5 @@
 {
-  "name": "@campus/event-ingestion",
+  "name": "@yums/event-ingestion",
   "version": "0.0.0",
   "private": true,
   "main": "index.ts",

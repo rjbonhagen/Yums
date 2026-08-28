@@ -1,4 +1,4 @@
-import type { GroceryProduct } from "@campus/shared"
+import type { GroceryProduct } from "@yums/shared"
 import { groceryProducts } from "./mock-data"
 
 export interface OptimizedGroceryPlan {

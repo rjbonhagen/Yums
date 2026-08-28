@@ -36,10 +36,20 @@ why for each.
       geometry + optional OSRM routing), replacing an earlier placeholder
       formula
 - [ ] Map view (deferred — no Mapbox/Google Maps key wired up)
-- [ ] Schedule awareness (deferred — no Google Calendar integration)
-- [ ] Auth (deferred — no login flow; Supabase schema + write functions
-      exist and are ready to use once one is added)
+- [x] Schedule awareness — real Google Calendar FreeBusy check once a user
+      connects via `/login`; flat placeholder otherwise (see
+      `docs/architecture.md`'s "Schedule awareness" section). Wired but not
+      verified against a live Google Cloud OAuth project in this session.
+- [x] Auth — magic-link sign-in (`/login`, `/auth/callback`); `/start`
+      switches to real Supabase-backed preference persistence for anyone
+      signed in, `localStorage` otherwise. Wired but not verified against a
+      live Supabase project in this session (none is configured).
 - [ ] Agentic checkout (out of MVP scope per the original spec)
+- [ ] Real student-discount data for nearby businesses — confirmed no live
+      source exists (ASUC's site has no discount-card page at any URL
+      checked, including its full page listing and REST search); still
+      shown honestly as "nearby eats" with no savings claim, per
+      `docs/data-sources.md`.
 
 ## What "live" means here
 

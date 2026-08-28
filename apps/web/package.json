@@ -9,8 +9,8 @@
     "lint": "eslint"
   },
   "dependencies": {
-    "@campus/event-ingestion": "*",
-    "@campus/shared": "*",
+    "@yums/event-ingestion": "*",
+    "@yums/shared": "*",
     "@base-ui/react": "^1.7.0",
     "@supabase/ssr": "^0.12.5",
     "@supabase/supabase-js": "^2.112.4",

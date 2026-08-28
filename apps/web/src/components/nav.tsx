@@ -1,5 +1,5 @@
 import Link from "next/link"
-import { Badge } from "@/components/ui/badge"
+import { AuthStatus } from "@/components/auth-status"
 
 export function Nav() {
   return (
@@ -7,15 +7,8 @@ export function Nav() {
       <nav className="mx-auto flex max-w-5xl items-center justify-between px-4 py-3">
         <div className="flex items-center gap-3">
           <Link href="/" className="font-semibold">
-            CampusSaver
+            Yums
           </Link>
-          <Badge
-            variant="outline"
-            className="text-muted-foreground border-amber-300 bg-amber-50 text-amber-700 dark:border-amber-900 dark:bg-amber-950 dark:text-amber-400"
-            title="This demo runs on sample data, not live campus/store feeds. See docs/data-sources.md."
-          >
-            Demo Mode
-          </Badge>
         </div>
         <div className="flex gap-4 text-sm">
           <Link href="/start" className="text-muted-foreground hover:text-foreground">
@@ -27,6 +20,7 @@ export function Nav() {
           <Link href="/feed" className="text-muted-foreground hover:text-foreground">
             Feed
           </Link>
+          <AuthStatus />
         </div>
       </nav>
     </header>

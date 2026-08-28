@@ -22,6 +22,44 @@ as the default. `buildRecommendations()`'s returned `meta.freeFood.source`
 tells the UI which one actually happened, and the UI shows a banner when
 it's the fallback.
 
+## Club events (Cal Link) — LIVE
+
+`services/event-ingestion/sources/callink-live.ts` hits
+`callink.berkeley.edu`'s public, unauthenticated JSON API
+(`/api/discovery/event/search`) at request time. This is UC Berkeley's
+official student-org platform (a CampusGroups instance) — real event
+titles, full HTML descriptions (stripped to plain text), start/end times,
+location names, and, when the organizing club entered them, real
+coordinates. Filtered to events starting from now onward via the API's own
+`startsAfter` param (confirmed working, not a guessed filter).
+
+Unlike the Berkeley calendar feed above, Cal Link also returns a
+`benefitNames` tag array that organizers set themselves — many food events
+are tagged literally `"Free Food"`. That's a real, attributable signal, not
+a guess, so it's folded into the description text handed to
+`extractDeterministic()` rather than fabricating a separate confidence
+path. Runs alongside (not instead of) the Berkeley calendar feed — the two
+sources cover different event catalogs (club/org events vs. the
+university's own calendar) with no meaningful overlap observed.
+
+**What's missing**: not every event has coordinates — some clubs don't
+enter a precise location, in which case `latitude`/`longitude` are left
+undefined rather than guessed, same as the Berkeley feed's handling of
+missing location data.
+
+**Fallback**: none — there's no hand-written mock for this source. If the
+live fetch throws, `buildRecommendations()`'s `meta.callink.source` is set
+to `"unavailable"` with the real error, and Cal Link events are simply
+omitted from that response rather than replaced with fake data. The UI
+(`/dashboard`, `/feed`, chatbot) shows this the same honest way it already
+handles a Overpass/nearby-eats outage.
+
+This was investigated as an alternative to scraping Instagram/club social
+pages for free-food posts — Instagram has no public read API for arbitrary
+accounts and scraping it violates their ToS, whereas Cal Link is a real,
+public, keyless API that already covers the same "what are clubs offering
+free food at" need with attributable data.
+
 ## Nearby eats — LIVE (real businesses, no fabricated deals)
 
 `apps/web/src/lib/nearby-places.ts` queries OpenStreetMap's Overpass API
@@ -33,6 +71,15 @@ of the businesses near campus publish one — so rather than attach fake
 discount percentages to real places, this is shown honestly as "nearby
 eats" with no savings claim (see the `RecommendationKind` comment in
 `packages/shared/types.ts`).
+
+**Specifically checked and ruled out**: ASUC (Berkeley's student
+government) was the most plausible candidate for a real, published,
+attributable student-discount list. Checked directly — `asuc.org`'s
+homepage, every guessed discount-card URL, its full WordPress REST page
+listing (100+ pages), and a REST search for "discount"/"card" — none show
+a discount-card program currently published anywhere on the site. This is
+a confirmed absence, not an unchecked gap; revisit only if ASUC publishes
+one at a URL that can be found.
 
 Also used by `apps/web/src/lib/grocery-stores.ts` to find real coordinates
 for Target/Safeway/Berkeley Bowl/Trader Joe's near campus (matched by name
@@ -94,14 +141,33 @@ persisted via `apps/web/src/lib/preferences.ts`, and `/dashboard` uses
 whatever was entered instead of a hardcoded number. This isn't "mocked" —
 it's real user-provided data, same as budget or transportation.
 
-## Schedule
+## Schedule — LIVE once connected, otherwise an honest placeholder
 
-Not implemented. `scheduleScore` in the recommendation engine is a flat
-placeholder. Google Calendar integration was scoped for Phase 5 in the
-original handoff doc.
+`apps/web/src/lib/google-calendar.ts` calls Google's real Calendar
+FreeBusy API (`calendar.freebusy` scope) for the signed-in user's primary
+calendar, once they explicitly connect via `/login`'s "Connect Google
+Calendar" action (Google OAuth linked through Supabase — see
+`docs/architecture.md`'s Auth / persistence section). `scheduleScore` for
+each free-food event becomes a real overlap check against the user's own
+busy blocks (`scheduleScoreFromBusyIntervals()` — no LLM, no guessing:
+overlap = busy, no overlap = free) instead of a fabricated number.
+
+**Fallback**: no connection (the default — nobody is opted in until they
+click "Connect") or a FreeBusy fetch failure both leave `scheduleScore` at
+the same flat `0.7` placeholder this always used; `meta.schedule.source` in
+`buildRecommendations()`'s return value is `"live"`, `"placeholder"`, or
+`"unavailable"` (with the real error) so callers can tell which happened,
+same pattern as every other source in this file.
+
+**Requires**: `GOOGLE_CLIENT_ID`/`GOOGLE_CLIENT_SECRET` (the app's own
+OAuth client, used only to refresh expired access tokens — see
+`apps/web/.env.example`) plus a Google OAuth provider configured in the
+Supabase project dashboard with the `calendar.freebusy` scope allowed.
+Neither is configured in this repo's example env — this is wired and
+ready, not verified against a live Google Cloud project in this session.
 
 ## Auth / preference persistence
 
 See `docs/architecture.md`'s Auth / persistence section — `localStorage`
-works today; the Supabase read/write path is written and correct but not
-wired in, pending a login flow.
+still works for anyone not signed in; the Supabase read/write path is now
+wired into `/start` via `/login`'s magic-link flow for anyone who is.

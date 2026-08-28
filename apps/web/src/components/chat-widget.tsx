@@ -54,7 +54,7 @@ export function ChatWidget() {
         className="fixed right-4 bottom-4 z-50 shadow-lg"
         size="lg"
       >
-        Ask CampusSaver
+        Ask Yums
       </Button>
     )
   }
@@ -62,7 +62,7 @@ export function ChatWidget() {
   return (
     <Card className="fixed right-4 bottom-4 z-50 flex h-[28rem] w-80 flex-col shadow-xl">
       <CardHeader className="flex-row items-center justify-between space-y-0 py-3">
-        <CardTitle className="text-sm">CampusSaver Assistant</CardTitle>
+        <CardTitle className="text-sm">Yums Assistant</CardTitle>
         <button
           onClick={() => setOpen(false)}
           className="text-muted-foreground hover:text-foreground text-sm"

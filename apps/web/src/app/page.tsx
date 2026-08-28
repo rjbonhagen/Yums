@@ -67,7 +67,7 @@ export default async function HomePage() {
             The cheapest way to eat and live around campus
           </h1>
           <p className="text-muted-foreground mt-6 max-w-xl text-lg text-balance">
-            CampusSaver finds free food, nearby eats, and cheap groceries near you, and
+            Yums finds free food, nearby eats, and cheap groceries near you, and
             turns them into a plan built around your schedule and your budget.
           </p>
           <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
