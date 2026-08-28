@@ -3,6 +3,9 @@ import { Card, CardContent } from "@/components/ui/card"
 import { Nav } from "@/components/nav"
 import { buildRecommendations } from "@/lib/recommendations"
 import { optimizeGroceryList, cheapestSingleStorePlan } from "@/lib/grocery-optimizer"
+import { berkeleyLiveSource, ingestSource, type ExtractedFoodEvent } from "@campus/event-ingestion"
+
+export const dynamic = "force-dynamic"
 
 const DEFAULT_BASKET = ["Eggs", "Greek Yogurt", "Bananas", "Chicken", "Rice", "Oats"]
 
@@ -11,10 +14,20 @@ function formatTime(iso?: string) {
   return new Date(iso).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })
 }
 
-export default function FeedPage() {
+async function fetchLiveEvents(): Promise<{ events: ExtractedFoodEvent[]; error?: string }> {
+  try {
+    const events = await ingestSource(berkeleyLiveSource)
+    return { events }
+  } catch (err) {
+    return { events: [], error: err instanceof Error ? err.message : "fetch failed" }
+  }
+}
+
+export default async function FeedPage() {
   const recommendations = buildRecommendations({ maxTravelMinutes: 20 })
   const multiStore = optimizeGroceryList(DEFAULT_BASKET)
   const singleStore = cheapestSingleStorePlan(DEFAULT_BASKET)
+  const live = await fetchLiveEvents()
 
   const savingsFromSplitting =
     singleStore != null ? Math.max(0, singleStore.totalCost - multiStore.totalCost) : 0
@@ -74,6 +87,42 @@ export default function FeedPage() {
             </CardContent>
           </Card>
         ))}
+
+        <div className="pt-4">
+          <div className="mb-2 flex items-center gap-2">
+            <h2 className="text-lg font-semibold">Live from Berkeley&apos;s events calendar</h2>
+            <Badge variant="outline" className="border-green-300 bg-green-50 text-green-700 dark:border-green-900 dark:bg-green-950 dark:text-green-400">
+              Live
+            </Badge>
+          </div>
+          <p className="text-muted-foreground mb-3 text-xs">
+            Pulled just now from events.berkeley.edu&apos;s public calendar feed and filtered to titles that
+            mention food. Only titles/times are available from this feed, so these aren&apos;t scored or
+            ranked like the recommendations above.
+          </p>
+          {live.error && (
+            <p className="text-muted-foreground text-sm">Couldn&apos;t reach the live calendar right now ({live.error}).</p>
+          )}
+          {!live.error && live.events.length === 0 && (
+            <p className="text-muted-foreground text-sm">No food-related events found on today&apos;s calendar.</p>
+          )}
+          <div className="space-y-3">
+            {live.events.map((e, i) => (
+              <Card key={i}>
+                <CardContent className="py-4">
+                  <p className="font-medium">{e.title}</p>
+                  <p className="text-muted-foreground text-xs">
+                    {formatTime(e.startTime)}
+                    {e.food && ` · mentions: ${e.food}`}
+                  </p>
+                  <a href={e.sourceUrl} target="_blank" rel="noreferrer" className="text-xs underline underline-offset-4">
+                    Source
+                  </a>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        </div>
 
         <div id="basket" className="pt-4">
           <h2 className="mb-2 text-lg font-semibold">Your Basket</h2>

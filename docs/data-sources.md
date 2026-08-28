@@ -1,21 +1,39 @@
 # Data sources — live vs. mocked
 
-Nothing below is connected to a real external source yet. Everything the
-app shows comes from `apps/web/src/lib/mock-data.ts` and
+Most of the app runs on `apps/web/src/lib/mock-data.ts` and
 `services/event-ingestion/sources/berkeley-mock.ts`, both clearly marked
-MOCK in-file. This doc exists so nobody mistakes mock data for a working
-integration, and to track what a real integration needs to replace it.
+MOCK in-file. One source is now genuinely live — see below. This doc exists
+so nobody mistakes mock data for a working integration, and to track what a
+real integration needs to replace it.
 
 ## Free food events
 
-**Mocked**: 3 hand-written UC Berkeley events (ACM meeting, Haas speaker
-series, res hall social) in `berkeley-mock.ts` and duplicated in
-`mock-data.ts`.
+**Live (partial)**: `services/event-ingestion/sources/berkeley-live.ts`
+hits `events.berkeley.edu`'s public, unauthenticated JSON calendar feed
+(`/live/json/events/?days=1&pp=100`) at request time — real event titles,
+URLs, and start/end times for whatever's on Berkeley's calendar today.
+Exposed via `GET /api/events/live` and shown in a "Live from Berkeley's
+events calendar" section on `/feed`, kept separate from the main
+`/api/recommendations` demo so a slow/unreachable upstream never breaks it.
 
-**To go live**, implement a `CampusEventSource` (see
-`services/event-ingestion/types.ts`) per real source:
+**What's still missing**: the feed doesn't return description or location
+fields — every query-param combination tried (`fields[]=`, `fields=`, bare
+booleans) left `meta.response_fields` empty, so this adapter is honest
+about that gap rather than guessing at a venue or writing a fake
+description. That means these live events aren't distance-scored or ranked
+like the mock recommendations are (no lat/lng to work with), and food
+detection runs on the title alone, so it's lower-precision than the mocked
+events (which have full descriptions to key off of).
 
-- Berkeley campus events calendar (check for a public iCal/JSON feed first)
+**Still mocked**: the main `/dashboard` and `/api/recommendations` paths —
+3 hand-written UC Berkeley events (ACM meeting, Haas speaker series, res
+hall social) in `berkeley-mock.ts` / `mock-data.ts` — because they need
+lat/lng and organization data the live feed doesn't provide yet.
+
+**To fully go live**: either find the right param to unlock
+location/description on the existing feed, or add a second
+`CampusEventSource` per source:
+
 - ASUC club event portal
 - Department event pages (Haas, EECS, etc.)
 - Public Instagram posts — needs Meta Graph API access + business account

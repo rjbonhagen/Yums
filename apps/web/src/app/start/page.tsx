@@ -1,12 +1,13 @@
 "use client"
 
 import { useRouter } from "next/navigation"
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Nav } from "@/components/nav"
+import { loadLocalPreferences, saveLocalPreferences, type WeeklyPreferences } from "@/lib/preferences"
 
 const OPTIMIZE_OPTIONS = [
   { value: "cheapest", label: "Cheapest" },
@@ -25,11 +26,25 @@ const TRANSPORT_OPTIONS = [
 export default function StartPage() {
   const router = useRouter()
   const [budget, setBudget] = useState(60)
-  const [optimizeFor, setOptimizeFor] = useState<(typeof OPTIMIZE_OPTIONS)[number]["value"]>("cheapest")
+  const [optimizeFor, setOptimizeFor] = useState<WeeklyPreferences["optimizeFor"]>("cheapest")
   const [transportation, setTransportation] = useState<(typeof TRANSPORT_OPTIONS)[number]["value"]>("walking")
   const [maxTravelMinutes, setMaxTravelMinutes] = useState(20)
+  const [restored, setRestored] = useState(false)
+
+  useEffect(() => {
+    const saved = loadLocalPreferences()
+    if (saved) {
+      setBudget(saved.budget)
+      setOptimizeFor(saved.optimizeFor)
+      setTransportation(saved.transportation)
+      setMaxTravelMinutes(saved.maxTravelMinutes)
+      setRestored(true)
+    }
+  }, [])
 
   function buildMyWeek() {
+    const prefs = { budget, optimizeFor, transportation, maxTravelMinutes }
+    saveLocalPreferences(prefs)
     const params = new URLSearchParams({
       budget: String(budget),
       optimizeFor,
@@ -49,6 +64,9 @@ export default function StartPage() {
           <p className="text-muted-foreground text-sm">
             The cheapest way to live around campus.
           </p>
+          {restored && (
+            <p className="text-muted-foreground text-xs">Restored your last saved preferences.</p>
+          )}
         </CardHeader>
         <CardContent className="space-y-6">
           <div className="space-y-2">
