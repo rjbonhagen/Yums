@@ -1,4 +1,4 @@
-import { freeFoodEvents, studentDeals, mealPlanStatus, university } from "./mock-data"
+import { university } from "./mock-data"
 import { buildRecommendations } from "./recommendations"
 import { optimizeGroceryList } from "./grocery-optimizer"
 
@@ -7,25 +7,38 @@ function formatTime(iso: string): string {
 }
 
 /**
- * Deterministic assistant grounded in mock-data.ts. Answers pattern-matched
- * questions with real (mock) numbers instead of letting an LLM guess at
- * prices/times — matches the "don't use an LLM for deterministic facts"
- * rule the rest of the app follows. Swap for callOpenAI() below once a real
- * OPENAI_API_KEY and live data sources exist.
+ * Grounded in buildRecommendations() — the same live data (or documented
+ * fallback) the rest of the app uses — instead of letting an LLM guess at
+ * deterministic facts. Swap for callOpenAI() below once a real
+ * OPENAI_API_KEY exists and open-ended questions need handling.
  */
-export function answerDeterministically(message: string): string {
+export async function answerDeterministically(message: string): Promise<string> {
   const text = message.toLowerCase()
 
   if (/free ?food|free lunch|free dinner|free pizza|free\b/.test(text)) {
-    const lines = freeFoodEvents.map(
-      (e) => `- ${e.food ? `Free ${e.food}` : "Free food"} at ${e.organization} (${e.location.name}), ${formatTime(e.startTime)}`,
-    )
-    return `Here's what's free near ${university.name} today:\n${lines.join("\n")}`
+    const { recommendations, meta } = await buildRecommendations({ maxTravelMinutes: 30 })
+    const freeFood = recommendations.filter((r) => r.kind === "free_food")
+    if (freeFood.length === 0) {
+      return `No free food found on ${university.name}'s calendar right now.`
+    }
+    const lines = freeFood
+      .slice(0, 5)
+      .map((r) => `- ${r.title}${r.subtitle ? ` at ${r.subtitle}` : ""}${r.startTime ? `, ${formatTime(r.startTime)}` : ""}`)
+    const note = meta.freeFood.source === "mock-fallback" ? " (live calendar was unreachable, showing fallback)" : ""
+    return `Here's what's free near ${university.name} today${note}:\n${lines.join("\n")}`
   }
 
-  if (/deal|discount|coupon|bogo/.test(text)) {
-    const lines = studentDeals.map((d) => `- ${d.businessName}: ${d.description} (~$${d.estimatedSavings?.toFixed(2)} off)`)
-    return `Current student deals:\n${lines.join("\n")}`
+  if (/deal|discount|coupon|bogo|nearby eat|restaurant|cafe/.test(text)) {
+    const { recommendations, meta } = await buildRecommendations({ maxTravelMinutes: 30 })
+    const eats = recommendations.filter((r) => r.kind === "nearby_eats")
+    if (meta.nearbyEats.source === "unavailable") {
+      return "Couldn't reach OpenStreetMap for nearby places just now — try again in a bit."
+    }
+    if (eats.length === 0) {
+      return "No nearby eats found."
+    }
+    const lines = eats.slice(0, 5).map((e) => `- ${e.title}${e.distanceMinutes != null ? ` (${e.distanceMinutes} min away)` : ""}`)
+    return `Real cafes/restaurants near campus (no live discount data exists, so no savings claims here):\n${lines.join("\n")}`
   }
 
   if (/grocer|shopping|basket|cart/.test(text)) {
@@ -33,19 +46,21 @@ export function answerDeterministically(message: string): string {
     const stores = Object.entries(plan.itemsByStore)
       .map(([store, items]) => `${store} (${items.map((i) => i.name).join(", ")})`)
       .join("; ")
-    return `Cheapest basket I found: $${plan.totalCost.toFixed(2)} across ${plan.storeCount} store(s) — ${stores}. Full basket is on the Feed page.`
+    return `Cheapest basket from reference pricing: $${plan.totalCost.toFixed(2)} across ${plan.storeCount} store(s) — ${stores}. (Prices are a manually maintained reference, not live — no retailer publishes one.) Full basket is on the Feed page.`
   }
 
   if (/swipe|dining dollar|meal plan/.test(text)) {
-    return `You have ${mealPlanStatus.mealSwipesRemaining} meal swipes and $${mealPlanStatus.diningDollarsRemaining.toFixed(2)} in dining dollars, with ${mealPlanStatus.daysLeftInTerm} days left in the term.`
+    return "Meal plan pacing isn't something I can look up — this app has no access to your real dining account. Enter your swipes and dining dollars on the Build My Week form and pacing advice will show up on your dashboard."
   }
 
   if (/budget|spend|afford|save|savings/.test(text)) {
-    const top = buildRecommendations({ maxTravelMinutes: 20 })[0]
-    return `Set your budget on the Build My Week form and I'll build a full weekly plan. Right now the best opportunity near you is: ${top.title} (${top.subtitle}), ${top.distanceMinutes} min away.`
+    const { recommendations } = await buildRecommendations({ maxTravelMinutes: 20 })
+    const top = recommendations[0]
+    if (!top) return "Set your budget on the Build My Week form and I'll build a full weekly plan."
+    return `Set your budget on the Build My Week form and I'll build a full weekly plan. Right now the best opportunity I can see is: ${top.title}${top.subtitle ? ` (${top.subtitle})` : ""}${top.distanceMinutes != null ? `, ${top.distanceMinutes} min away` : ""}.`
   }
 
-  return "I can tell you about free food happening today, current student deals, cheapest groceries, or your meal plan / dining dollar balance — ask me about any of those."
+  return "I can tell you about free food happening today, nearby eats, cheapest groceries, or how to set up meal plan pacing — ask me about any of those."
 }
 
 /**

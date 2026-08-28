@@ -31,6 +31,7 @@ export const berkeleyLiveSource: CampusEventSource = {
       headers: { Accept: "application/json" },
       // Real calendar data changes throughout the day; don't cache stale results.
       cache: "no-store",
+      signal: AbortSignal.timeout(8000),
     })
 
     if (!res.ok) {

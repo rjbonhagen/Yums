@@ -95,15 +95,21 @@ export interface RecommendationWeights {
   confidenceWeight: number
 }
 
-export type RecommendationKind = "free_food" | "deal" | "grocery" | "dining"
+export type RecommendationKind = "free_food" | "nearby_eats" | "grocery" | "dining"
 
 export interface Recommendation {
   id: string
   kind: RecommendationKind
   title: string
   subtitle?: string
+  /** Only meaningful for kinds with a real savings figure (free_food). No
+   * live source exists for restaurant discount data, so nearby_eats never
+   * carries a fabricated number here — see docs/data-sources.md. */
   estimatedSavings: number
   distanceMinutes?: number
+  /** true when distanceMinutes is a haversine estimate rather than a
+   * routed value; undefined when distance couldn't be computed at all. */
+  distanceEstimated?: boolean
   startTime?: string
   sourceUrl?: string
   score: number

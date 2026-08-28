@@ -1,8 +1,7 @@
-// MOCK DATA — stands in for live campus event sources, business deal
-// feeds, and retailer prices until those integrations are built.
-// See docs/data-sources.md for what each source is meant to become.
+// FALLBACK DATA — used only where a live source doesn't exist or fails.
+// See docs/data-sources.md for exactly what's live vs. reference-only.
 
-import type { FreeFoodEvent, GroceryProduct, StudentDeal } from "@campus/shared"
+import type { FreeFoodEvent, GroceryProduct } from "@campus/shared"
 
 const today = new Date()
 function at(hour: number, minute = 0): string {
@@ -16,6 +15,11 @@ export const university = {
   slug: "berkeley",
 }
 
+/**
+ * Fallback only — recommendations.ts uses this when the live
+ * events.berkeley.edu fetch fails (network error, upstream down), not as
+ * the default path. See docs/data-sources.md.
+ */
 export const freeFoodEvents: FreeFoodEvent[] = [
   {
     id: "evt-1",
@@ -58,40 +62,13 @@ export const freeFoodEvents: FreeFoodEvent[] = [
   },
 ]
 
-export const studentDeals: StudentDeal[] = [
-  {
-    id: "deal-1",
-    businessName: "Local Poke Shop",
-    description: "40% off with student ID, dine-in only.",
-    discountType: "student",
-    estimatedSavings: 4.5,
-    latitude: 37.8683,
-    longitude: -122.2585,
-    expirationTime: at(20, 0),
-    sourceUrl: "https://example.com/poke-deal",
-  },
-  {
-    id: "deal-2",
-    businessName: "Burrito Corner",
-    description: "$5 student burrito deal, all day.",
-    discountType: "fixed",
-    estimatedSavings: 3.0,
-    latitude: 37.8676,
-    longitude: -122.2591,
-    sourceUrl: "https://example.com/burrito-deal",
-  },
-  {
-    id: "deal-3",
-    businessName: "Telegraph Grounds Cafe",
-    description: "BOGO coffee, 2-4 PM weekdays.",
-    discountType: "bogo",
-    estimatedSavings: 3.75,
-    latitude: 37.8671,
-    longitude: -122.2588,
-    sourceUrl: "https://example.com/cafe-deal",
-  },
-]
-
+/**
+ * Reference pricing — no public API exposes live retail prices for any of
+ * these chains (confirmed: none publish one). Store *locations* are real
+ * (fetched live from OpenStreetMap in grocery-stores.ts); these per-item
+ * prices are a manually maintained snapshot, not a live feed. See
+ * docs/data-sources.md.
+ */
 export const groceryProducts: GroceryProduct[] = [
   { id: "g-1", storeName: "Target", name: "Eggs (dozen)", price: 3.49, unit: "dozen" },
   { id: "g-2", storeName: "Target", name: "Greek Yogurt (32oz)", price: 4.99, unit: "32oz", proteinGrams: 90 },
@@ -106,9 +83,3 @@ export const groceryProducts: GroceryProduct[] = [
   { id: "g-11", storeName: "Trader Joe's", name: "Rice (5lb bag)", price: 4.99, unit: "5lb" },
   { id: "g-12", storeName: "Trader Joe's", name: "Rolled Oats (42oz)", price: 2.99, unit: "42oz" },
 ]
-
-export const mealPlanStatus = {
-  mealSwipesRemaining: 18,
-  diningDollarsRemaining: 326,
-  daysLeftInTerm: 22,
-}

@@ -4,47 +4,54 @@ import { Card, CardContent } from "@/components/ui/card"
 import { Nav } from "@/components/nav"
 import { buildRecommendations } from "@/lib/recommendations"
 
-const STATS = [
-  { value: "$24", label: "avg. weekly savings found" },
-  { value: "3", label: "free food events near you today" },
-  { value: "12 min", label: "typical walk to free food" },
-]
-
 const FEATURES = [
   {
     title: "Free Food Radar",
-    body: "Club meetings, speaker series, and campus events with food, ranked by how close they are to your next class.",
+    body: "Live from Berkeley's public events calendar — club meetings, speaker series, and campus events with food.",
   },
   {
-    title: "Local Student Deals",
-    body: "Student-ID discounts and happy-hour pricing at restaurants and cafes near campus, surfaced before they expire.",
+    title: "Nearby Eats",
+    body: "Real cafes and restaurants near campus from OpenStreetMap, ranked by distance. No live student-discount data exists yet, so this shows places, not fake deals.",
   },
   {
     title: "Grocery Optimizer",
-    body: "Compares prices across nearby stores and tells you when splitting a trip is actually worth the extra stop.",
+    body: "Compares a reference price catalog across nearby stores and tells you when splitting a trip is actually worth the extra stop.",
   },
   {
     title: "Meal Plan Pacing",
-    body: "Tracks swipes and dining dollars against days left in the term so nothing goes unused.",
+    body: "Enter your swipes and dining dollars and it flags whether you're on pace to leave any unused.",
   },
   {
-    title: "Schedule Awareness",
-    body: "Weighs opportunities against your class schedule — a 3-minute walk beats a 25-minute one, even if the food's the same.",
+    title: "Real Distances",
+    body: "Walking time is computed from actual coordinates, not a guess — routed live where possible, geometric distance otherwise.",
   },
   {
     title: "Save Money vs. Save Time",
-    body: "One slider tunes every recommendation toward the cheapest option or the fewest trips, your call.",
+    body: "Set a max travel time and every recommendation is ranked against it, your call.",
   },
 ]
 
 const STEPS = [
   { n: "01", title: "Tell it your week", body: "Budget, dietary needs, transportation, how far you'll walk." },
-  { n: "02", title: "It scans campus", body: "Free food events, local deals, dining hall value, and grocery prices near you." },
-  { n: "03", title: "You get a plan", body: "A day-by-day plan with exact costs, plus a ready-to-buy grocery basket." },
+  { n: "02", title: "It scans campus", body: "Live free food events, real nearby eateries, and reference grocery prices." },
+  { n: "03", title: "You get a plan", body: "A ranked feed of what's actually happening today, plus a ready-to-buy grocery basket." },
 ]
 
-export default function HomePage() {
-  const preview = buildRecommendations({ maxTravelMinutes: 20 }).slice(0, 3)
+export default async function HomePage() {
+  const { recommendations, meta } = await buildRecommendations({ maxTravelMinutes: 20 })
+  const preview = recommendations.slice(0, 3)
+  const freeFoodCount = recommendations.filter((r) => r.kind === "free_food").length
+  const eatsCount = recommendations.filter((r) => r.kind === "nearby_eats").length
+  const closest = recommendations.find((r) => r.distanceMinutes != null)
+
+  const stats = [
+    { value: String(freeFoodCount), label: "free food events on campus today" },
+    { value: String(eatsCount), label: "nearby eats found live" },
+    {
+      value: closest?.distanceMinutes != null ? `${closest.distanceMinutes} min` : "—",
+      label: "closest opportunity right now",
+    },
+  ]
 
   return (
     <div className="flex flex-1 flex-col">
@@ -60,7 +67,7 @@ export default function HomePage() {
             The cheapest way to eat and live around campus
           </h1>
           <p className="text-muted-foreground mt-6 max-w-xl text-lg text-balance">
-            CampusSaver finds free food, student deals, and cheap groceries near you, and
+            CampusSaver finds free food, nearby eats, and cheap groceries near you, and
             turns them into a plan built around your schedule and your budget.
           </p>
           <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
@@ -83,7 +90,7 @@ export default function HomePage() {
       {/* Stats */}
       <section className="border-b">
         <div className="mx-auto grid max-w-5xl grid-cols-1 divide-y sm:grid-cols-3 sm:divide-x sm:divide-y-0">
-          {STATS.map((stat) => (
+          {stats.map((stat) => (
             <div key={stat.label} className="flex flex-col items-center gap-1 px-6 py-10 text-center">
               <span className="text-4xl font-semibold">{stat.value}</span>
               <span className="text-muted-foreground text-sm">{stat.label}</span>
@@ -143,11 +150,13 @@ export default function HomePage() {
                 <div className="mb-2 flex items-start justify-between gap-2">
                   <p className="font-medium">{r.title}</p>
                   <Badge variant={r.kind === "free_food" ? "default" : "secondary"}>
-                    {r.kind === "free_food" ? "FREE" : `$${r.estimatedSavings.toFixed(2)} off`}
+                    {r.kind === "free_food" ? "FREE" : r.kind === "nearby_eats" ? "Nearby" : `$${r.estimatedSavings.toFixed(2)} off`}
                   </Badge>
                 </div>
-                <p className="text-muted-foreground text-sm">{r.subtitle}</p>
-                <p className="text-muted-foreground mt-1 text-xs">{r.distanceMinutes} min away</p>
+                {r.subtitle && <p className="text-muted-foreground text-sm">{r.subtitle}</p>}
+                <p className="text-muted-foreground mt-1 text-xs">
+                  {r.distanceMinutes != null ? `${r.distanceMinutes} min away` : "distance unknown"}
+                </p>
               </CardContent>
             </Card>
           ))}

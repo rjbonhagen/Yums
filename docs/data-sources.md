@@ -1,79 +1,107 @@
-# Data sources — live vs. mocked
+# Data sources — live vs. reference
 
-Most of the app runs on `apps/web/src/lib/mock-data.ts` and
-`services/event-ingestion/sources/berkeley-mock.ts`, both clearly marked
-MOCK in-file. One source is now genuinely live — see below. This doc exists
-so nobody mistakes mock data for a working integration, and to track what a
-real integration needs to replace it.
+## Free food events — LIVE
 
-## Free food events
+`services/event-ingestion/sources/berkeley-live.ts` hits
+`events.berkeley.edu`'s public, unauthenticated JSON calendar feed
+(`/live/json/events/?days=1&pp=100`) at request time. Real titles, URLs,
+and start/end times for whatever's on Berkeley's calendar today. Powers
+`/dashboard`, `/feed`, `/`, and the chatbot's free-food answers via
+`buildRecommendations()` in `apps/web/src/lib/recommendations.ts`.
 
-**Live (partial)**: `services/event-ingestion/sources/berkeley-live.ts`
-hits `events.berkeley.edu`'s public, unauthenticated JSON calendar feed
-(`/live/json/events/?days=1&pp=100`) at request time — real event titles,
-URLs, and start/end times for whatever's on Berkeley's calendar today.
-Exposed via `GET /api/events/live` and shown in a "Live from Berkeley's
-events calendar" section on `/feed`, kept separate from the main
-`/api/recommendations` demo so a slow/unreachable upstream never breaks it.
-
-**What's still missing**: the feed doesn't return description or location
+**What's missing**: the feed doesn't return description or location
 fields — every query-param combination tried (`fields[]=`, `fields=`, bare
-booleans) left `meta.response_fields` empty, so this adapter is honest
-about that gap rather than guessing at a venue or writing a fake
-description. That means these live events aren't distance-scored or ranked
-like the mock recommendations are (no lat/lng to work with), and food
-detection runs on the title alone, so it's lower-precision than the mocked
-events (which have full descriptions to key off of).
+booleans) left `meta.response_fields` empty, so live events show up with
+title/time only, no venue, and "distance unknown" rather than a guessed
+one. Food keyword matching runs on the title alone (lower-precision than a
+full description would give).
 
-**Still mocked**: the main `/dashboard` and `/api/recommendations` paths —
-3 hand-written UC Berkeley events (ACM meeting, Haas speaker series, res
-hall social) in `berkeley-mock.ts` / `mock-data.ts` — because they need
-lat/lng and organization data the live feed doesn't provide yet.
+**Fallback**: `apps/web/src/lib/mock-data.ts`'s `freeFoodEvents` — used
+only if the live fetch itself throws (network error, upstream down), never
+as the default. `buildRecommendations()`'s returned `meta.freeFood.source`
+tells the UI which one actually happened, and the UI shows a banner when
+it's the fallback.
 
-**To fully go live**: either find the right param to unlock
-location/description on the existing feed, or add a second
-`CampusEventSource` per source:
+## Nearby eats — LIVE (real businesses, no fabricated deals)
 
-- ASUC club event portal
-- Department event pages (Haas, EECS, etc.)
-- Public Instagram posts — needs Meta Graph API access + business account
-  scraping is fragile/ToS-risky; prefer official APIs where they exist
-- Discord announcements — only where a bot/API is authorized by the server
+`apps/web/src/lib/nearby-places.ts` queries OpenStreetMap's Overpass API
+(public, keyless) for real cafes/restaurants/fast-food within a bounding
+box around campus. This replaced a set of made-up business names ("Local
+Poke Shop", "Burrito Corner") the app used to show as fake "student
+deals." **No public source exists for real student-discount data** — none
+of the businesses near campus publish one — so rather than attach fake
+discount percentages to real places, this is shown honestly as "nearby
+eats" with no savings claim (see the `RecommendationKind` comment in
+`packages/shared/types.ts`).
 
-Each adapter returns `CampusEvent[]`; `extractDeterministic` (or
-`extractWithLLM` once implemented) tags food + confidence.
+Also used by `apps/web/src/lib/grocery-stores.ts` to find real coordinates
+for Target/Safeway/Berkeley Bowl/Trader Joe's near campus (matched by name
+against Overpass results), shown as a live "~N min walk" next to each
+store in the `/feed` basket.
 
-## Student deals
+**Known reliability caveat**: verified working end-to-end via `curl`
+against `overpass-api.de` — real business data confirmed (Caffé Strada,
+Royal Ground Coffee, Target, Safeway, Trader Joe's, Berkeley Bowl, all with
+real coordinates). During development, Node's `fetch` (and even the raw
+`https` module) on the dev machine used to build this intermittently
+couldn't reach `overpass-api.de` or its `overpass.kumi.systems` mirror
+(`fetch failed` / connection timeouts), while `curl.exe` on the same
+machine reached it reliably every time. That points to a TLS-fingerprint-
+or client-based block somewhere on that machine's network path — not a bug
+in this code, and not something fixable from application code. Two
+mirrors are tried with a 6s timeout each; if both fail,
+`meta.nearbyEats.source` is set to `"unavailable"` with the real error
+message, and the UI says so rather than showing fabricated data. On a
+normal deployment network this should just work — verify with `curl -X
+POST https://overpass-api.de/api/interpreter --data-urlencode
+'data=[out:json];node["amenity"="cafe"](37.86,-122.27,37.87,-122.25);out
+body 5;'`.
 
-**Mocked**: 3 hand-written deals in `mock-data.ts`.
+## Grocery prices — reference only, not live
 
-**To go live**: no adapter interface exists yet (unlike events). Needs the
-same `fetchDeals(): Promise<StudentDeal[]>` shape, likely sourced from
-manually curated business partnerships first (most local restaurants don't
-publish structured deal data) before any scraping is attempted.
+`apps/web/src/lib/mock-data.ts`'s `groceryProducts` — a manually
+maintained snapshot. **Confirmed no public API exists** for any of these
+chains (Target, Safeway, Berkeley Bowl, Trader Joe's) — this isn't a
+"haven't gotten to it yet," it's a real gap. Store *locations* are live
+(see above); per-item *prices* are not, and the UI/chatbot say so
+explicitly rather than implying otherwise.
 
-## Grocery prices
+**To go live**: either a manually updated price sheet on a schedule, a
+retailer partner API (Instacart/Kroger have one; none of these four
+chains do), or browser automation against store websites — fragile,
+higher maintenance, arguably better deferred to the agentic-checkout phase
+where automation is needed anyway.
 
-**Mocked**: 12 hand-written products across Target/Safeway/Berkeley
-Bowl/Trader Joe's in `mock-data.ts`.
+## Distance / routing — real geometry, real coordinates
 
-**To go live**: retailer APIs are the main blocker — most (Target, Safeway,
-Berkeley Bowl, Trader Joe's) don't offer public product/price APIs. Options, roughly in order
-of effort: manually maintained price sheet (fastest to ship, needs regular
-updates), Instacart/Kroger partner APIs where available, or browser
-automation (Playwright) against store websites — fragile and higher
-maintenance, save for the agentic-checkout phase where automation is
-needed anyway.
+`apps/web/src/lib/geo.ts`'s `haversineMinutes()` computes actual
+great-circle distance between real coordinates (replacing an earlier
+placeholder that multiplied an arbitrary lat/lng delta by a constant).
+`walkingMinutesBetween()` calls the public OSRM demo router
+(`router.project-osrm.org`, keyless) for real routed walking time,
+falling back to the haversine estimate if that's slow/unreachable —
+verified working via `curl`. Not wired into every recommendation (would
+mean one OSRM call per item); used where a small, bounded number of calls
+makes sense.
 
-## Maps / distance
+## Meal plan / dining dollars — user input, not a data source
 
-**Mocked**: `apps/web/src/lib/recommendations.ts` computes a rough
-"minutes away" from a lat/lng delta around a hardcoded campus center — not
-real routing. No Mapbox/Google Maps key is configured
-(`NEXT_PUBLIC_MAPBOX_TOKEN` in `.env.example` is unset).
+There's no public API for a student's own dining balance (and there
+couldn't reasonably be one without the student's real login — out of
+scope, and this app is not the place to collect campus SSO credentials).
+`/start` now asks for meal swipes / dining dollars / days left directly,
+persisted via `apps/web/src/lib/preferences.ts`, and `/dashboard` uses
+whatever was entered instead of a hardcoded number. This isn't "mocked" —
+it's real user-provided data, same as budget or transportation.
 
 ## Schedule
 
 Not implemented. `scheduleScore` in the recommendation engine is a flat
 placeholder. Google Calendar integration was scoped for Phase 5 in the
 original handoff doc.
+
+## Auth / preference persistence
+
+See `docs/architecture.md`'s Auth / persistence section — `localStorage`
+works today; the Supabase read/write path is written and correct but not
+wired in, pending a login flow.

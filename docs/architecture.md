@@ -12,24 +12,37 @@ packages/shared        Cross-package types + deterministic scoring math
 `apps/web` depends on `@campus/shared` and `@campus/event-ingestion` as npm
 workspace packages (see root `package.json`).
 
-## Data flow (current, mock-backed)
+## Data flow (live-first, documented fallbacks)
 
 ```
-apps/web/src/lib/mock-data.ts
-  -> apps/web/src/lib/recommendations.ts   (scores free food + deals)
-  -> apps/web/src/lib/grocery-optimizer.ts (cheapest basket across stores)
-  -> apps/web/src/app/api/recommendations/route.ts
-  -> /dashboard, /feed pages
+events.berkeley.edu (live)  ─┐
+                              ├─> apps/web/src/lib/recommendations.ts (async)
+OpenStreetMap Overpass (live)┘      scores + ranks free food + nearby eats
+                                     |
+apps/web/src/lib/mock-data.ts ──────┘ (freeFoodEvents: fallback only, on fetch failure)
+                                     |
+apps/web/src/lib/grocery-optimizer.ts (reference pricing, real store locations)
+                                     |
+apps/web/src/app/api/recommendations/route.ts
+                                     |
+                          /, /dashboard, /feed pages, chatbot
 ```
 
-`services/event-ingestion` now has two `CampusEventSource` adapters:
-`berkeleyMockSource` (hand-written) and `berkeleyLiveSource`, which really
-does hit `events.berkeley.edu`'s public JSON feed at request time. Both run
-through the same `extractDeterministic` food-tagging pass. The live source
-is wired into `GET /api/events/live` and shown on `/feed`, but not into
-`/api/recommendations` yet — the live feed has no lat/lng or organization
-data, so it can't be scored/ranked the same way (see `docs/data-sources.md`
-for exactly what's missing and why).
+`buildRecommendations()` is async and returns `{ recommendations, meta }`.
+`meta.freeFood.source` and `meta.nearbyEats.source` tell every caller
+(`/`, `/dashboard`, `/feed`, `/api/recommendations`, the chatbot) whether
+each piece is genuinely live right now or degraded, with the real error
+message attached — nothing silently pretends to be live when it isn't.
+
+`services/event-ingestion` has two `CampusEventSource` adapters:
+`berkeleyMockSource` (hand-written, fallback-only) and `berkeleyLiveSource`
+(hits `events.berkeley.edu`'s public JSON feed for real). Both run through
+`extractDeterministic`. `apps/web/src/lib/nearby-places.ts` hits
+OpenStreetMap's Overpass API for real cafes/restaurants/fast-food near
+campus — see `docs/data-sources.md` for exactly what's live vs. reference,
+including a known Overpass-reachability caveat on the dev machine this was
+built on (confirmed not a code bug — verified against the real API via
+`curl`).
 
 ## Scoring (deterministic, no LLM)
 
@@ -78,6 +91,11 @@ Preferences persistence exists at two levels today:
   `/start`'s submit handler to call `savePreferencesToSupabase` when signed
   in, falling back to `saveLocalPreferences` otherwise.
 
-`recommendations.ts` / `grocery-optimizer.ts` still read from
-`mock-data.ts` regardless — swapping those for Supabase queries is a
-separate step from preferences persistence.
+`grocery-optimizer.ts` still reads its price catalog from `mock-data.ts`
+(reference pricing, see `docs/data-sources.md`) — that's a data-source gap,
+not a persistence gap, and unaffected by Supabase wiring.
+
+Meal plan (swipes/dining dollars/days left) is collected directly from the
+user on `/start` and passed through to `/dashboard` via query params +
+`localStorage`, same pattern as the rest of the preferences — there's no
+external source to fetch this from (see `docs/data-sources.md`).

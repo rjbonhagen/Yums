@@ -11,6 +11,6 @@ export async function POST(request: Request) {
 
   // Deterministic responder only for now — see apps/web/src/lib/chatbot.ts
   // for the answerWithLLM() stub that takes over once OPENAI_API_KEY is set.
-  const reply = answerDeterministically(message)
+  const reply = await answerDeterministically(message)
   return NextResponse.json({ reply })
 }

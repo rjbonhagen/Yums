@@ -1,10 +1,17 @@
 import type { SupabaseClient } from "@supabase/supabase-js"
 
+export interface MealPlanInput {
+  mealSwipesRemaining: number
+  diningDollarsRemaining: number
+  daysLeftInTerm: number
+}
+
 export interface WeeklyPreferences {
   budget: number
   optimizeFor: "cheapest" | "healthy" | "high_protein" | "fast" | "custom"
   transportation: "walking" | "bike" | "car" | "transit"
   maxTravelMinutes: number
+  mealPlan?: MealPlanInput
 }
 
 const STORAGE_KEY = "campussaver.preferences"
@@ -74,4 +81,22 @@ export async function loadPreferencesFromSupabase(
     maxTravelMinutes: data.max_travel_minutes,
     optimizeFor: data.optimize_for,
   }
+}
+
+/** Matches packages/database/schema.sql's meal_plans table. Same
+ * not-wired-in-yet status as the functions above — needs an authenticated
+ * session. */
+export async function saveMealPlanToSupabase(
+  supabase: SupabaseClient,
+  userId: string,
+  mealPlan: MealPlanInput,
+): Promise<void> {
+  const { error } = await supabase.from("meal_plans").upsert({
+    user_id: userId,
+    meal_swipes_remaining: mealPlan.mealSwipesRemaining,
+    dining_dollars_remaining: mealPlan.diningDollarsRemaining,
+    days_left_in_term: mealPlan.daysLeftInTerm,
+    updated_at: new Date().toISOString(),
+  })
+  if (error) throw error
 }
