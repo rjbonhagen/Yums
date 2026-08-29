@@ -44,7 +44,6 @@ export async function answerDeterministically(message: string): Promise<string> 
     return `Real cafes/restaurants near campus (no live discount data exists, so no savings claims here):\n${lines.join("\n")}`
   }
 
-
   if (/budget|spend|afford|save|savings/.test(text)) {
     const { recommendations } = await buildRecommendations({ maxTravelMinutes: 20 })
     const top = recommendations[0]
@@ -55,12 +54,71 @@ export async function answerDeterministically(message: string): Promise<string> 
   return "I can tell you about free food happening today or nearby eats — ask me about either of those."
 }
 
+export function isOpenAIConfigured(): boolean {
+  return Boolean(process.env.OPENAI_API_KEY)
+}
+
+const OPENAI_CHAT_URL = "https://api.openai.com/v1/chat/completions"
+const MODEL = "gpt-4o-mini"
+
+export interface ChatMessage {
+  role: "user" | "assistant"
+  content: string
+}
+
 /**
- * NOT WIRED UP. Real LLM path for open-ended natural-language questions
- * (e.g. "feed me for a week for $50" from the original spec) once
- * OPENAI_API_KEY is configured. Left as a stub — see
- * services/event-ingestion/extract.ts for the same pattern.
+ * Real LLM path for open-ended natural-language questions (e.g. "feed me
+ * for a week for $50" from the original spec), once OPENAI_API_KEY is
+ * configured — see /api/chat/route.ts for the fallback-on-failure wiring.
+ * Grounded in the same live buildRecommendations() data
+ * answerDeterministically() uses: the system prompt hands the model
+ * today's real free food/nearby eats and explicitly instructs it to
+ * answer only from that, never invent events, businesses, or discounts —
+ * same no-fabrication standard as the rest of this app, just enforced via
+ * the prompt instead of a keyword match.
  */
-export async function answerWithLLM(_message: string, _history: { role: string; content: string }[]): Promise<string> {
-  throw new Error("answerWithLLM is not implemented yet — set OPENAI_API_KEY and see apps/web/src/lib/chatbot.ts")
+export async function answerWithLLM(message: string, history: ChatMessage[] = []): Promise<string> {
+  const apiKey = process.env.OPENAI_API_KEY
+  if (!apiKey) throw new Error("OPENAI_API_KEY is not configured")
+
+  const { recommendations } = await buildRecommendations({ maxTravelMinutes: 20 })
+  const freeFood = recommendations.filter((r) => r.kind === "free_food").slice(0, 8)
+  const nearbyEats = recommendations.filter((r) => r.kind === "nearby_eats").slice(0, 8)
+
+  const context = [
+    `Free food events today at ${university.name} (this is the complete real list — do not invent more):`,
+    ...(freeFood.length > 0
+      ? freeFood.map(
+          (r) => `- ${r.title}${r.subtitle ? ` at ${r.subtitle}` : ""}${r.startTime ? `, ${formatTime(r.startTime)}` : ""}`,
+        )
+      : ["(none found right now)"]),
+    "",
+    "Real nearby cafes/restaurants (no discount data exists for any of these — never state a savings amount for them):",
+    ...(nearbyEats.length > 0
+      ? nearbyEats.map((r) => `- ${r.title}${r.distanceMinutes != null ? ` (${r.distanceMinutes} min away)` : ""}`)
+      : ["(none found right now)"]),
+  ].join("\n")
+
+  const systemPrompt = `You are Yums, a budget/food assistant for ${university.name} students. Answer ONLY using the real data below — never invent free food events, businesses, discounts, or prices that aren't listed. If asked about something this data doesn't cover (a specific dish, a discount percentage, a dining-account balance, etc.), say plainly that you don't have that information rather than guessing. Keep answers short and concrete.\n\n${context}`
+
+  const res = await fetch(OPENAI_CHAT_URL, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      model: MODEL,
+      messages: [{ role: "system", content: systemPrompt }, ...history, { role: "user", content: message }],
+      temperature: 0.3,
+    }),
+    signal: AbortSignal.timeout(15000),
+  })
+
+  if (!res.ok) throw new Error(`OpenAI chat completion returned ${res.status}`)
+
+  const body = (await res.json()) as { choices?: { message?: { content?: string } }[] }
+  const reply = body.choices?.[0]?.message?.content?.trim()
+  if (!reply) throw new Error("OpenAI returned an empty response")
+  return reply
 }

@@ -27,8 +27,11 @@ why for each.
       savings claim, replacing what used to be fake "student deals."
 - [x] Weekly recommendations feed (`/feed`), ranked by the scoring formula
 - [x] Dashboard with today's free food + weekly budget projection (`/dashboard`)
-- [x] Floating chatbot assistant, deterministic answers grounded in the
-      same live data (or documented fallback) as the rest of the app
+- [x] Floating chatbot assistant. Real LLM path (OpenAI, grounded in the
+      same live `buildRecommendations()` data, instructed never to
+      invent facts) once `OPENAI_API_KEY` is set; deterministic
+      keyword-matched answers otherwise or on any LLM failure — see
+      `docs/architecture.md`'s "AI responsibilities" section.
 - [x] Real distance/walking-time math from actual coordinates (haversine
       geometry + optional OSRM routing), replacing an earlier placeholder
       formula

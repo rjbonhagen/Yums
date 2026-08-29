@@ -33,7 +33,10 @@ export function ChatWidget() {
       const res = await fetch("/api/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message: trimmed }),
+        // Sends prior turns so a real LLM (once OPENAI_API_KEY is set, see
+        // /api/chat/route.ts) has conversational context; the deterministic
+        // fallback ignores it.
+        body: JSON.stringify({ message: trimmed, history: messages }),
       })
       const data = await res.json()
       setMessages((prev) => [

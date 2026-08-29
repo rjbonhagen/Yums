@@ -100,9 +100,20 @@ Never use an LLM for: price comparisons, distance math, budget arithmetic,
 the recommendation score itself — all of that is plain TypeScript in
 `packages/shared` and `apps/web/src/lib`.
 
-No LLM calls are wired up yet (no `OPENAI_API_KEY` handling exists). The
-`extractWithLLM` stub in `services/event-ingestion/extract.ts` is the
-intended integration point.
+**Chat**: wired. `apps/web/src/lib/chatbot.ts`'s `answerWithLLM()` calls
+OpenAI's chat completions API directly (raw `fetch`, no SDK — same
+pattern as every other external integration in this app) once
+`OPENAI_API_KEY` is set. Its system prompt hands the model the same live
+`buildRecommendations()` data `answerDeterministically()` uses and
+explicitly instructs it to answer only from that, never invent events or
+prices — the no-fabrication rule enforced via the prompt instead of a
+keyword match. `/api/chat/route.ts` tries the LLM path first when
+configured and falls back to `answerDeterministically()` on any failure
+(bad/expired key, rate limit, outage) so a chat request never hard-fails.
+
+**Extraction**: still a stub. The `extractWithLLM` function in
+`services/event-ingestion/extract.ts` is the intended integration point
+for extracting food info from event descriptions, not yet implemented.
 
 ## Auth / persistence
 

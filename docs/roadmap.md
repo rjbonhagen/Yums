@@ -11,59 +11,59 @@ based on reading the current code, not a guess — see the file references.
   schedule-awareness (`/login`)
 - Live data: free food events (events.berkeley.edu + Cal Link), real
   nearby eateries (OpenStreetMap) — see `docs/data-sources.md`
-- Deterministic scoring/ranking feed (`/feed`), dashboard (`/dashboard`)
+- Scoring/ranking feed (`/feed`), dashboard (`/dashboard`)
 - Map view (Mapbox), real distance/walking-time math
-- Deterministic chatbot grounded in the same live data
-- Test coverage for scoring, geo, and event-mapping logic (43 tests)
+- Chatbot: LLM-first (OpenAI, grounded in live data) with a
+  deterministic fallback
+- Test coverage for scoring, geo, event-mapping, and formatting logic
 
-## Phase 1 — Fix what's broken or misleading
+## Phase 1 — Fix what's broken or misleading (done)
 
 Nothing new here — just making the existing surface honest and complete
 before building on top of it.
 
-1. **Event dates are missing where they matter.** Berkeley's calendar
-   feed only returns today's events (`?days=1`,
-   `services/event-ingestion/sources/berkeley-live.ts:13`), but Cal Link
-   has no upper bound (`callink-live.ts:53-58`) and can return events
-   days or weeks out. Both `formatTime()` implementations
-   (`recommendations-view.tsx:9`, `dashboard/page.tsx:14`) render only
-   the time — a club event next Tuesday shows identically to one
-   tonight. Fix: show the date whenever an event isn't today.
-2. **Dietary preferences are advertised but don't exist.** The homepage
-   says "Tell it your week: Budget, dietary needs, transportation..."
-   (`page.tsx:27`), but there's no dietary-preference field anywhere in
-   `/start`, and `preferenceScore` — the scoring input dietary fit would
-   feed into — is a hardcoded flat `0.6`/`0.5` in both places it's used
-   (`recommendations.ts:187,217`), never computed from real data.
-   Either build the field + real scoring, or stop claiming it.
-3. **No empty state on `/feed`.** If every live source fails or returns
-   nothing, the List tab silently renders blank
-   (`recommendations-view.tsx:61-65`) — no "nothing found right now"
-   message. Dashboard already handles this correctly for free food
-   (`dashboard/page.tsx:58-60`); feed doesn't.
-4. **Dead code cleanup.** `/api/recommendations` and `/api/events/live`
-   are unused by any client code — `/feed`/`/dashboard` call
-   `buildRecommendations()` directly. One route's comment falsely claims
-   `/api/recommendations` "stays on mock data" (it doesn't).
-   `answerWithLLM` (`chatbot.ts`) is fully unreferenced dead code, not
-   just "not wired yet."
-5. **`/login` is unreachable from nav** when Supabase isn't configured
-   (`AuthStatus` returns `null` in that state) — only affects an
-   unconfigured deployment, not the current one, but worth a fallback
-   link.
+1. [x] **Event dates were missing where they matter.** Berkeley's
+   calendar feed only returns today's events, but Cal Link has no upper
+   bound and can return events days/weeks out — a club event next
+   Tuesday showed identically to one tonight. Fixed:
+   `lib/format.ts`'s `formatEventDateTime()` now shows the date whenever
+   an event isn't today, used by `recommendations-view.tsx` and
+   `dashboard/page.tsx`.
+2. [x] **Dietary preferences were advertised but didn't exist.** The
+   homepage claimed "budget, dietary needs, transportation..." with no
+   backing field or real scoring anywhere. Removed the false claim
+   rather than build fake matching against free-text event descriptions
+   / sparse OSM tags — consistent with this app's no-fabrication
+   standard rather than a compromise of it.
+3. [x] **No empty state on `/feed`.** Fixed — the list view now shows
+   "Nothing found right now" (zero results) or "Nothing matches your
+   filter/search" (filtered to zero) instead of rendering blank.
+4. [x] **Dead code / misleading comments cleaned up.**
+   `/api/events/live/route.ts`'s comment falsely claiming
+   `/api/recommendations` "stays on mock data" is fixed; both routes are
+   kept as a documented public JSON API surface (not deleted — they're
+   correct, just unused by the current web UI).
+5. [x] **`/login` is now reachable from nav** even when Supabase isn't
+   configured — `AuthStatus` still renders the "Sign in" link in that
+   state instead of returning `null`.
 
-## Phase 2 — Round out the core experience
+## Phase 2 — Round out the core experience (done)
 
-6. **Filter/search on `/feed`.** Currently one undifferentiated ranked
-   list (List/Map toggle only) — add a free-food-only / nearby-eats-only
-   filter, and keyword search.
-7. **Component-level test coverage.** All 43 existing tests cover
-   scoring/geo/mapping logic in `lib/`; zero tests exercise the actual
-   React components or pages.
-8. **Real LLM chat path**, once `OPENAI_API_KEY` is configured — replace
-   or augment `answerDeterministically()`'s keyword matching with actual
-   open-ended question handling (the original spec's "feed me for a week
-   for $50" case), while keeping deterministic answers as the fallback.
+6. [x] **Filter/search on `/feed`.** `RecommendationsView` now has an
+   All/Free food/Nearby eats filter plus keyword search over
+   title/subtitle, computed client-side over the already-fetched
+   recommendations.
+7. [x] **Component-level test coverage.** Added
+   `@testing-library/react` + jsdom; `RecommendationsView` and
+   `AuthStatus` now have real component tests (filter/search/empty
+   states, all three auth-config states).
+8. [x] **Real LLM chat path.** `answerWithLLM()` in `chatbot.ts` calls
+   OpenAI directly once `OPENAI_API_KEY` is set, grounded in the same
+   live `buildRecommendations()` data and instructed never to invent
+   facts; `/api/chat/route.ts` falls back to the deterministic path on
+   any failure. Not yet verified against a live OpenAI key in this
+   session (none is configured) — code path and fallback are tested,
+   the actual API call is not.
 
 ## Phase 3 — New capabilities
 
@@ -82,18 +82,23 @@ before building on top of it.
 ## Phase 4 — Beyond a single-campus demo
 
 Only worth pursuing if this outgrows "student project for one campus."
+Deliberately not started — see reasoning below.
 
 13. **Multi-campus support** — `/start` already has a disabled
     "University: UC Berkeley — More campuses coming soon" field
-    (`start/page.tsx:174-177`); the schema (`universities` table) already
+    (`start/page.tsx:150-152`); the schema (`universities` table) already
     supports it, nothing else does yet.
 14. **Deployment/CI, error monitoring** — not worth the overhead while
     this stays a local/dev project.
 
-## Suggested near-term order
+## Status
 
-Phase 1 items are all small, concrete, and prevent the app from
-misleading a user (fake feature claim, wrong-looking dates, silent blank
-states) — worth clearing before Phase 2/3 adds anything new on top of a
-shaky foundation. Within Phase 1, start with #1 (dates) since it's
-already confirmed and scoped.
+Phases 0–2 are complete and verified (tests passing, changes checked
+live in the browser). Phase 3 items are each a real feature build (new
+DB tables, new UI flows) rather than a bugfix — tackle them one at a
+time based on which is actually wanted next, rather than building all
+four speculatively. Phase 4 is intentionally not started: both items
+are explicitly conditional on the project outgrowing a single-campus
+student demo, which hasn't happened, and multi-campus support in
+particular would require real per-campus event/place sources to be
+worth anything (no fabricated "coming soon" campuses).
