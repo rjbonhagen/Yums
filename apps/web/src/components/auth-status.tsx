@@ -32,18 +32,22 @@ export function AuthStatus() {
   }
 
   return (
-    <button
-      type="button"
-      className="text-muted-foreground hover:text-foreground"
-      onClick={async () => {
-        const supabase = createClient()
-        await supabase.auth.signOut()
-        router.push("/")
-        router.refresh()
-      }}
-      title={`Signed in as ${email}`}
-    >
-      Sign out
-    </button>
+    <div className="flex items-center gap-3">
+      <Link href="/login" className="text-muted-foreground hover:text-foreground" title={`Signed in as ${email}`}>
+        Account
+      </Link>
+      <button
+        type="button"
+        className="text-muted-foreground hover:text-foreground"
+        onClick={async () => {
+          const supabase = createClient()
+          await supabase.auth.signOut()
+          router.push("/")
+          router.refresh()
+        }}
+      >
+        Sign out
+      </button>
+    </div>
   )
 }

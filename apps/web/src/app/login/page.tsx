@@ -19,13 +19,13 @@ export default function LoginPage() {
   const [status, setStatus] = useState<"idle" | "sending" | "sent" | "error">("idle")
   const [error, setError] = useState<string | null>(null)
   const [calendarError, setCalendarError] = useState<string | null>(null)
-  const [signedIn, setSignedIn] = useState(false)
+  const [signedInEmail, setSignedInEmail] = useState<string | null>(null)
 
   useEffect(() => {
     if (!isSupabaseConfigured()) return
     createClient()
       .auth.getUser()
-      .then(({ data: { user } }) => setSignedIn(Boolean(user)))
+      .then(({ data: { user } }) => setSignedInEmail(user?.email ?? null))
   }, [])
 
   async function sendMagicLink() {
@@ -86,6 +86,10 @@ export default function LoginPage() {
                 Sign-in isn&apos;t configured on this deployment (no Supabase project connected) — your
                 preferences will keep saving to this browser only. See apps/web/.env.example.
               </p>
+            ) : signedInEmail ? (
+              <p className="text-sm">
+                Signed in as <span className="font-medium">{signedInEmail}</span>.
+              </p>
             ) : status === "sent" ? (
               <p className="text-sm">
                 Check <span className="font-medium">{email}</span> for a sign-in link.
@@ -111,7 +115,7 @@ export default function LoginPage() {
           </CardContent>
         </Card>
 
-        {isSupabaseConfigured() && signedIn && (
+        {isSupabaseConfigured() && signedInEmail && (
           <Card className="mt-4 w-full max-w-md">
             <CardHeader>
               <CardTitle className="text-lg">Schedule awareness</CardTitle>

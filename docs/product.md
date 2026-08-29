@@ -48,8 +48,10 @@ why for each.
       verified against a live Google Cloud OAuth project in this session.
 - [x] Auth — magic-link sign-in (`/login`, `/auth/callback`); `/start`
       switches to real Supabase-backed preference persistence for anyone
-      signed in, `localStorage` otherwise. Wired but not verified against a
-      live Supabase project in this session (none is configured).
+      signed in, `localStorage` otherwise. Verified end-to-end against the
+      live Supabase project: a confirmed `auth.users` row exists with the
+      `handle_new_auth_user` trigger correctly mirroring it into
+      `public.users` and `public.user_preferences`.
 - [ ] Agentic checkout (out of MVP scope per the original spec)
 - [ ] Real student-discount data for nearby businesses — confirmed no live
       source exists (ASUC's site has no discount-card page at any URL
