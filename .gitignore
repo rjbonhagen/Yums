@@ -4,3 +4,7 @@ node_modules/
 .env.local
 *.log
 .DS_Store
+
+# Mirrored third-party skill docs (regenerable via skills-lock.json)
+.agents/skills/
+.claude/skills/
