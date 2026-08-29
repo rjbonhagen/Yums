@@ -12,7 +12,7 @@ interface ChatMessage {
 
 const GREETING: ChatMessage = {
   role: "assistant",
-  content: "Ask me what's free today, what's cheap on groceries, or how your meal plan is pacing.",
+  content: "Ask me what's free today, what's nearby, or about Grubhub+ Student.",
 }
 
 export function ChatWidget() {

@@ -14,12 +14,8 @@ const FEATURES = [
     body: "Real cafes and restaurants near campus from OpenStreetMap, ranked by distance. No live student-discount data exists yet, so this shows places, not fake deals.",
   },
   {
-    title: "Grocery Optimizer",
-    body: "Compares a reference price catalog across nearby stores and tells you when splitting a trip is actually worth the extra stop.",
-  },
-  {
-    title: "Meal Plan Pacing",
-    body: "Enter your swipes and dining dollars and it flags whether you're on pace to leave any unused.",
+    title: "Grubhub+ Student",
+    body: "UC Berkeley's real Grubhub Campus Dining partnership — link your Cal ID for free Grubhub+ (no delivery fee, lower service fees) at restaurants on and off campus.",
   },
   {
     title: "Real Distances",
@@ -33,8 +29,8 @@ const FEATURES = [
 
 const STEPS = [
   { n: "01", title: "Tell it your week", body: "Budget, dietary needs, transportation, how far you'll walk." },
-  { n: "02", title: "It scans campus", body: "Live free food events, real nearby eateries, and reference grocery prices." },
-  { n: "03", title: "You get a plan", body: "A ranked feed of what's actually happening today, plus a ready-to-buy grocery basket." },
+  { n: "02", title: "It scans campus", body: "Live free food events and real nearby eateries, ranked by distance." },
+  { n: "03", title: "You get a plan", body: "A ranked feed of what's actually happening today, near you, right now." },
 ]
 
 export default async function HomePage() {
@@ -67,8 +63,8 @@ export default async function HomePage() {
             The cheapest way to eat and live around campus
           </h1>
           <p className="text-muted-foreground mt-6 max-w-xl text-lg text-balance">
-            Yums finds free food, nearby eats, and cheap groceries near you, and
-            turns them into a plan built around your schedule and your budget.
+            Yums finds free food and nearby eats near you, and turns them into a plan built around your
+            schedule and your budget.
           </p>
           <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
             <Link

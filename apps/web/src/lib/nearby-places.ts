@@ -21,7 +21,7 @@ async function fetchFromOverpass(url: string, query: string): Promise<OverpassRe
     },
     body: `data=${encodeURIComponent(query)}`,
     // cache:'force-cache' is required for this specific fetch (not just the
-    // outer unstable_cache in recommendations.ts/grocery-stores.ts) —
+    // outer unstable_cache in recommendations.ts) —
     // empirically, a POST request without its own explicit opt-in stayed
     // uncached even inside unstable_cache whenever the calling route was
     // dynamically rendered (searchParams/cookies() elsewhere in the same

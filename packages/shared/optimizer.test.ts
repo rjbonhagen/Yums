@@ -63,10 +63,9 @@ describe("totalCost", () => {
       travelMinutes: 20,
       inconveniencePenalty: 1,
       discountValue: 3,
-      mealPlanValue: 0,
       freeFoodValue: 0,
     })
-    // 10 + 2 + (0.1*20=2) + 1 - 3 - 0 - 0 = 12
+    // 10 + 2 + (0.1*20=2) + 1 - 3 - 0 = 12
     expect(cost).toBeCloseTo(12, 10)
   })
 
@@ -78,7 +77,6 @@ describe("totalCost", () => {
       travelMinutes: 0,
       inconveniencePenalty: 0,
       discountValue: 0,
-      mealPlanValue: 0,
       freeFoodValue: 8,
     })
     expect(cost).toBeCloseTo(-3, 10)

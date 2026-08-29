@@ -1,6 +1,5 @@
 import { university } from "./mock-data"
 import { buildRecommendations } from "./recommendations"
-import { optimizeGroceryList } from "./grocery-optimizer"
 
 function formatTime(iso: string): string {
   return new Date(iso).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })
@@ -45,16 +44,8 @@ export async function answerDeterministically(message: string): Promise<string> 
     return `Real cafes/restaurants near campus (no live discount data exists, so no savings claims here):\n${lines.join("\n")}`
   }
 
-  if (/grocer|shopping|basket|cart/.test(text)) {
-    const plan = optimizeGroceryList(["Eggs", "Greek Yogurt", "Bananas", "Chicken", "Rice", "Oats"])
-    const stores = Object.entries(plan.itemsByStore)
-      .map(([store, items]) => `${store} (${items.map((i) => i.name).join(", ")})`)
-      .join("; ")
-    return `Cheapest basket from reference pricing: $${plan.totalCost.toFixed(2)} across ${plan.storeCount} store(s) — ${stores}. (Prices are a manually maintained reference, not live — no retailer publishes one.) Full basket is on the Feed page.`
-  }
-
-  if (/swipe|dining dollar|meal plan/.test(text)) {
-    return "Meal plan pacing isn't something I can look up — this app has no access to your real dining account. Enter your swipes and dining dollars on the Build My Week form and pacing advice will show up on your dashboard."
+  if (/grubhub/.test(text)) {
+    return "UC Berkeley has a real Grubhub Campus Dining partnership — link your Cal ID in the Grubhub app for free Grubhub+ (no delivery fee on $18+ orders, lower service fees, 5% credit back on pickup) at restaurants on and off campus. See the Feed page for the link."
   }
 
   if (/budget|spend|afford|save|savings/.test(text)) {
@@ -64,7 +55,7 @@ export async function answerDeterministically(message: string): Promise<string> 
     return `Set your budget on the Build My Week form and I'll build a full weekly plan. Right now the best opportunity I can see is: ${top.title}${top.subtitle ? ` (${top.subtitle})` : ""}${top.distanceMinutes != null ? `, ${top.distanceMinutes} min away` : ""}.`
   }
 
-  return "I can tell you about free food happening today, nearby eats, cheapest groceries, or how to set up meal plan pacing — ask me about any of those."
+  return "I can tell you about free food happening today, nearby eats, or Grubhub+ Student — ask me about any of those."
 }
 
 /**

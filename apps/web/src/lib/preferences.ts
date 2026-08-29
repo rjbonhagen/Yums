@@ -1,17 +1,10 @@
 import type { SupabaseClient } from "@supabase/supabase-js"
 
-export interface MealPlanInput {
-  mealSwipesRemaining: number
-  diningDollarsRemaining: number
-  daysLeftInTerm: number
-}
-
 export interface WeeklyPreferences {
   budget: number
   optimizeFor: "cheapest" | "healthy" | "high_protein" | "fast" | "custom"
   transportation: "walking" | "bike" | "car" | "transit"
   maxTravelMinutes: number
-  mealPlan?: MealPlanInput
 }
 
 const STORAGE_KEY = "yums.preferences"
@@ -65,54 +58,19 @@ export async function loadPreferencesFromSupabase(
   supabase: SupabaseClient,
   userId: string,
 ): Promise<WeeklyPreferences | null> {
-  const [prefsResult, mealPlanResult] = await Promise.all([
-    supabase
-      .from("user_preferences")
-      .select("weekly_budget, transportation, max_travel_minutes, optimize_for")
-      .eq("user_id", userId)
-      .maybeSingle(),
-    supabase
-      .from("meal_plans")
-      .select("meal_swipes_remaining, dining_dollars_remaining, days_left_in_term")
-      .eq("user_id", userId)
-      .maybeSingle(),
-  ])
+  const { data, error } = await supabase
+    .from("user_preferences")
+    .select("weekly_budget, transportation, max_travel_minutes, optimize_for")
+    .eq("user_id", userId)
+    .maybeSingle()
 
-  if (prefsResult.error) throw prefsResult.error
-  if (!prefsResult.data) return null
-
-  const mealPlanRow = mealPlanResult.error ? null : mealPlanResult.data
-  const mealPlan: MealPlanInput | undefined = mealPlanRow
-    ? {
-        mealSwipesRemaining: mealPlanRow.meal_swipes_remaining,
-        diningDollarsRemaining: mealPlanRow.dining_dollars_remaining,
-        daysLeftInTerm: mealPlanRow.days_left_in_term,
-      }
-    : undefined
+  if (error) throw error
+  if (!data) return null
 
   return {
-    budget: prefsResult.data.weekly_budget,
-    transportation: prefsResult.data.transportation,
-    maxTravelMinutes: prefsResult.data.max_travel_minutes,
-    optimizeFor: prefsResult.data.optimize_for,
-    mealPlan,
+    budget: data.weekly_budget,
+    transportation: data.transportation,
+    maxTravelMinutes: data.max_travel_minutes,
+    optimizeFor: data.optimize_for,
   }
-}
-
-/** Matches packages/database/schema.sql's meal_plans table. Called
- * alongside savePreferencesToSupabase from /start for a signed-in
- * session. */
-export async function saveMealPlanToSupabase(
-  supabase: SupabaseClient,
-  userId: string,
-  mealPlan: MealPlanInput,
-): Promise<void> {
-  const { error } = await supabase.from("meal_plans").upsert({
-    user_id: userId,
-    meal_swipes_remaining: mealPlan.mealSwipesRemaining,
-    dining_dollars_remaining: mealPlan.diningDollarsRemaining,
-    days_left_in_term: mealPlan.daysLeftInTerm,
-    updated_at: new Date().toISOString(),
-  })
-  if (error) throw error
 }

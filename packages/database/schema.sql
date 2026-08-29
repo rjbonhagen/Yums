@@ -21,7 +21,7 @@ create table users (
 
 -- Mirrors every new Supabase auth user (magic-link sign-in, see
 -- apps/web/src/app/login) into public.users, so the FK on
--- user_preferences/meal_plans/recommendations has a row to point at
+-- user_preferences/recommendations has a row to point at
 -- immediately after signup — without this, the first
 -- savePreferencesToSupabase() call for a brand-new user fails the FK
 -- constraint. security definer is required because auth.users insert
@@ -107,56 +107,6 @@ create table deals (
   created_at timestamptz not null default now()
 );
 
-create table stores (
-  id uuid primary key default uuid_generate_v4(),
-  name text not null,
-  chain text,
-  latitude double precision,
-  longitude double precision,
-  created_at timestamptz not null default now()
-);
-
-create table products (
-  id uuid primary key default uuid_generate_v4(),
-  store_id uuid references stores (id),
-  name text not null,
-  unit text,
-  protein_grams numeric(6, 2),
-  calories numeric(6, 2),
-  created_at timestamptz not null default now()
-);
-
-create table product_prices (
-  id uuid primary key default uuid_generate_v4(),
-  product_id uuid references products (id),
-  price numeric(10, 2) not null,
-  unit_price numeric(10, 2),
-  observed_at timestamptz not null default now()
-);
-
-create table grocery_lists (
-  id uuid primary key default uuid_generate_v4(),
-  user_id uuid references users (id) on delete cascade,
-  name text not null default 'This week',
-  created_at timestamptz not null default now()
-);
-
-create table grocery_list_items (
-  id uuid primary key default uuid_generate_v4(),
-  grocery_list_id uuid references grocery_lists (id) on delete cascade,
-  product_id uuid references products (id),
-  quantity numeric(6, 2) not null default 1,
-  created_at timestamptz not null default now()
-);
-
-create table meal_plans (
-  user_id uuid primary key references users (id) on delete cascade,
-  meal_swipes_remaining int not null default 0,
-  dining_dollars_remaining numeric(10, 2) not null default 0,
-  days_left_in_term int not null default 0,
-  updated_at timestamptz not null default now()
-);
-
 -- Google Calendar connection for real schedule-awareness (replaces the
 -- flat scheduleScore placeholder in packages/shared/optimizer.ts). Tokens
 -- come from Supabase's Google OAuth provider (see /login and
@@ -179,7 +129,7 @@ create table recommendations (
   -- (that TS type is the source of truth — this table isn't written to by
   -- any app code yet, see docs/product.md's roadmap).
   kind text not null check (kind in ('free_food', 'nearby_eats', 'grocery', 'dining')),
-  ref_id uuid, -- points at events.id / deals.id / grocery_lists.id depending on kind
+  ref_id uuid, -- points at events.id / deals.id depending on kind
   title text not null,
   subtitle text,
   estimated_savings numeric(10, 2) not null default 0,
@@ -190,30 +140,15 @@ create table recommendations (
   created_at timestamptz not null default now()
 );
 
--- Row Level Security: users only see their own preferences/lists/plans/recs.
+-- Row Level Security: users only see their own preferences/recs.
 alter table users enable row level security;
 alter table user_preferences enable row level security;
-alter table grocery_lists enable row level security;
-alter table grocery_list_items enable row level security;
-alter table meal_plans enable row level security;
 alter table recommendations enable row level security;
 alter table calendar_connections enable row level security;
 
 create policy "users manage own row" on users
   for all using (auth.uid() = id);
 create policy "users manage own preferences" on user_preferences
-  for all using (auth.uid() = user_id);
-create policy "users manage own grocery lists" on grocery_lists
-  for all using (auth.uid() = user_id);
-create policy "users manage own grocery list items" on grocery_list_items
-  for all using (
-    exists (
-      select 1 from grocery_lists
-      where grocery_lists.id = grocery_list_items.grocery_list_id
-        and grocery_lists.user_id = auth.uid()
-    )
-  );
-create policy "users manage own meal plan" on meal_plans
   for all using (auth.uid() = user_id);
 create policy "users manage own recommendations" on recommendations
   for all using (auth.uid() = user_id);

@@ -52,17 +52,6 @@ export interface StudentDeal {
   sourceUrl?: string
 }
 
-export interface GroceryProduct {
-  id: string
-  storeName: string
-  name: string
-  price: number
-  unit?: string
-  unitPrice?: number
-  proteinGrams?: number
-  calories?: number
-}
-
 export interface UserPreferences {
   universitySlug: string
   weeklyBudget: number
@@ -71,12 +60,6 @@ export interface UserPreferences {
   maxTravelMinutes: number
   optimizeFor: "cheapest" | "healthy" | "high_protein" | "fast" | "custom"
   saveMoneyVsTime: number // 0 (save money) - 1 (save time)
-}
-
-export interface MealPlanStatus {
-  mealSwipesRemaining: number
-  diningDollarsRemaining: number
-  daysLeftInTerm: number
 }
 
 export interface RecommendationScoreInput {

@@ -21,20 +21,11 @@ export default async function DashboardPage(props: PageProps<"/dashboard">) {
   const budget = Number(searchParams.budget ?? 60)
   const maxTravelMinutes = Number(searchParams.maxTravelMinutes ?? 20)
 
-  const mealSwipesRemaining = searchParams.mealSwipes != null ? Number(searchParams.mealSwipes) : null
-  const diningDollarsRemaining = searchParams.diningDollars != null ? Number(searchParams.diningDollars) : null
-  const daysLeftInTerm = searchParams.daysLeft != null ? Number(searchParams.daysLeft) : null
-  const hasMealPlanInput = mealSwipesRemaining != null && diningDollarsRemaining != null && daysLeftInTerm != null
-
   const calendarAccessToken = await getConnectedCalendarAccessToken()
   const { recommendations, meta } = await buildRecommendations({ maxTravelMinutes, calendarAccessToken: calendarAccessToken ?? undefined })
   const freeFood = recommendations.filter((r) => r.kind === "free_food")
   const projectedSpend = Math.max(0, budget - recommendations.reduce((sum, r) => sum + r.estimatedSavings, 0) * 0.4)
   const projectedSavings = Math.max(0, budget - projectedSpend)
-
-  const projectedDiningDollarsUnused = hasMealPlanInput
-    ? Math.max(0, diningDollarsRemaining! - daysLeftInTerm! * 12)
-    : 0
 
   return (
     <div className="flex flex-1 flex-col">
@@ -103,38 +94,6 @@ export default async function DashboardPage(props: PageProps<"/dashboard">) {
                 <p className="text-muted-foreground text-xs">Projected savings</p>
                 <p className="text-xl font-semibold text-green-600">${projectedSavings.toFixed(2)}</p>
               </div>
-            </CardContent>
-          </Card>
-        </section>
-
-        <section>
-          <Card>
-            <CardHeader>
-              <CardTitle>Meal Plan</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-2 text-sm">
-              {hasMealPlanInput ? (
-                <>
-                  <p>{mealSwipesRemaining} meal swipes remaining</p>
-                  <p>${diningDollarsRemaining!.toFixed(2)} dining dollars remaining</p>
-                  <p>{daysLeftInTerm} days left in the term</p>
-                  {projectedDiningDollarsUnused > 0 && (
-                    <p className="text-amber-600">
-                      You&apos;re on pace to leave ~${projectedDiningDollarsUnused.toFixed(0)} of dining dollars
-                      unused. Use dining dollars for a few lunches this week instead of buying groceries.
-                    </p>
-                  )}
-                </>
-              ) : (
-                <p className="text-muted-foreground">
-                  Enter your meal swipes and dining dollars on the{" "}
-                  <Link href="/start" className="underline underline-offset-4">
-                    Build My Week
-                  </Link>{" "}
-                  form to see pacing here — this app has no way to look up your real balance, that has to
-                  come from you.
-                </p>
-              )}
             </CardContent>
           </Card>
         </section>

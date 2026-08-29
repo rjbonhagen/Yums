@@ -12,7 +12,6 @@ import {
   loadPreferencesFromSupabase,
   saveLocalPreferences,
   savePreferencesToSupabase,
-  saveMealPlanToSupabase,
   type WeeklyPreferences,
 } from "@/lib/preferences"
 import { createClient, isSupabaseConfigured } from "@/lib/supabase/client"
@@ -37,9 +36,6 @@ export default function StartPage() {
   const [optimizeFor, setOptimizeFor] = useState<WeeklyPreferences["optimizeFor"]>("cheapest")
   const [transportation, setTransportation] = useState<(typeof TRANSPORT_OPTIONS)[number]["value"]>("walking")
   const [maxTravelMinutes, setMaxTravelMinutes] = useState(20)
-  const [mealSwipes, setMealSwipes] = useState("")
-  const [diningDollars, setDiningDollars] = useState("")
-  const [daysLeft, setDaysLeft] = useState("")
   const [restored, setRestored] = useState(false)
   const [userId, setUserId] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
@@ -50,11 +46,6 @@ export default function StartPage() {
       setOptimizeFor(saved.optimizeFor)
       setTransportation(saved.transportation)
       setMaxTravelMinutes(saved.maxTravelMinutes)
-      if (saved.mealPlan) {
-        setMealSwipes(String(saved.mealPlan.mealSwipesRemaining))
-        setDiningDollars(String(saved.mealPlan.diningDollarsRemaining))
-        setDaysLeft(String(saved.mealPlan.daysLeftInTerm))
-      }
       setRestored(true)
     }
 
@@ -85,23 +76,13 @@ export default function StartPage() {
   }, [])
 
   async function buildMyWeek() {
-    const hasMealPlan = mealSwipes !== "" && diningDollars !== "" && daysLeft !== ""
-    const mealPlan = hasMealPlan
-      ? {
-          mealSwipesRemaining: Number(mealSwipes),
-          diningDollarsRemaining: Number(diningDollars),
-          daysLeftInTerm: Number(daysLeft),
-        }
-      : undefined
-
-    const prefs: WeeklyPreferences = { budget, optimizeFor, transportation, maxTravelMinutes, mealPlan }
+    const prefs: WeeklyPreferences = { budget, optimizeFor, transportation, maxTravelMinutes }
 
     if (userId && isSupabaseConfigured()) {
       setSaving(true)
       try {
         const supabase = createClient()
         await savePreferencesToSupabase(supabase, userId, prefs)
-        if (mealPlan) await saveMealPlanToSupabase(supabase, userId, mealPlan)
       } catch {
         // Real Supabase write failed (network, RLS, etc.) — still fall back
         // to localStorage below so the user's input isn't lost.
@@ -119,11 +100,6 @@ export default function StartPage() {
       transportation,
       maxTravelMinutes: String(maxTravelMinutes),
     })
-    if (mealPlan) {
-      params.set("mealSwipes", String(mealPlan.mealSwipesRemaining))
-      params.set("diningDollars", String(mealPlan.diningDollarsRemaining))
-      params.set("daysLeft", String(mealPlan.daysLeftInTerm))
-    }
     router.push(`/dashboard?${params.toString()}`)
   }
 
@@ -201,52 +177,6 @@ export default function StartPage() {
               value={maxTravelMinutes}
               onChange={(e) => setMaxTravelMinutes(Number(e.target.value))}
             />
-          </div>
-
-          <div className="space-y-2 border-t pt-4">
-            <Label>Meal plan (optional)</Label>
-            <p className="text-muted-foreground text-xs">
-              We can&apos;t look this up for you — enter it from your dining account if you want pacing
-              advice on the dashboard.
-            </p>
-            <div className="grid grid-cols-3 gap-2">
-              <div>
-                <Label htmlFor="mealSwipes" className="text-xs font-normal">
-                  Swipes left
-                </Label>
-                <Input
-                  id="mealSwipes"
-                  type="number"
-                  min={0}
-                  value={mealSwipes}
-                  onChange={(e) => setMealSwipes(e.target.value)}
-                />
-              </div>
-              <div>
-                <Label htmlFor="diningDollars" className="text-xs font-normal">
-                  Dining $
-                </Label>
-                <Input
-                  id="diningDollars"
-                  type="number"
-                  min={0}
-                  value={diningDollars}
-                  onChange={(e) => setDiningDollars(e.target.value)}
-                />
-              </div>
-              <div>
-                <Label htmlFor="daysLeft" className="text-xs font-normal">
-                  Days left
-                </Label>
-                <Input
-                  id="daysLeft"
-                  type="number"
-                  min={0}
-                  value={daysLeft}
-                  onChange={(e) => setDaysLeft(e.target.value)}
-                />
-              </div>
-            </div>
           </div>
 
           <Button className="w-full" size="lg" onClick={buildMyWeek} disabled={saving}>

@@ -81,11 +81,6 @@ a discount-card program currently published anywhere on the site. This is
 a confirmed absence, not an unchecked gap; revisit only if ASUC publishes
 one at a URL that can be found.
 
-Also used by `apps/web/src/lib/grocery-stores.ts` to find real coordinates
-for Target/Safeway/Berkeley Bowl/Trader Joe's near campus (matched by name
-against Overpass results), shown as a live "~N min walk" next to each
-store in the `/feed` basket.
-
 **Known reliability caveat**: verified working end-to-end via `curl`
 against `overpass-api.de` — real business data confirmed (Caffé Strada,
 Royal Ground Coffee, Target, Safeway, Trader Joe's, Berkeley Bowl, all with
@@ -104,20 +99,26 @@ POST https://overpass-api.de/api/interpreter --data-urlencode
 'data=[out:json];node["amenity"="cafe"](37.86,-122.27,37.87,-122.25);out
 body 5;'`.
 
-## Grocery prices — reference only, not live
+## Grubhub+ Student — real program, not a live discount feed
 
-`apps/web/src/lib/mock-data.ts`'s `groceryProducts` — a manually
-maintained snapshot. **Confirmed no public API exists** for any of these
-chains (Target, Safeway, Berkeley Bowl, Trader Joe's) — this isn't a
-"haven't gotten to it yet," it's a real gap. Store *locations* are live
-(see above); per-item *prices* are not, and the UI/chatbot say so
-explicitly rather than implying otherwise.
+**No public API exists for GrubHub restaurant discounts.** GrubHub's only
+public-facing APIs are partner/merchant tools (Partner Integration API,
+Hydra data feed) requiring business credentials — there's no
+unauthenticated endpoint for "current promotions near this location."
+Third-party scraping services exist but scraping GrubHub violates its
+ToS, the same reason this app already rules out scraping Instagram for
+free-food posts (see the Free food events section above) — not used
+here either, regardless of project scope.
 
-**To go live**: either a manually updated price sheet on a schedule, a
-retailer partner API (Instacart/Kroger have one; none of these four
-chains do), or browser automation against store websites — fragile,
-higher maintenance, arguably better deferred to the agentic-checkout phase
-where automation is needed anyway.
+What *is* real and verifiable: **Grubhub+ Student** via UC Berkeley's own
+Grubhub Campus Dining partnership — confirmed at
+`dining.berkeley.edu/locations/grubhub/`. Students link their Cal ID in
+the Grubhub app to get Grubhub+ free (no delivery fee on $18+ orders,
+lower service fees, 5% credit back on pickup), and can use flex
+dollars/meal swipes as equivalency at participating campus locations.
+This is shown as an honest link to Berkeley's own page (`/feed`), not a
+fabricated list of "today's Grubhub deals" — same standard as every
+other source in this file.
 
 ## Distance / routing — real geometry, real coordinates
 
@@ -130,16 +131,6 @@ falling back to the haversine estimate if that's slow/unreachable —
 verified working via `curl`. Not wired into every recommendation (would
 mean one OSRM call per item); used where a small, bounded number of calls
 makes sense.
-
-## Meal plan / dining dollars — user input, not a data source
-
-There's no public API for a student's own dining balance (and there
-couldn't reasonably be one without the student's real login — out of
-scope, and this app is not the place to collect campus SSO credentials).
-`/start` now asks for meal swipes / dining dollars / days left directly,
-persisted via `apps/web/src/lib/preferences.ts`, and `/dashboard` uses
-whatever was entered instead of a hardcoded number. This isn't "mocked" —
-it's real user-provided data, same as budget or transportation.
 
 ## Schedule — LIVE once connected, otherwise an honest placeholder
 

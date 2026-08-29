@@ -21,8 +21,6 @@ OpenStreetMap Overpass (live)─┘      scores + ranks free food + nearby eats
                                      |
 apps/web/src/lib/mock-data.ts ──────┘ (freeFoodEvents: fallback only, on Berkeley-calendar fetch failure)
                                      |
-apps/web/src/lib/grocery-optimizer.ts (reference pricing, real store locations)
-                                     |
 apps/web/src/app/api/recommendations/route.ts
                                      |
                           /, /dashboard, /feed pages, chatbot
@@ -59,8 +57,8 @@ fetches went from ~65ms (cached) to 2-6s (live, every request) the moment
 any Request-time API was read anywhere in the same render, regardless of
 `cache: 'force-cache'` on the fetch itself.
 
-The fix, used throughout `apps/web/src/lib/recommendations.ts` and
-`grocery-stores.ts`: wrap each live source in `unstable_cache` (Next's
+The fix, used throughout `apps/web/src/lib/recommendations.ts`: wrap
+each live source in `unstable_cache` (Next's
 documented mechanism for persisting a function's result across requests
 independent of whether the calling route is dynamically rendered), defined
 once at module scope, not per-call. This alone was sufficient for the two
@@ -96,8 +94,7 @@ events pre-connection) otherwise.
 ## AI responsibilities (per the original spec)
 
 Use an LLM for: parsing natural-language budget/preference requests,
-extracting food info from event descriptions, generating meal plans,
-explaining recommendations, product substitution reasoning.
+extracting food info from event descriptions, explaining recommendations.
 
 Never use an LLM for: price comparisons, distance math, budget arithmetic,
 the recommendation score itself — all of that is plain TypeScript in
@@ -131,20 +128,11 @@ Preferences persistence now has two levels, chosen automatically:
   `saveLocalPreferences`/`loadLocalPreferences` write to `localStorage`.
   `/start` saves on submit and restores on load.
 - **Signed in**: the same file's `savePreferencesToSupabase` /
-  `loadPreferencesFromSupabase` write/read the real `user_preferences` (and
-  `meal_plans`) tables via the session's user id — `/start` calls these
-  automatically once `/login` has produced a session, falling back to
+  `loadPreferencesFromSupabase` write/read the real `user_preferences`
+  table via the session's user id — `/start` calls these automatically
+  once `/login` has produced a session, falling back to
   `saveLocalPreferences` if the Supabase write itself fails so input is
   never silently lost.
-
-`grocery-optimizer.ts` still reads its price catalog from `mock-data.ts`
-(reference pricing, see `docs/data-sources.md`) — that's a data-source gap,
-not a persistence gap, and unaffected by Supabase wiring.
-
-Meal plan (swipes/dining dollars/days left) is collected directly from the
-user on `/start` and passed through to `/dashboard` via query params, plus
-`localStorage` or Supabase depending on session state — there's no
-external source to fetch this from (see `docs/data-sources.md`).
 
 ## Schedule awareness (Google Calendar)
 

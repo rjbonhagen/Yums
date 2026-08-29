@@ -25,7 +25,7 @@ export function scoreOpportunity(
 }
 
 // TOTAL COST = purchase cost + transportation cost + time cost
-//              + inconvenience penalty - discount value - meal-plan value - free-food value
+//              + inconvenience penalty - discount value - free-food value
 export interface TotalCostInput {
   purchaseCost: number
   transportationCost: number
@@ -33,7 +33,6 @@ export interface TotalCostInput {
   travelMinutes: number
   inconveniencePenalty: number
   discountValue: number
-  mealPlanValue: number
   freeFoodValue: number
 }
 
@@ -45,7 +44,6 @@ export function totalCost(input: TotalCostInput): number {
     timeCost +
     input.inconveniencePenalty -
     input.discountValue -
-    input.mealPlanValue -
     input.freeFoodValue
   )
 }
