@@ -14,10 +14,6 @@ const FEATURES = [
     body: "Real cafes and restaurants near campus from OpenStreetMap, ranked by distance. No live student-discount data exists yet, so this shows places, not fake deals.",
   },
   {
-    title: "Grubhub+ Student",
-    body: "UC Berkeley's real Grubhub Campus Dining partnership — link your Cal ID for free Grubhub+ (no delivery fee, lower service fees) at restaurants on and off campus.",
-  },
-  {
     title: "Real Distances",
     body: "Walking time is computed from actual coordinates, not a guess — routed live where possible, geometric distance otherwise.",
   },

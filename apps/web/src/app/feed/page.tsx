@@ -1,5 +1,4 @@
 import Link from "next/link"
-import { Card, CardContent } from "@/components/ui/card"
 import { Nav } from "@/components/nav"
 import { RecommendationsView } from "@/components/recommendations-view"
 import { buildRecommendations } from "@/lib/recommendations"
@@ -63,26 +62,6 @@ export default async function FeedPage() {
             schedule score instead.
           </p>
         )}
-
-        <Card>
-          <CardContent className="space-y-1 py-4">
-            <p className="font-medium">Grubhub+ Student</p>
-            <p className="text-muted-foreground text-sm">
-              UC Berkeley has a real Grubhub Campus Dining partnership — link your Cal ID in the Grubhub app
-              to get Grubhub+ free (no delivery fee on $18+ orders, lower service fees, 5% credit back on
-              pickup) at restaurants on and off campus, plus use flex dollars/meal swipes at participating
-              campus locations.
-            </p>
-            <a
-              href="https://dining.berkeley.edu/locations/grubhub/"
-              target="_blank"
-              rel="noreferrer"
-              className="text-primary text-sm underline underline-offset-4"
-            >
-              Berkeley Dining's Grubhub page →
-            </a>
-          </CardContent>
-        </Card>
 
         <RecommendationsView recommendations={recommendations} />
       </main>

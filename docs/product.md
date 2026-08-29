@@ -3,9 +3,9 @@
 AI savings agent for college students — answers "what's the cheapest and
 easiest way for me to find free food and eat cheap around campus this
 week?" Scope is deliberately narrow: free food events and real nearby
-eateries/restaurants (plus the real Grubhub+ Student program). No
-grocery shopping, no meal-plan/dining-dollars tracking — cut from V1 to
-keep the app focused on eateries and restaurants specifically.
+eateries/restaurants. No grocery shopping, no meal-plan/dining-dollars
+tracking — cut from V1 to keep the app focused on eateries and
+restaurants specifically.
 
 Full spec lives in the original handoff doc; this file tracks what's
 actually built vs. planned. See `docs/architecture.md` for how it's built
@@ -25,10 +25,6 @@ why for each.
       OpenStreetMap. No live source exists anywhere for student-discount
       data, so this intentionally shows real places with no fabricated
       savings claim, replacing what used to be fake "student deals."
-- [x] Grubhub+ Student — UC Berkeley's real Grubhub Campus Dining
-      partnership, shown as an honest link to Berkeley Dining's own page,
-      not a fabricated per-restaurant discount feed (GrubHub has no public
-      discount API — see `docs/data-sources.md`).
 - [x] Weekly recommendations feed (`/feed`), ranked by the scoring formula
 - [x] Dashboard with today's free food + weekly budget projection (`/dashboard`)
 - [x] Floating chatbot assistant, deterministic answers grounded in the
@@ -45,8 +41,10 @@ why for each.
       as every other optional integration in this app.
 - [x] Schedule awareness — real Google Calendar FreeBusy check once a user
       connects via `/login`; flat placeholder otherwise (see
-      `docs/architecture.md`'s "Schedule awareness" section). Wired but not
-      verified against a live Google Cloud OAuth project in this session.
+      `docs/architecture.md`'s "Schedule awareness" section). Verified
+      end-to-end this session: `calendar_connections` holds a real
+      access/refresh token pair and `/feed` correctly shows the "live"
+      ranking notice.
 - [x] Auth — magic-link sign-in (`/login`, `/auth/callback`); `/start`
       switches to real Supabase-backed preference persistence for anyone
       signed in, `localStorage` otherwise. Verified end-to-end against the

@@ -44,9 +44,6 @@ export async function answerDeterministically(message: string): Promise<string> 
     return `Real cafes/restaurants near campus (no live discount data exists, so no savings claims here):\n${lines.join("\n")}`
   }
 
-  if (/grubhub/.test(text)) {
-    return "UC Berkeley has a real Grubhub Campus Dining partnership — link your Cal ID in the Grubhub app for free Grubhub+ (no delivery fee on $18+ orders, lower service fees, 5% credit back on pickup) at restaurants on and off campus. See the Feed page for the link."
-  }
 
   if (/budget|spend|afford|save|savings/.test(text)) {
     const { recommendations } = await buildRecommendations({ maxTravelMinutes: 20 })
@@ -55,7 +52,7 @@ export async function answerDeterministically(message: string): Promise<string> 
     return `Set your budget on the Build My Week form and I'll build a full weekly plan. Right now the best opportunity I can see is: ${top.title}${top.subtitle ? ` (${top.subtitle})` : ""}${top.distanceMinutes != null ? `, ${top.distanceMinutes} min away` : ""}.`
   }
 
-  return "I can tell you about free food happening today, nearby eats, or Grubhub+ Student — ask me about any of those."
+  return "I can tell you about free food happening today or nearby eats — ask me about either of those."
 }
 
 /**

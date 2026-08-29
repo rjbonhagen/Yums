@@ -99,27 +99,6 @@ POST https://overpass-api.de/api/interpreter --data-urlencode
 'data=[out:json];node["amenity"="cafe"](37.86,-122.27,37.87,-122.25);out
 body 5;'`.
 
-## Grubhub+ Student — real program, not a live discount feed
-
-**No public API exists for GrubHub restaurant discounts.** GrubHub's only
-public-facing APIs are partner/merchant tools (Partner Integration API,
-Hydra data feed) requiring business credentials — there's no
-unauthenticated endpoint for "current promotions near this location."
-Third-party scraping services exist but scraping GrubHub violates its
-ToS, the same reason this app already rules out scraping Instagram for
-free-food posts (see the Free food events section above) — not used
-here either, regardless of project scope.
-
-What *is* real and verifiable: **Grubhub+ Student** via UC Berkeley's own
-Grubhub Campus Dining partnership — confirmed at
-`dining.berkeley.edu/locations/grubhub/`. Students link their Cal ID in
-the Grubhub app to get Grubhub+ free (no delivery fee on $18+ orders,
-lower service fees, 5% credit back on pickup), and can use flex
-dollars/meal swipes as equivalency at participating campus locations.
-This is shown as an honest link to Berkeley's own page (`/feed`), not a
-fabricated list of "today's Grubhub deals" — same standard as every
-other source in this file.
-
 ## Distance / routing — real geometry, real coordinates
 
 `apps/web/src/lib/geo.ts`'s `haversineMinutes()` computes actual
