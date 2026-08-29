@@ -5,16 +5,12 @@ import { Nav } from "@/components/nav"
 import { buildRecommendations } from "@/lib/recommendations"
 import { getConnectedCalendarAccessToken } from "@/lib/google-calendar"
 import { university } from "@/lib/mock-data"
+import { formatEventDateTime } from "@/lib/format"
 
 // No force-dynamic: see the same note in api/recommendations/route.ts —
 // this page already renders per-request (searchParams + cookies() via
 // getConnectedCalendarAccessToken), so removing it only stops the
 // per-source fetch caching from being silently overridden to no-store.
-
-function formatTime(iso?: string) {
-  if (!iso) return ""
-  return new Date(iso).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })
-}
 
 export default async function DashboardPage(props: PageProps<"/dashboard">) {
   const searchParams = await props.searchParams
@@ -65,7 +61,7 @@ export default async function DashboardPage(props: PageProps<"/dashboard">) {
                     <p className="font-medium">{r.title}</p>
                     <p className="text-muted-foreground text-sm">{r.subtitle}</p>
                     <p className="text-muted-foreground text-xs">
-                      {formatTime(r.startTime)}
+                      {formatEventDateTime(r.startTime)}
                       {r.distanceMinutes != null ? ` · ${r.distanceMinutes} min away` : " · distance unknown"}
                     </p>
                   </div>

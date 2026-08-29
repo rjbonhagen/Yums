@@ -5,8 +5,10 @@ import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { createClient, isSupabaseConfigured } from "@/lib/supabase/client"
 
-/** Sign-in/sign-out control for Nav — only renders once Supabase is
- * configured, since there's no auth to show otherwise (see /login). */
+/** Sign-in/sign-out control for Nav. Still links to /login when Supabase
+ * isn't configured — that page shows its own honest "not configured"
+ * message rather than a broken form, so hiding the link entirely would
+ * just make /login unreachable without a reason. */
 export function AuthStatus() {
   const router = useRouter()
   const [email, setEmail] = useState<string | null | undefined>(undefined)
@@ -21,7 +23,15 @@ export function AuthStatus() {
     return () => subscription.unsubscribe()
   }, [])
 
-  if (!isSupabaseConfigured() || email === undefined) return null
+  if (!isSupabaseConfigured()) {
+    return (
+      <Link href="/login" className="text-muted-foreground hover:text-foreground">
+        Sign in
+      </Link>
+    )
+  }
+
+  if (email === undefined) return null
 
   if (!email) {
     return (

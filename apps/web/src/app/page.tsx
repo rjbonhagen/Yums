@@ -24,7 +24,7 @@ const FEATURES = [
 ]
 
 const STEPS = [
-  { n: "01", title: "Tell it your week", body: "Budget, dietary needs, transportation, how far you'll walk." },
+  { n: "01", title: "Tell it your week", body: "Budget, transportation, how far you'll walk." },
   { n: "02", title: "It scans campus", body: "Live free food events and real nearby eateries, ranked by distance." },
   { n: "03", title: "You get a plan", body: "A ranked feed of what's actually happening today, near you, right now." },
 ]
