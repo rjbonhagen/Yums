@@ -9,9 +9,10 @@ import { Nav } from "@/components/nav"
 import { createClient, isSupabaseConfigured } from "@/lib/supabase/client"
 
 /**
- * Magic-link sign-in. This is the login flow docs/architecture.md notes as
- * missing — once a session exists, /start switches from localStorage to the
- * real savePreferencesToSupabase/loadPreferencesFromSupabase path (see
+ * Sign-in, via magic-link or Google OAuth (identity only — no calendar
+ * scope, see signInWithGoogle below). Once a session exists, /start
+ * switches from localStorage to the real
+ * savePreferencesToSupabase/loadPreferencesFromSupabase path (see
  * apps/web/src/lib/preferences.ts).
  */
 export default function LoginPage() {
@@ -20,6 +21,8 @@ export default function LoginPage() {
   const [error, setError] = useState<string | null>(null)
   const [calendarError, setCalendarError] = useState<string | null>(null)
   const [signedInEmail, setSignedInEmail] = useState<string | null>(null)
+  const [googleStatus, setGoogleStatus] = useState<"idle" | "redirecting" | "error">("idle")
+  const [googleError, setGoogleError] = useState<string | null>(null)
 
   useEffect(() => {
     if (!isSupabaseConfigured()) return
@@ -42,6 +45,28 @@ export default function LoginPage() {
     } catch (err) {
       setStatus("error")
       setError(err instanceof Error ? err.message : "Failed to send magic link")
+    }
+  }
+
+  // Sign-in-only Google OAuth, separate from connectGoogleCalendar below —
+  // no calendar.freebusy scope requested here, so this never triggers
+  // Google's OAuth consent screen for calendar access. If this email
+  // matches an existing magic-link account, Supabase's automatic identity
+  // linking attaches this Google identity to that same user rather than
+  // creating a duplicate.
+  async function signInWithGoogle() {
+    setGoogleStatus("redirecting")
+    setGoogleError(null)
+    try {
+      const supabase = createClient()
+      const { error: authError } = await supabase.auth.signInWithOAuth({
+        provider: "google",
+        options: { redirectTo: `${window.location.origin}/auth/callback` },
+      })
+      if (authError) throw authError
+    } catch (err) {
+      setGoogleStatus("error")
+      setGoogleError(err instanceof Error ? err.message : "Failed to start Google sign-in")
     }
   }
 
@@ -96,6 +121,22 @@ export default function LoginPage() {
               </p>
             ) : (
               <>
+                <Button
+                  className="w-full"
+                  variant="outline"
+                  disabled={googleStatus === "redirecting"}
+                  onClick={signInWithGoogle}
+                >
+                  {googleStatus === "redirecting" ? "Redirecting…" : "Continue with Google"}
+                </Button>
+                {googleStatus === "error" && <p className="text-destructive text-xs">{googleError}</p>}
+
+                <div className="flex items-center gap-2">
+                  <div className="bg-border h-px flex-1" />
+                  <span className="text-muted-foreground text-xs">or</span>
+                  <div className="bg-border h-px flex-1" />
+                </div>
+
                 <div className="space-y-2">
                   <Label htmlFor="email">Email</Label>
                   <Input
