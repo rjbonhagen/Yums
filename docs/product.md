@@ -11,8 +11,9 @@ why for each.
 ## MVP scope (V1, UC Berkeley only)
 
 - [x] Campus/budget/preferences/meal-plan onboarding form (`/start`),
-      persisted to `localStorage` (real Supabase write path exists, not
-      wired in yet — see `docs/architecture.md`)
+      persisted to `localStorage` for anyone signed out, or to Supabase
+      (`savePreferencesToSupabase`/`saveMealPlanToSupabase`) for anyone
+      signed in — see `docs/architecture.md`
 - [x] Free food event discovery — **live**, from events.berkeley.edu's
       public calendar feed, with a documented mock fallback if that fetch
       fails. Powers `/`, `/dashboard`, `/feed`, and the chatbot.

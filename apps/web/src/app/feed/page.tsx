@@ -1,3 +1,4 @@
+import Link from "next/link"
 import { Badge } from "@/components/ui/badge"
 import { Card, CardContent } from "@/components/ui/card"
 import { Nav } from "@/components/nav"
@@ -72,6 +73,27 @@ export default async function FeedPage() {
         {meta.nearbyEats.source === "unavailable" && (
           <p className="text-muted-foreground text-xs">
             Couldn&apos;t reach OpenStreetMap for nearby eats just now ({meta.nearbyEats.error}).
+          </p>
+        )}
+        {meta.schedule.source === "live" && (
+          <p className="text-muted-foreground text-xs">
+            Ranked using your connected Google Calendar — items that conflict with your schedule are
+            deprioritized.
+          </p>
+        )}
+        {meta.schedule.source === "placeholder" && (
+          <p className="text-muted-foreground text-xs">
+            Not using your real schedule yet —{" "}
+            <Link href="/login" className="underline underline-offset-4">
+              connect Google Calendar
+            </Link>{" "}
+            to rank recommendations by when you&apos;re actually free.
+          </p>
+        )}
+        {meta.schedule.source === "unavailable" && (
+          <p className="text-muted-foreground text-xs">
+            Couldn&apos;t reach Google Calendar just now ({meta.schedule.error}) — using a flat placeholder
+            schedule score instead.
           </p>
         )}
 
