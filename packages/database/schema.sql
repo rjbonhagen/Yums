@@ -122,13 +122,19 @@ create table calendar_connections (
   updated_at timestamptz not null default now()
 );
 
+-- Doubles as the saved/favorited-items table (see
+-- apps/web/src/lib/saved-items.ts) — a signed-in user "saving" a
+-- recommendation from /feed inserts a denormalized snapshot of it here
+-- (title/subtitle/coordinates/etc. at save time), since the live
+-- free-food event or OSM place it came from won't necessarily still be
+-- returned by buildRecommendations() later (an event's date passes, an
+-- OSM query returns different results). ref_id is unused by any current
+-- app code but kept for a future live-events-table integration.
 create table recommendations (
   id uuid primary key default uuid_generate_v4(),
   user_id uuid references users (id) on delete cascade,
-  -- Must match packages/shared/types.ts's RecommendationKind union exactly
-  -- (that TS type is the source of truth — this table isn't written to by
-  -- any app code yet, see docs/product.md's roadmap).
-  kind text not null check (kind in ('free_food', 'nearby_eats', 'grocery', 'dining')),
+  -- Must match packages/shared/types.ts's RecommendationKind union exactly.
+  kind text not null check (kind in ('free_food', 'nearby_eats')),
   ref_id uuid, -- points at events.id / deals.id depending on kind
   title text not null,
   subtitle text,
@@ -136,6 +142,8 @@ create table recommendations (
   distance_minutes int,
   start_time timestamptz,
   source_url text,
+  latitude double precision,
+  longitude double precision,
   score numeric(6, 4) not null default 0,
   created_at timestamptz not null default now()
 );

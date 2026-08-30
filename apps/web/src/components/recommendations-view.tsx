@@ -1,6 +1,6 @@
 "use client"
 
-import { useMemo, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import type { Recommendation } from "@yums/shared"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -9,6 +9,8 @@ import { Input } from "@/components/ui/input"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { FeedMap } from "@/components/feed-map"
 import { formatEventDateTime } from "@/lib/format"
+import { createClient, isSupabaseConfigured } from "@/lib/supabase/client"
+import { loadSavedItems, saveRecommendation, unsaveItem } from "@/lib/saved-items"
 
 function kindLabel(kind: string, estimatedSavings: number): string {
   if (kind === "free_food") return "FREE"
@@ -16,7 +18,25 @@ function kindLabel(kind: string, estimatedSavings: number): string {
   return `$${estimatedSavings.toFixed(2)} off`
 }
 
-function RecommendationCard({ r }: { r: Recommendation }) {
+// Recommendation ids aren't stable save-to-save (they're derived from the
+// live source, which can return different results next time) — this key
+// is what actually identifies "the same place/event" for save/unsave
+// matching, both here and in lib/saved-items.ts's SavedItem shape.
+function savedKey(r: { kind: string; title: string; sourceUrl?: string }): string {
+  return `${r.kind}::${r.title}::${r.sourceUrl ?? ""}`
+}
+
+function RecommendationCard({
+  r,
+  signedIn,
+  saved,
+  onToggleSave,
+}: {
+  r: Recommendation
+  signedIn: boolean
+  saved: boolean
+  onToggleSave: (r: Recommendation) => void
+}) {
   return (
     <Card>
       <CardContent className="flex items-start justify-between gap-4 py-4">
@@ -38,7 +58,21 @@ function RecommendationCard({ r }: { r: Recommendation }) {
             </a>
           )}
         </div>
-        <Badge variant={r.kind === "free_food" ? "default" : "secondary"}>{kindLabel(r.kind, r.estimatedSavings)}</Badge>
+        <div className="flex flex-col items-end gap-2">
+          <Badge variant={r.kind === "free_food" ? "default" : "secondary"}>{kindLabel(r.kind, r.estimatedSavings)}</Badge>
+          {signedIn && (
+            <Button
+              type="button"
+              size="sm"
+              variant="ghost"
+              className="h-auto p-0 text-xs"
+              onClick={() => onToggleSave(r)}
+              aria-pressed={saved}
+            >
+              {saved ? "★ Saved" : "☆ Save"}
+            </Button>
+          )}
+        </div>
       </CardContent>
     </Card>
   )
@@ -58,10 +92,63 @@ const KIND_FILTERS: { value: KindFilter; label: string }[] = [
  * requests. Map tab only ever plots items with real coordinates (see
  * FeedMap) and shows an honest "not configured" message instead of a broken
  * map when no Mapbox token is set — same pattern as the rest of the app's
- * optional integrations. */
+ * optional integrations. Signed-in users can save/unsave items (see
+ * lib/saved-items.ts, /saved); the save controls simply don't render when
+ * signed out, same pattern as /login's Google Calendar card. */
 export function RecommendationsView({ recommendations }: { recommendations: Recommendation[] }) {
   const [kindFilter, setKindFilter] = useState<KindFilter>("all")
   const [search, setSearch] = useState("")
+  const [userId, setUserId] = useState<string | null>(null)
+  const [savedByKey, setSavedByKey] = useState<Map<string, string>>(new Map())
+
+  useEffect(() => {
+    if (!isSupabaseConfigured()) return
+    const supabase = createClient()
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      setUserId(user?.id ?? null)
+      if (!user) return
+      loadSavedItems(supabase, user.id)
+        .then((items) => setSavedByKey(new Map(items.map((it) => [savedKey(it), it.id]))))
+        .catch(() => {
+          // Saved state just stays empty — save/unsave still works for new
+          // items, it just can't show which of *these* were already saved.
+        })
+    })
+  }, [])
+
+  async function handleToggleSave(r: Recommendation) {
+    if (!userId) return
+    const supabase = createClient()
+    const key = savedKey(r)
+    const existingId = savedByKey.get(key)
+
+    if (existingId) {
+      setSavedByKey((prev) => {
+        const next = new Map(prev)
+        next.delete(key)
+        return next
+      })
+      try {
+        await unsaveItem(supabase, userId, existingId)
+      } catch {
+        setSavedByKey((prev) => new Map(prev).set(key, existingId)) // revert — don't lie about saved state
+      }
+      return
+    }
+
+    const optimisticId = `pending:${key}`
+    setSavedByKey((prev) => new Map(prev).set(key, optimisticId))
+    try {
+      const saved = await saveRecommendation(supabase, userId, r)
+      setSavedByKey((prev) => new Map(prev).set(key, saved.id))
+    } catch {
+      setSavedByKey((prev) => {
+        const next = new Map(prev)
+        next.delete(key)
+        return next
+      })
+    }
+  }
 
   const filtered = useMemo(() => {
     const query = search.trim().toLowerCase()
@@ -112,7 +199,13 @@ export function RecommendationsView({ recommendations }: { recommendations: Reco
             </p>
           )}
           {filtered.map((r) => (
-            <RecommendationCard key={r.id} r={r} />
+            <RecommendationCard
+              key={r.id}
+              r={r}
+              signedIn={userId != null}
+              saved={savedByKey.has(savedKey(r))}
+              onToggleSave={handleToggleSave}
+            />
           ))}
         </TabsContent>
         <TabsContent value="map" className="pt-3">

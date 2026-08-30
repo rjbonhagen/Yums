@@ -20,6 +20,9 @@ export function Nav() {
           <Link href="/feed" className="text-muted-foreground hover:text-foreground">
             Feed
           </Link>
+          <Link href="/saved" className="text-muted-foreground hover:text-foreground">
+            Saved
+          </Link>
           <AuthStatus />
         </div>
       </nav>

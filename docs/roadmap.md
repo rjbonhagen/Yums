@@ -73,7 +73,14 @@ before building on top of it.
    volume grows.
 10. **Notifications/reminders** — e.g. "free food starting in 20 min
     near you," building on the schedule-awareness work already in place.
-11. **Save/favorite places or events** for a signed-in user.
+11. [x] **Save/favorite places or events** for a signed-in user. Done:
+    ☆/★ Save toggle on every `/feed` card, a `/saved` page with a
+    working Remove action, persisted to the `recommendations` table
+    (repurposed for this — see its comment in `schema.sql` — rather than
+    a new table, since it already had the right shape). Matches by
+    `kind::title::sourceUrl` since recommendation ids aren't stable
+    across requests. Verified end-to-end against the live Supabase
+    project (insert, list, delete all confirmed via direct SQL).
 12. **Crowdsourced event reporting** — let students report free food
     they find that isn't on either live feed, with the same
     no-fabrication discipline the rest of the app holds (clearly labeled
