@@ -148,11 +148,35 @@ create table recommendations (
   created_at timestamptz not null default now()
 );
 
--- Row Level Security: users only see their own preferences/recs.
+-- Crowdsourced free-food reports (see apps/web/src/lib/reported-events.ts)
+-- — a deliberately separate table from events/event_sources rather than
+-- folding these into the automated ingestion pipeline, so a user's
+-- unverified tip can never be mistaken for (or silently merged with) a
+-- live-source event. Shown on /feed in its own clearly-labeled
+-- "Community reports (unverified)" section, never scored/ranked
+-- alongside the live sources.
+create table user_reported_events (
+  id uuid primary key default uuid_generate_v4(),
+  user_id uuid references users (id) on delete cascade,
+  title text not null,
+  description text,
+  location_name text,
+  latitude double precision,
+  longitude double precision,
+  start_time timestamptz not null,
+  source_url text,
+  created_at timestamptz not null default now()
+);
+
+-- Row Level Security: users only see their own preferences/recs;
+-- user_reported_events is publicly readable (a shared community list,
+-- same visibility as the live free-food feed) but only the submitting
+-- user can modify or delete their own report.
 alter table users enable row level security;
 alter table user_preferences enable row level security;
 alter table recommendations enable row level security;
 alter table calendar_connections enable row level security;
+alter table user_reported_events enable row level security;
 
 create policy "users manage own row" on users
   for all using (auth.uid() = id);
@@ -162,6 +186,14 @@ create policy "users manage own recommendations" on recommendations
   for all using (auth.uid() = user_id);
 create policy "users manage own calendar connection" on calendar_connections
   for all using (auth.uid() = user_id);
+create policy "anyone can view reported events" on user_reported_events
+  for select using (true);
+create policy "signed-in users can submit reports" on user_reported_events
+  for insert with check (auth.uid() = user_id);
+create policy "users manage own reports" on user_reported_events
+  for update using (auth.uid() = user_id);
+create policy "users delete own reports" on user_reported_events
+  for delete using (auth.uid() = user_id);
 
 -- Seed: one university for the MVP.
 insert into universities (name, slug, latitude, longitude)

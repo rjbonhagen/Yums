@@ -90,10 +90,18 @@ before building on top of it.
     `kind::title::sourceUrl` since recommendation ids aren't stable
     across requests. Verified end-to-end against the live Supabase
     project (insert, list, delete all confirmed via direct SQL).
-12. **Crowdsourced event reporting** — let students report free food
-    they find that isn't on either live feed, with the same
-    no-fabrication discipline the rest of the app holds (clearly labeled
-    as user-submitted, not verified).
+12. [x] **Crowdsourced event reporting.** Done: `/report` lets a
+    signed-in student submit free food they found that isn't on either
+    live feed; shown on `/feed` in its own "Community reports" section
+    with an explicit "Unverified — user-submitted" badge — a deliberate
+    design choice to keep it out of `buildRecommendations()`'s
+    scored/ranked list entirely, never blended with the live sources
+    (see the comment on `user_reported_events` in `schema.sql`). Public
+    read (no sign-in needed to see reports, matching the rest of the
+    app), reports scoped to their author for delete. Verified
+    end-to-end against the live Supabase project: submitted a real
+    report, confirmed it via SQL, removed it, confirmed the row was
+    actually gone.
 
 ## Phase 4 — Beyond a single-campus demo
 
