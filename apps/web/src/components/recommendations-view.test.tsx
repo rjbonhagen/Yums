@@ -78,4 +78,54 @@ describe("RecommendationsView", () => {
 
     expect(screen.getByText(/nothing matches your filter\/search/i)).toBeInTheDocument()
   })
+
+  describe("recurring-event grouping", () => {
+    const MEETING_1 = rec({
+      id: "m1",
+      kind: "free_food",
+      title: "Free pizza",
+      subtitle: "ACM · Soda Hall",
+      seriesKey: "ACM at UC Berkeley::Weekly General Meeting",
+      startTime: "2026-09-01T18:00:00Z",
+      sourceUrl: "https://events.berkeley.edu/1",
+    })
+    const MEETING_2 = rec({
+      id: "m2",
+      kind: "free_food",
+      title: "Free pizza",
+      subtitle: "ACM · Soda Hall",
+      seriesKey: "ACM at UC Berkeley::Weekly General Meeting",
+      startTime: "2026-09-08T18:00:00Z",
+      sourceUrl: "https://events.berkeley.edu/2",
+    })
+
+    it("collapses two instances of the same exact seriesKey into one card", () => {
+      render(<RecommendationsView recommendations={[MEETING_1, MEETING_2]} />)
+
+      expect(screen.getByText(/recurring · 2 upcoming/i)).toBeInTheDocument()
+      // Both dates still show, individually, inside the group.
+      expect(screen.getByText(/Sep 1/)).toBeInTheDocument()
+      expect(screen.getByText(/Sep 8/)).toBeInTheDocument()
+    })
+
+    it("does not group a lone free_food item even if it has a seriesKey", () => {
+      render(<RecommendationsView recommendations={[MEETING_1, NEARBY_PLACE]} />)
+      expect(screen.queryByText(/recurring/i)).not.toBeInTheDocument()
+    })
+
+    it("never groups items with different seriesKeys, even with the same display title", () => {
+      const differentClub = rec({
+        id: "m3",
+        kind: "free_food",
+        title: "Free pizza", // same displayed title as MEETING_1 — must not cause a false merge
+        subtitle: "Different Club · Elsewhere",
+        seriesKey: "Different Club::Totally Unrelated Event",
+        startTime: "2026-09-03T18:00:00Z",
+      })
+
+      render(<RecommendationsView recommendations={[MEETING_1, differentClub]} />)
+
+      expect(screen.queryByText(/recurring/i)).not.toBeInTheDocument()
+    })
+  })
 })

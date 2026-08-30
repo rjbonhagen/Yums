@@ -101,5 +101,14 @@ export interface Recommendation {
   longitude?: number
   startTime?: string
   sourceUrl?: string
+  /** free_food only: `${organization}::${original event title}` — the
+   * *original* title from the source, before any "Free {food}" display
+   * transformation, since that transformed title isn't a safe grouping
+   * key (two unrelated events can both become "Free pizza"). Lets the UI
+   * group exact-duplicate recurring meetings (e.g. a weekly club meeting
+   * appearing as 3 separate upcoming instances) without guessing —
+   * exact-match only, no fuzzy title similarity. Undefined for
+   * nearby_eats, which has no concept of a recurring series. */
+  seriesKey?: string
   score: number
 }

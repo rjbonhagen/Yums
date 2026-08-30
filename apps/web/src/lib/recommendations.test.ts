@@ -135,6 +135,32 @@ describe("buildRecommendations", () => {
     expect(recommendations.every((r) => r.kind !== "nearby_eats")).toBe(true)
   })
 
+  it("sets seriesKey from the ORIGINAL event title, not the transformed display title", async () => {
+    mockIngestSource(async (source) =>
+      source.key === "berkeley-live" ? [liveBerkeleyEvent] : [liveCallinkEvent],
+    )
+    vi.mocked(fetchNearbyPlaces).mockResolvedValue([nearbyPlace])
+
+    const { recommendations } = await buildRecommendations({ maxTravelMinutes: 20 })
+
+    const pizzaRec = recommendations.find((r) => r.sourceUrl === liveBerkeleyEvent.sourceUrl)!
+    // Display title is transformed ("Free pizza"), but seriesKey must use
+    // the original "Free pizza social" — using the transformed title
+    // would risk grouping unrelated events that both happen to serve
+    // pizza (see the Recommendation.seriesKey comment in
+    // packages/shared/types.ts).
+    expect(pizzaRec.title).toBe("Free pizza")
+    expect(pizzaRec.seriesKey).toBe("ACM at UC Berkeley::Free pizza social")
+
+    const dinnerRec = recommendations.find((r) => r.sourceUrl === liveCallinkEvent.sourceUrl)!
+    expect(dinnerRec.seriesKey).toBe("Orthodox Christian Fellowship::Free dinner")
+
+    // nearby_eats has no concept of a recurring series.
+    const nearbyRec = recommendations.find((r) => r.kind === "nearby_eats")
+    expect(nearbyRec).toBeDefined()
+    expect(nearbyRec?.seriesKey).toBeUndefined()
+  })
+
   it("gives nearby_eats recommendations zero estimated savings even on success (no fabricated deals)", async () => {
     mockIngestSource(async () => [])
     vi.mocked(fetchNearbyPlaces).mockResolvedValue([nearbyPlace])

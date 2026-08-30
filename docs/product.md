@@ -54,6 +54,25 @@ why for each.
       live Supabase project: a confirmed `auth.users` row exists with the
       `handle_new_auth_user` trigger correctly mirroring it into
       `public.users` and `public.user_preferences`.
+- [x] Filter/search on `/feed` — free-food-only / nearby-eats-only
+      toggle plus keyword search over title/subtitle, client-side over
+      the already-fetched recommendations.
+- [x] Save/favorite items — ☆/★ toggle on every `/feed` card for a
+      signed-in user, a `/saved` page to view and remove them. See
+      `docs/roadmap.md` item 11 for the persistence design.
+- [x] Recurring-event grouping — exact-match-only (never fuzzy/guessed)
+      grouping of a club's repeated weekly meeting into one card
+      instead of N separate ones. See `docs/roadmap.md` item 9.
+- [x] Client-side free-food reminders — a real browser notification
+      ~20 min before an event's start, while `/feed` stays open. Not
+      push notifications (no background delivery) — see
+      `docs/roadmap.md` item 10 for why that's an honest, not a missing,
+      scope limit.
+- [x] Crowdsourced event reporting (`/report`) — a signed-in student can
+      submit free food that isn't on either live feed; shown on `/feed`
+      as an explicitly "Unverified — user-submitted" section, never
+      blended into the scored/ranked recommendations. See
+      `docs/roadmap.md` item 12.
 - [ ] Agentic checkout (out of MVP scope per the original spec)
 - [ ] Real student-discount data for nearby businesses — confirmed no live
       source exists (ASUC's site has no discount-card page at any URL

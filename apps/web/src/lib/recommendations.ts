@@ -200,6 +200,10 @@ export async function buildRecommendations(params: RecommendationParams): Promis
       longitude: event.longitude,
       startTime: event.startTime,
       sourceUrl: event.sourceUrl,
+      // event.title here is the original (pre-"Free {food}"-transform)
+      // title — see the Recommendation.seriesKey comment in
+      // packages/shared/types.ts for why that distinction matters.
+      seriesKey: `${event.organization}::${event.title}`,
       score,
     })
   }

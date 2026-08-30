@@ -65,12 +65,25 @@ before building on top of it.
    session (none is configured) — code path and fallback are tested,
    the actual API call is not.
 
-## Phase 3 — New capabilities
+## Phase 3 — New capabilities (done)
 
-9. **Recurring-event awareness.** Weekly club meetings currently show as
-   a flat list of upcoming instances rather than being recognized as
-   recurring — worth grouping/deduping intelligently once Cal Link
-   volume grows.
+9. [x] **Recurring-event awareness.** Done, conservatively: Cal Link's
+   API has no recurrence metadata at all (confirmed by reading
+   `callink-live.ts` — no series/recurring id field exists), so this
+   deliberately does **not** use fuzzy title matching, which risks
+   merging unrelated events. Instead, `Recommendation.seriesKey`
+   (`${organization}::${original event title}`, set in
+   `recommendations.ts`) is an exact-match-only key computed from the
+   *original* title — not the transformed display title ("Free pizza"),
+   which two unrelated events could both end up with. `/feed`'s List
+   view groups 2+ items sharing a seriesKey into one card listing every
+   upcoming instance, each keeping its own Save button and Source link;
+   a lone item never gets grouped. Map view and per-item save/search
+   are unaffected — grouping is purely a List-view display choice.
+   Covered by a dedicated `recommendations.test.ts` case (confirms
+   seriesKey uses the original title) and three `recommendations-view`
+   component tests (groups real duplicates, doesn't group a lone item,
+   never merges same-display-title-different-series items).
 10. [x] **Notifications/reminders.** Done, with an honest scope limit:
     `NotificationToggle` schedules a real browser `Notification` ~20 min
     before each upcoming free-food event's actual `startTime`, via
@@ -117,12 +130,24 @@ Deliberately not started — see reasoning below.
 
 ## Status
 
-Phases 0–2 are complete and verified (tests passing, changes checked
-live in the browser). Phase 3 items are each a real feature build (new
-DB tables, new UI flows) rather than a bugfix — tackle them one at a
-time based on which is actually wanted next, rather than building all
-four speculatively. Phase 4 is intentionally not started: both items
-are explicitly conditional on the project outgrowing a single-campus
-student demo, which hasn't happened, and multi-campus support in
-particular would require real per-campus event/place sources to be
-worth anything (no fabricated "coming soon" campuses).
+Phases 0–3 are complete and verified: 98 tests passing (up from 43 at
+the start of this work), `tsc --noEmit` clean, and every feature checked
+live — either in the browser directly, or end-to-end against the live
+Supabase project (insert → confirm via SQL → delete → confirm gone) for
+anything involving persistence. One thing genuinely NOT verified: the
+real OpenAI API call in `answerWithLLM()`, since no `OPENAI_API_KEY` is
+configured in this environment — its request-building/grounding logic
+and the fallback-to-deterministic wiring are both covered by
+mocked-fetch tests instead.
+
+Phase 4 is intentionally not started: both items are explicitly
+conditional on the project outgrowing a single-campus student demo,
+which hasn't happened, and multi-campus support in particular would
+require real per-campus event/place sources to be worth anything (no
+fabricated "coming soon" campuses).
+
+GrubHub was considered as a Phase 3 candidate and explicitly dropped:
+no public discount API exists, and scraping it would violate its ToS —
+declined for the same reason this app already rules out scraping
+Instagram for free-food posts (see `docs/data-sources.md`), regardless
+of this being a non-commercial student project.

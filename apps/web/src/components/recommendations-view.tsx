@@ -78,6 +78,94 @@ function RecommendationCard({
   )
 }
 
+/** Groups multiple upcoming instances of the exact same recurring meeting
+ * (same Recommendation.seriesKey — organization + original title, an
+ * exact match, never a fuzzy/guessed one — see that field's comment in
+ * packages/shared/types.ts) into one card instead of N separate ones.
+ * Preserves per-instance Save controls and Source links; Map view is
+ * unaffected (still plots every instance individually). Only groups when
+ * 2+ items actually share a key — a lone free_food item just renders as
+ * a normal RecommendationCard. */
+function RecurringGroupCard({
+  items,
+  signedIn,
+  savedByKey,
+  onToggleSave,
+}: {
+  items: Recommendation[]
+  signedIn: boolean
+  savedByKey: Map<string, string>
+  onToggleSave: (r: Recommendation) => void
+}) {
+  const [first] = items
+  return (
+    <Card>
+      <CardContent className="space-y-2 py-4">
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <p className="font-medium">{first.title}</p>
+            {first.subtitle && <p className="text-muted-foreground text-sm">{first.subtitle}</p>}
+            <p className="text-muted-foreground text-xs">Recurring · {items.length} upcoming</p>
+          </div>
+          <Badge variant={first.kind === "free_food" ? "default" : "secondary"}>
+            {kindLabel(first.kind, first.estimatedSavings)}
+          </Badge>
+        </div>
+        <ul className="space-y-1.5 border-t pt-2">
+          {items.map((r) => (
+            <li key={r.id} className="flex items-center justify-between gap-3">
+              <span className="text-muted-foreground text-xs">
+                {formatEventDateTime(r.startTime)}
+                {r.distanceMinutes != null ? ` · ${r.distanceEstimated ? "~" : ""}${r.distanceMinutes} min away` : ""}
+              </span>
+              <div className="flex items-center gap-2">
+                {r.sourceUrl && (
+                  <a href={r.sourceUrl} target="_blank" rel="noreferrer" className="text-xs underline underline-offset-4">
+                    Source
+                  </a>
+                )}
+                {signedIn && (
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="ghost"
+                    className="h-auto p-0 text-xs"
+                    onClick={() => onToggleSave(r)}
+                    aria-pressed={savedByKey.has(savedKey(r))}
+                    aria-label={savedByKey.has(savedKey(r)) ? "Unsave" : "Save"}
+                  >
+                    {savedByKey.has(savedKey(r)) ? "★" : "☆"}
+                  </Button>
+                )}
+              </div>
+            </li>
+          ))}
+        </ul>
+      </CardContent>
+    </Card>
+  )
+}
+
+type ListEntry = { kind: "single"; item: Recommendation } | { kind: "group"; seriesKey: string; items: Recommendation[] }
+
+function groupBySeries(items: Recommendation[]): ListEntry[] {
+  const placed = new Set<string>()
+  const entries: ListEntry[] = []
+  for (const item of items) {
+    if (item.kind === "free_food" && item.seriesKey) {
+      if (placed.has(item.seriesKey)) continue // already emitted as part of an earlier group in this pass
+      const group = items.filter((i) => i.kind === "free_food" && i.seriesKey === item.seriesKey)
+      if (group.length > 1) {
+        placed.add(item.seriesKey)
+        entries.push({ kind: "group", seriesKey: item.seriesKey, items: group })
+        continue
+      }
+    }
+    entries.push({ kind: "single", item })
+  }
+  return entries
+}
+
 type KindFilter = "all" | "free_food" | "nearby_eats"
 
 const KIND_FILTERS: { value: KindFilter; label: string }[] = [
@@ -198,15 +286,25 @@ export function RecommendationsView({ recommendations }: { recommendations: Reco
                 : "Nothing matches your filter/search."}
             </p>
           )}
-          {filtered.map((r) => (
-            <RecommendationCard
-              key={r.id}
-              r={r}
-              signedIn={userId != null}
-              saved={savedByKey.has(savedKey(r))}
-              onToggleSave={handleToggleSave}
-            />
-          ))}
+          {groupBySeries(filtered).map((entry) =>
+            entry.kind === "group" ? (
+              <RecurringGroupCard
+                key={entry.seriesKey}
+                items={entry.items}
+                signedIn={userId != null}
+                savedByKey={savedByKey}
+                onToggleSave={handleToggleSave}
+              />
+            ) : (
+              <RecommendationCard
+                key={entry.item.id}
+                r={entry.item}
+                signedIn={userId != null}
+                saved={savedByKey.has(savedKey(entry.item))}
+                onToggleSave={handleToggleSave}
+              />
+            ),
+          )}
         </TabsContent>
         <TabsContent value="map" className="pt-3">
           <FeedMap places={mappable} />
