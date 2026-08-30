@@ -71,8 +71,17 @@ before building on top of it.
    a flat list of upcoming instances rather than being recognized as
    recurring — worth grouping/deduping intelligently once Cal Link
    volume grows.
-10. **Notifications/reminders** — e.g. "free food starting in 20 min
-    near you," building on the schedule-awareness work already in place.
+10. [x] **Notifications/reminders.** Done, with an honest scope limit:
+    `NotificationToggle` schedules a real browser `Notification` ~20 min
+    before each upcoming free-food event's actual `startTime`, via
+    `setTimeout` while `/feed` stays open. This is explicitly **not**
+    push notifications — there's no service worker or backend
+    subscription (that would need VAPID keys and a subscriptions table
+    this app doesn't have) — so closing the tab cancels pending
+    reminders, and the UI says so rather than implying background
+    delivery. Gracefully renders nothing when the browser doesn't
+    support the Notification API, and shows a real "blocked" message
+    when permission is denied rather than silently failing.
 11. [x] **Save/favorite places or events** for a signed-in user. Done:
     ☆/★ Save toggle on every `/feed` card, a `/saved` page with a
     working Remove action, persisted to the `recommendations` table

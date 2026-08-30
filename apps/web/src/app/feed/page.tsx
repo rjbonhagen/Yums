@@ -1,6 +1,7 @@
 import Link from "next/link"
 import { Nav } from "@/components/nav"
 import { RecommendationsView } from "@/components/recommendations-view"
+import { NotificationToggle } from "@/components/notification-toggle"
 import { buildRecommendations } from "@/lib/recommendations"
 import { getConnectedCalendarAccessToken } from "@/lib/google-calendar"
 
@@ -62,6 +63,8 @@ export default async function FeedPage() {
             schedule score instead.
           </p>
         )}
+
+        <NotificationToggle freeFoodEvents={recommendations.filter((r) => r.kind === "free_food")} />
 
         <RecommendationsView recommendations={recommendations} />
       </main>
