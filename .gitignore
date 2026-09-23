@@ -5,6 +5,13 @@ node_modules/
 *.log
 .DS_Store
 
-# Mirrored third-party skill docs (regenerable via skills-lock.json)
-.agents/skills/
-.claude/skills/
+# AI assistant / agent tooling files
+.agents/
+.claude/
+.codex/
+.cursor/
+.mcp.json
+skills-lock.json
+CLAUDE.md
+AGENTS.md
+GEMINI.md
