@@ -41,7 +41,16 @@ export async function fetchBusyIntervals(accessToken: string, timeMin: Date, tim
   if (!res.ok) throw new Error(`Google FreeBusy API returned ${res.status}`)
 
   const body = (await res.json()) as FreeBusyResponse
-  return body.calendars?.primary?.busy ?? []
+  const primary = body?.calendars?.primary
+  if (!primary || primary.errors?.length || !Array.isArray(primary.busy)) {
+    throw new Error("Google Calendar could not confirm availability")
+  }
+  if (!primary.busy.every((interval) => typeof interval.start === "string" && typeof interval.end === "string"
+    && Number.isFinite(Date.parse(interval.start)) && Number.isFinite(Date.parse(interval.end))
+    && Date.parse(interval.end) > Date.parse(interval.start))) {
+    throw new Error("Google Calendar returned invalid availability")
+  }
+  return primary.busy
 }
 
 /**
@@ -74,6 +83,9 @@ export async function refreshAccessToken(refreshToken: string): Promise<{ access
   if (!res.ok) throw new Error(`Google token refresh returned ${res.status}`)
 
   const body = (await res.json()) as { access_token: string; expires_in: number }
+  if (!body?.access_token || typeof body.access_token !== "string" || !Number.isFinite(body.expires_in) || body.expires_in <= 0) {
+    throw new Error("Google token refresh returned invalid credentials")
+  }
   return { accessToken: body.access_token, expiresAt: new Date(Date.now() + body.expires_in * 1000) }
 }
 
@@ -92,6 +104,10 @@ export async function refreshAccessToken(refreshToken: string): Promise<{ access
  * connecting is the normal/default state (see /login).
  */
 export async function getConnectedCalendarAccessToken(): Promise<string | null> {
+  try { return await resolveConnectedCalendarToken() } catch { return null }
+}
+
+async function resolveConnectedCalendarToken(): Promise<string | null> {
   const { isSupabaseConfigured } = await import("./supabase/client")
   if (!isSupabaseConfigured()) return null
 

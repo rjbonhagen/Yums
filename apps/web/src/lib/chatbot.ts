@@ -19,7 +19,10 @@ export async function answerDeterministically(message: string): Promise<string> 
     const { recommendations, meta } = await buildRecommendations({ maxTravelMinutes: 30 })
     const freeFood = recommendations.filter((r) => r.kind === "free_food")
     if (freeFood.length === 0) {
-      return `No free food found on ${university.name}'s calendar right now.`
+      const unavailable = [meta.freeFood.source === "unavailable" ? "Berkeley calendar" : null,
+        meta.callink.source === "unavailable" ? "Cal Link" : null].filter(Boolean)
+      if (unavailable.length === 2) return "Couldn't reach the campus event sources, so I can't confirm current free-food offers. Try again shortly."
+      return `No qualifying free-food offers found in the available ${university.name} source results.${unavailable.length ? ` ${unavailable[0]} is unavailable; its offers may be missing.` : " Source coverage is limited; check the campus calendars too."}`
     }
     const lines = freeFood
       .slice(0, 5)

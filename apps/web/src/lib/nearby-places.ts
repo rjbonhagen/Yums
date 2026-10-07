@@ -28,6 +28,7 @@ async function fetchFromOverpass(url: string, query: string): Promise<OverpassRe
     // request), while GET-based sources cached fine with unstable_cache
     // alone. Both layers are needed together for POST. See docs/architecture.md.
     cache: "force-cache",
+    next: { revalidate: 600 },
     signal: AbortSignal.timeout(6000),
   })
   if (!res.ok) throw new Error(`${url} returned ${res.status}`)

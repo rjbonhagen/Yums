@@ -26,6 +26,9 @@ describe("fetchNearbyPlaces", () => {
     expect(places).toEqual([
       { id: "1", name: "Caffé Strada", category: "cafe", latitude: 37.87, longitude: -122.26, address: undefined },
     ])
+    expect(vi.mocked(global.fetch).mock.calls.every(([, options]) =>
+      (options as RequestInit & { next?: { revalidate: number } }).next?.revalidate === 600,
+    )).toBe(true)
   })
 
   it("filters out elements with no name tag rather than showing an unnamed place", async () => {
