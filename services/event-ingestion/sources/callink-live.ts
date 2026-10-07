@@ -66,8 +66,11 @@ export const callinkSource: CampusEventSource = {
     }
 
     const body = (await res.json()) as CalLinkSearchResponse
+    if (!body || !Array.isArray(body.value)) throw new Error("Invalid Cal Link event response")
 
-    return body.value.map((e) => {
+    return body.value.flatMap((e) => {
+      if (!e || !["string", "number"].includes(typeof e.id)
+        || !/^[a-zA-Z0-9_-]{1,128}$/.test(String(e.id))) return []
       const description = e.description ? stripHtml(e.description) : undefined
       const hasFreeFoodBenefit = e.benefitNames?.some((b) => b.trim().toLowerCase() === "free food") ?? false
 
@@ -80,7 +83,7 @@ export const callinkSource: CampusEventSource = {
       const latitude = e.latitude ? Number(e.latitude) : undefined
       const longitude = e.longitude ? Number(e.longitude) : undefined
 
-      return {
+      return [{
         organization: e.organizationName ?? "UC Berkeley student organization",
         title: e.name,
         description,
@@ -89,9 +92,9 @@ export const callinkSource: CampusEventSource = {
         locationName: e.location?.trim() || undefined,
         latitude: latitude != null && !Number.isNaN(latitude) ? latitude : undefined,
         longitude: longitude != null && !Number.isNaN(longitude) ? longitude : undefined,
-        sourceUrl: `https://callink.berkeley.edu/event/${e.id}`,
+        sourceUrl: `https://callink.berkeley.edu/event/${encodeURIComponent(e.id)}`,
         freeFoodConfirmed: hasFreeFoodBenefit,
-      }
+      }]
     })
   },
 }

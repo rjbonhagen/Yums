@@ -11,6 +11,8 @@ Pagination reads all returned pages up to a bounded four-page limit; exceeding
 that limit is disclosed as source unavailability. The recommendation layer
 applies the final seven-date window and excludes ended events. No source
 guarantees complete coverage of every campus offer.
+Publisher-relative links resolve against the Berkeley origin; unsafe links
+and records without required event fields are omitted during ingestion.
 
 API format: [LiveWhale documentation](https://support.livewhale.com/live/blurbs/json-api).
 
@@ -29,6 +31,8 @@ same-title grouping is a display heuristic, not verified recurrence metadata.
 `apps/web/src/lib/nearby-places.ts` queries two Overpass instances for named
 cafes, restaurants, and fast-food nodes around campus. Sources can time out;
 failed results are omitted. Each live recommendation links to its OSM node.
+Malformed mirror responses count as failures, allowing another valid mirror
+to supply places; failures from both mirrors are disclosed as unavailability.
 Listings are not proof of opening hours, prices, student discounts, or nutrition.
 No current price or merchant-offer dataset is integrated; this does not imply
 that no such dataset could exist.

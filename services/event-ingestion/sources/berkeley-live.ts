@@ -1,4 +1,5 @@
 import type { CampusEvent, CampusEventSource } from "../types"
+import { normalizeSourceUrl } from "../source-url"
 
 interface LiveWhaleEvent {
   id: number
@@ -40,16 +41,21 @@ export const berkeleyLiveSource: CampusEventSource = {
       })
       if (!res.ok) throw new Error(`events.berkeley.edu returned ${res.status}`)
       const body = (await res.json()) as LiveWhaleResponse
-      if (!Array.isArray(body.data)) throw new Error("Invalid Berkeley event response")
+      if (!body || !Array.isArray(body.data)) throw new Error("Invalid Berkeley event response")
       pages = body.meta?.total_pages ?? 1
       if (!Number.isInteger(pages) || pages < 1 || pages > 4) throw new Error("Berkeley event page limit exceeded")
       events.push(...body.data)
     }
-    return events.map((e) => ({
+    return events.flatMap((e) => {
+      if (!e || typeof e.title !== "string" || typeof e.date_iso !== "string") return []
+      const sourceUrl = normalizeSourceUrl(e.url, "https://events.berkeley.edu")
+      if (!sourceUrl) return []
+      return [{
       organization: "UC Berkeley Events Calendar", title: plainText(e.title),
       description: e.description ? plainText(e.description) : undefined,
       locationName: e.location ? plainText(e.location) : undefined,
-      startTime: e.date_iso, endTime: e.date2_iso, sourceUrl: e.url,
-    }))
+      startTime: e.date_iso, endTime: e.date2_iso, sourceUrl,
+      }]
+    })
   },
 }

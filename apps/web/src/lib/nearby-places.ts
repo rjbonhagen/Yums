@@ -26,7 +26,9 @@ async function fetchFromOverpass(url: string, query: string): Promise<OverpassRe
     signal: AbortSignal.timeout(6000),
   })
   if (!res.ok) throw new Error(`${url} returned ${res.status}`)
-  return (await res.json()) as OverpassResponse
+  const body = (await res.json()) as OverpassResponse
+  if (!body || !Array.isArray(body.elements)) throw new Error("Invalid OpenStreetMap response")
+  return body
 }
 
 async function postToOverpass(query: string): Promise<OverpassResponse> {

@@ -16,6 +16,17 @@ describe("fetchNearbyPlaces", () => {
     global.fetch = originalFetch
   })
 
+  it("ignores a malformed mirror response when another mirror returns valid records", async () => {
+    vi.mocked(global.fetch)
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ error: "bad response" }) } as Response)
+      .mockResolvedValueOnce(overpassResponse([{ id: 1, lat: 37.87, lon: -122.26, tags: { name: "Real cafe", amenity: "cafe" } }]))
+    expect((await fetchNearbyPlaces([37.83, -122.3, 37.9, -122.22])).map((place) => place.name)).toEqual(["Real cafe"])
+  })
+  it("rejects malformed replies from both mirrors rather than reporting no places", async () => {
+    vi.mocked(global.fetch).mockResolvedValue({ ok: true, json: async () => ({ error: "bad response" }) } as Response)
+    await expect(fetchNearbyPlaces([37.83, -122.3, 37.9, -122.22])).rejects.toThrow("Invalid OpenStreetMap response")
+  })
+
   it("maps a named OSM element to a NearbyPlace with real coordinates", async () => {
     vi.mocked(global.fetch).mockResolvedValue(
       overpassResponse([{ id: 1, lat: 37.87, lon: -122.26, tags: { name: "Caffé Strada", amenity: "cafe" } }]),

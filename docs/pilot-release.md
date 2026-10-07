@@ -50,7 +50,7 @@ Invitation-mode sign-in avoids creating new accounts through magic links;
 Supabase's global new-signup switch must also be disabled by the project owner.
 See [pilot setup](pilot-setup.md) for configuration and operator steps.
 
-Local verification after these changes: 230 tests across 35 files, lint,
+Local verification after these changes: 238 tests across 36 files, lint,
 live-mode production build, and production dependency audit all pass. No
 production dependency vulnerabilities were reported. Database migrations were
 tested in local PostgreSQL; they have not been applied to the remote project.
@@ -72,6 +72,17 @@ Source occurrence IDs now remain stable across reordered responses. Duplicate
 source URL/start-time pairs and duplicate restaurant IDs collapse; distinct
 recurring dates remain. Invalid coordinates cannot reach distance scoring or
 map markers. Tests cover richer duplicate snapshots and repeated occurrences.
+
+Live ingestion also requires a nonempty event title/organization, a parseable
+start time, and a complete http/https source link without embedded credentials
+or control characters. Invalid records are omitted. Berkeley relative links
+resolve against its publisher origin. Cal Link records without usable event
+IDs cannot produce fabricated links. Malformed source response envelopes fail
+explicitly; a malformed Overpass mirror no longer masks another valid mirror.
+Eight additional regression tests cover these boundaries.
+The production API smoke check after this change retained 42 live listings,
+including two food listings, with all discovery sources available and no
+invalid source-link protocols. No optional account service was configured.
 
 Reports now have application validation for a future start within seven days,
 field lengths, and safe http/https links. Database constraints prevent clients

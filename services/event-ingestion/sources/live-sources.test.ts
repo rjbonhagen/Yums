@@ -5,6 +5,24 @@ import { callinkSource } from "./callink-live"
 afterEach(() => { vi.unstubAllGlobals(); vi.useRealTimers() })
 
 describe("live source coverage", () => {
+  it("resolves Berkeley relative links and omits unsafe source URLs", async () => {
+    const event = { id: 1, title: "Free pizza", date_iso: "2026-10-07T20:00:00Z" }
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ ok: true, json: async () => ({ data: [
+      { ...event, url: "/live/events/1" }, { ...event, url: "javascript:alert(1)" },
+    ] }) }))
+    expect((await berkeleyLiveSource.fetchEvents()).map((event) => event.sourceUrl)).toEqual(["https://events.berkeley.edu/live/events/1"])
+  })
+  it("rejects a malformed Cal Link response rather than reporting a successful empty feed", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ ok: true, json: async () => ({ error: "bad response" }) }))
+    await expect(callinkSource.fetchEvents()).rejects.toThrow("Invalid Cal Link event response")
+  })
+  it("does not create event links from absent or invalid Cal Link IDs", async () => {
+    const event = { name: "Free pizza", startsOn: "2026-10-07T20:00:00Z" }
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ ok: true, json: async () => ({ value: [
+      { ...event, id: 123 }, { ...event }, { ...event, id: "../other" },
+    ] }) }))
+    expect((await callinkSource.fetchEvents()).map((event) => event.sourceUrl)).toEqual(["https://callink.berkeley.edu/event/123"])
+  })
   it("uses Pacific dates and documented path parameters for the weekly feed", async () => {
     vi.useFakeTimers()
     vi.setSystemTime(new Date("2026-10-08T01:00:00Z"))
