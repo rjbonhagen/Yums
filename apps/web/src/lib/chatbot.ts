@@ -1,8 +1,9 @@
 import { university } from "./mock-data"
 import { buildRecommendations } from "./recommendations"
+import { formatEventDateTime } from "./format"
 
 function formatTime(iso: string): string {
-  return new Date(iso).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })
+  return formatEventDateTime(iso)
 }
 
 /**
@@ -28,7 +29,7 @@ export async function answerDeterministically(message: string): Promise<string> 
       meta.callink.source === "unavailable" ? "Cal Link was unreachable, club events omitted" : null,
     ].filter((n): n is string => n != null)
     const note = notes.length > 0 ? ` (${notes.join("; ")})` : ""
-    return `Here's what's free near ${university.name} today${note}:\n${lines.join("\n")}`
+    return `Here's what's free near ${university.name} this week${note} (times in Berkeley):\n${lines.join("\n")}`
   }
 
   if (/deal|discount|coupon|bogo|nearby eat|restaurant|cafe/.test(text)) {
@@ -47,8 +48,8 @@ export async function answerDeterministically(message: string): Promise<string> 
   if (/budget|spend|afford|save|savings/.test(text)) {
     const { recommendations } = await buildRecommendations({ maxTravelMinutes: 20 })
     const top = recommendations[0]
-    if (!top) return "Set your budget on the Build My Week form and I'll build a full weekly plan."
-    return `Set your budget on the Build My Week form and I'll build a full weekly plan. Right now the best opportunity I can see is: ${top.title}${top.subtitle ? ` (${top.subtitle})` : ""}${top.distanceMinutes != null ? `, ${top.distanceMinutes} min away` : ""}.`
+    if (!top) return "Set your budget target on Build My Week. No food opportunities were found right now; actual spending and savings aren't tracked."
+    return `Set your budget target on Build My Week. Actual spending and savings aren't tracked. A current opportunity is: ${top.title}${top.subtitle ? ` (${top.subtitle})` : ""}${top.distanceMinutes != null ? `, approximately ${top.distanceMinutes} minutes from campus center` : ""}.`
   }
 
   return "I can tell you about free food happening today or nearby eats — ask me about either of those."
@@ -86,7 +87,7 @@ export async function answerWithLLM(message: string, history: ChatMessage[] = []
   const nearbyEats = recommendations.filter((r) => r.kind === "nearby_eats").slice(0, 8)
 
   const context = [
-    `Free food events today at ${university.name} (this is the complete real list — do not invent more):`,
+    `Free food events this week at ${university.name} (a limited source list; times in Berkeley; do not invent more):`,
     ...(freeFood.length > 0
       ? freeFood.map(
           (r) => `- ${r.title}${r.subtitle ? ` at ${r.subtitle}` : ""}${r.startTime ? `, ${formatTime(r.startTime)}` : ""}`,

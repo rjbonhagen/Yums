@@ -85,9 +85,8 @@ export interface Recommendation {
   kind: RecommendationKind
   title: string
   subtitle?: string
-  /** Only meaningful for kinds with a real savings figure (free_food). No
-   * live source exists for restaurant discount data, so nearby_eats never
-   * carries a fabricated number here — see docs/data-sources.md. */
+  /** Reserved for verified savings values; current discovery sources have
+   * no meal replacement or spending data, so recommendations use zero. */
   estimatedSavings: number
   distanceMinutes?: number
   /** true when distanceMinutes is a haversine estimate rather than a

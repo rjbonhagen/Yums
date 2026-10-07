@@ -16,7 +16,7 @@ const FEATURES = [
   },
   {
     title: "Real Distances",
-    body: "Walking time is computed from actual coordinates, not a guess — routed live where possible, geometric distance otherwise.",
+    body: "Approximate walking times use source coordinates and start at campus center. Events with no coordinates show distance unknown.",
   },
   {
     title: "Save Money vs. Save Time",
@@ -25,7 +25,7 @@ const FEATURES = [
 ]
 
 const STEPS = [
-  { n: "01", title: "Tell it your week", body: "Budget, transportation, how far you'll walk." },
+  { n: "01", title: "Tell it your week", body: "Set a budget target and how far you'll walk." },
   { n: "02", title: "It scans campus", body: "Live free food events and real nearby eateries, ranked by distance." },
   { n: "03", title: "You get a plan", body: "A ranked feed of what's actually happening today, near you, right now." },
 ]
@@ -58,11 +58,11 @@ export default async function HomePage() {
             Built for UC Berkeley
           </Badge>
           <h1 className="max-w-3xl text-5xl font-semibold tracking-tight text-balance sm:text-6xl">
-            The cheapest way to eat and live around campus
+            Find your next free bite around campus
           </h1>
           <p className="text-muted-foreground mt-6 max-w-xl text-lg text-balance">
-            Yums finds free food and nearby eats near you, and turns them into a plan built around your
-            schedule and your budget.
+            Discover campus events offering free food and nearby places to eat.
+            Choose shorter walks or free food first, and connect your calendar to check conflicts.
           </p>
           <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
             <Link

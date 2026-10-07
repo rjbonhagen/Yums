@@ -22,8 +22,7 @@ export default async function DashboardPage(props: PageProps<"/dashboard">) {
   const calendarAccessToken = await getConnectedCalendarAccessToken()
   const { recommendations, meta } = await buildRecommendations({ maxTravelMinutes, optimizeFor: preferences.optimizeFor, calendarAccessToken: calendarAccessToken ?? undefined })
   const freeFood = recommendations.filter((r) => r.kind === "free_food" && isToday(r.startTime))
-  const projectedSpend = Math.max(0, budget - recommendations.reduce((sum, r) => sum + r.estimatedSavings, 0) * 0.4)
-  const projectedSavings = Math.max(0, budget - projectedSpend)
+  const weeklyEvents = recommendations.filter((r) => r.kind === "free_food").length
 
   return (
     <div className="flex flex-1 flex-col">
@@ -77,21 +76,24 @@ export default async function DashboardPage(props: PageProps<"/dashboard">) {
         <section>
           <Card>
             <CardHeader>
-              <CardTitle>This Week</CardTitle>
+              <CardTitle>Your week</CardTitle>
             </CardHeader>
-            <CardContent className="grid grid-cols-3 gap-4 text-center">
+            <CardContent className="space-y-4">
+              <div className="grid grid-cols-3 gap-4 text-center">
               <div>
-                <p className="text-muted-foreground text-xs">Budget</p>
+                <p className="text-muted-foreground text-xs">Budget target</p>
                 <p className="text-xl font-semibold">${budget.toFixed(2)}</p>
               </div>
               <div>
-                <p className="text-muted-foreground text-xs">Projected spend</p>
-                <p className="text-xl font-semibold">${projectedSpend.toFixed(2)}</p>
+                <p className="text-muted-foreground text-xs">Food events</p>
+                <p className="text-xl font-semibold">{weeklyEvents}</p>
               </div>
               <div>
-                <p className="text-muted-foreground text-xs">Projected savings</p>
-                <p className="text-xl font-semibold text-green-600">${projectedSavings.toFixed(2)}</p>
+                <p className="text-muted-foreground text-xs">Preferred walk</p>
+                <p className="text-xl font-semibold">{maxTravelMinutes} min</p>
               </div>
+              </div>
+              <p className="text-muted-foreground text-xs">Your budget is a planning target. Events may offer snacks rather than a full meal; attendance, prices, and actual savings aren&apos;t tracked.</p>
             </CardContent>
           </Card>
         </section>

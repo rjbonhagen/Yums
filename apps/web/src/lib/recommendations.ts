@@ -175,7 +175,7 @@ export async function buildRecommendations(params: RecommendationParams): Promis
     const minutesAway = hasCoords
       ? haversineMinutes(CAMPUS_CENTER.lat, CAMPUS_CENTER.lng, event.latitude!, event.longitude!)
       : undefined
-    const estimatedSavings = 8 // typical meal value; no live per-event price source exists
+    const estimatedSavings = 0 // No verified meal replacement value or actual spending data.
 
     // Real overlap check against the connected calendar's busy blocks when
     // available; otherwise the documented flat placeholder (see
