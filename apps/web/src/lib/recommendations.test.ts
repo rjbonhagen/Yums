@@ -24,9 +24,13 @@ vi.mock("@yums/event-ingestion", () => ({
 vi.mock("./nearby-places", () => ({
   fetchNearbyPlaces: vi.fn(),
 }))
+vi.mock("./google-calendar", async (original) => ({
+  ...await original<typeof import("./google-calendar")>(), fetchBusyIntervals: vi.fn(),
+}))
 
 const { ingestSource } = await import("@yums/event-ingestion")
 const { fetchNearbyPlaces } = await import("./nearby-places")
+const { fetchBusyIntervals } = await import("./google-calendar")
 const { buildRecommendations } = await import("./recommendations")
 
 const liveBerkeleyEvent = {
@@ -72,6 +76,7 @@ beforeEach(() => {
   vi.setSystemTime(new Date("2026-09-01T18:00:00Z"))
   vi.mocked(ingestSource).mockReset()
   vi.mocked(fetchNearbyPlaces).mockReset()
+  vi.mocked(fetchBusyIntervals).mockReset()
 })
 
 afterEach(() => { vi.useRealTimers(); vi.unstubAllEnvs() })
@@ -217,5 +222,23 @@ describe("buildRecommendations", () => {
     expect(recommendations.every((r) => r.isSample)).toBe(true)
     expect(ingestSource).not.toHaveBeenCalled()
     expect(fetchNearbyPlaces).not.toHaveBeenCalled()
+  })
+  it("uses a source's full duration when checking Calendar conflicts", async () => {
+    mockIngestSource(async (source) => source.key === "callink-live" ? [] : [{ ...liveBerkeleyEvent, endTime: "2026-09-01T22:00:00Z" }])
+    vi.mocked(fetchNearbyPlaces).mockResolvedValue([])
+    vi.mocked(fetchBusyIntervals).mockResolvedValue([{ start: "2026-09-01T21:30:00Z", end: "2026-09-01T22:30:00Z" }])
+    const conflict = await buildRecommendations({ maxTravelMinutes: 20, calendarAccessToken: "test-token" })
+    vi.mocked(fetchBusyIntervals).mockResolvedValue([])
+    const available = await buildRecommendations({ maxTravelMinutes: 20, calendarAccessToken: "test-token" })
+    expect(conflict.meta.schedule.source).toBe("live")
+    expect(conflict.recommendations[0].score).toBeLessThan(available.recommendations[0].score)
+  })
+  it("discloses Calendar failure without losing discovery results", async () => {
+    mockIngestSource(async (source) => source.key === "callink-live" ? [] : [liveBerkeleyEvent])
+    vi.mocked(fetchNearbyPlaces).mockResolvedValue([])
+    vi.mocked(fetchBusyIntervals).mockRejectedValue(new Error("Calendar unavailable"))
+    const result = await buildRecommendations({ maxTravelMinutes: 20, calendarAccessToken: "test-token" })
+    expect(result.meta.schedule).toEqual({ source: "unavailable", error: "Calendar unavailable" })
+    expect(result.recommendations).toHaveLength(1)
   })
 })
