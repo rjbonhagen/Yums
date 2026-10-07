@@ -210,7 +210,7 @@ export async function buildRecommendations(params: RecommendationParams): Promis
       id: event.id,
       kind: "free_food",
       isSample: demo,
-      title: event.food ? `Free ${event.food}` : event.title,
+      title: event.title,
       subtitle: event.locationName ? `${event.organization} · ${event.locationName}` : event.organization,
       estimatedSavings,
       distanceMinutes: minutesAway,

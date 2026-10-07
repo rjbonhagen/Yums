@@ -48,7 +48,7 @@ describe("extractDeterministic", () => {
     "Pizza costs $5", "Free admission, pizza costs $5", "No free food today",
     "Food is not free", "There won't be free pizza", "Gluten-free pizza social",
     "Discussion about free food policy", "Free food with purchase",
-    "Coffee tasting", "Lunch seminar about food insecurity",
+    "Coffee tasting", "Lunch seminar about food insecurity", "Not a free lunch", "Free pizza canceled",
   ])("does not advertise an ambiguous or paid offer: %s", (description) => {
     expect(extractDeterministic(event({ description })).confidenceScore).toBe(0)
   })
@@ -61,6 +61,9 @@ describe("extractDeterministic", () => {
     const result = extractDeterministic(event({ freeFoodConfirmed: true }))
     expect(result.confidenceScore).toBe(0.9)
     expect(result.food).toBeUndefined()
+  })
+  it("rejects withdrawn offers even if the original benefit tag remains", () => {
+    expect(extractDeterministic(event({ freeFoodConfirmed: true, description: "No free food today." })).confidenceScore).toBe(0)
   })
 
   it("only checks title and description, not organization", () => {

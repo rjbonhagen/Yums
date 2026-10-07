@@ -155,7 +155,7 @@ describe("buildRecommendations", () => {
     // would risk grouping unrelated events that both happen to serve
     // pizza (see the Recommendation.seriesKey comment in
     // packages/shared/types.ts).
-    expect(pizzaRec.title).toBe("Free pizza")
+    expect(pizzaRec.title).toBe("Free pizza social")
     expect(pizzaRec.seriesKey).toBe("ACM at UC Berkeley::Free pizza social")
 
     const dinnerRec = recommendations.find((r) => r.sourceUrl === liveCallinkEvent.sourceUrl)!

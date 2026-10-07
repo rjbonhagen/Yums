@@ -12,7 +12,7 @@ const FEATURES = [
   },
   {
     title: "Nearby Eats",
-    body: "Real cafes and restaurants near campus from OpenStreetMap, ranked by distance. No live student-discount data exists yet, so this shows places, not fake deals.",
+    body: "Browse cafes and restaurants near campus from OpenStreetMap. Menu prices and discounts aren't verified.",
   },
   {
     title: "Real Distances",
@@ -36,7 +36,7 @@ export default async function HomePage() {
   const preview = todayRecommendations.slice(0, 3)
   const freeFoodCount = todayRecommendations.filter((r) => r.kind === "free_food").length
   const eatsCount = recommendations.filter((r) => r.kind === "nearby_eats").length
-  const closest = recommendations.find((r) => r.distanceMinutes != null)
+  const closest = [...todayRecommendations].filter((r) => r.distanceMinutes != null).sort((a, b) => a.distanceMinutes! - b.distanceMinutes!)[0]
 
   const stats = [
     { value: String(freeFoodCount), label: "free food events on campus today" },
@@ -133,7 +133,7 @@ export default async function HomePage() {
 
       {/* Live preview */}
       <section className="mx-auto max-w-5xl px-4 py-24">
-        <div className="mb-8 flex items-end justify-between">
+        <div className="mb-8 flex flex-wrap items-end justify-between gap-3">
           <h2 className="text-3xl font-semibold tracking-tight">Happening near campus today</h2>
           <Link href="/feed" className="text-sm underline underline-offset-4">
             View full feed →

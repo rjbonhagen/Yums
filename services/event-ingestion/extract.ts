@@ -12,7 +12,8 @@ export interface ExtractedFoodEvent extends CampusEvent {
  */
 export function extractDeterministic(event: CampusEvent): ExtractedFoodEvent {
   const text = `${event.title} ${event.description ?? ""}`.toLowerCase()
-  const confirmed = event.freeFoodConfirmed === true || hasExplicitFreeFoodOffer(text)
+  const contradicted = /\b(?:no|not|without|never)\s+(?:(?:a|any|longer)\s+)?(?:free|complimentary)\b|\b(?:isn't|aren't|won't be)\s+free\b|\b(?:cancelled|canceled|sold out|no longer available)\b/.test(text)
+  const confirmed = !contradicted && (event.freeFoodConfirmed === true || hasExplicitFreeFoodOffer(text))
 
   return {
     ...event,

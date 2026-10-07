@@ -79,13 +79,8 @@ export const callinkSource: CampusEventSource = {
       const description = e.description ? stripHtml(e.description) : undefined
       const hasFreeFoodBenefit = e.benefitNames?.some((b) => b.trim().toLowerCase() === "free food") ?? false
 
-      // benefitNames is Cal Link's own organizer-set tag, not a guess — fold
-      // it into the description text so the existing keyword extractor
-      // (services/event-ingestion/extract.ts) picks it up as a real signal
-      // rather than adding a second, parallel confidence mechanism.
-      const annotatedDescription = hasFreeFoodBenefit
-        ? `${description ?? ""} Benefits: Free Food.`.trim()
-        : description
+      // Keep organizer evidence separate from description text so a
+      // withdrawn offer can override a stale benefit tag.
 
       // Coordinates are present on some events (organizer-entered) and
       // absent on others — never guess when missing, same rule
@@ -96,7 +91,7 @@ export const callinkSource: CampusEventSource = {
       return {
         organization: e.organizationName ?? "UC Berkeley student organization",
         title: e.name,
-        description: annotatedDescription,
+        description,
         startTime: e.startsOn,
         endTime: e.endsOn,
         locationName: e.location?.trim() || undefined,
