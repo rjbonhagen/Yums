@@ -13,7 +13,13 @@ import { removeGuestItem } from "@/lib/guest-saved-items"
  * reload — /saved's server component just fetches the initial list and
  * hands it here. userId is passed down rather than re-derived client-side
  * since the server component already has it from the same session. */
-export function SavedList({ userId, initialItems, guest = false }: { userId: string; initialItems: SavedItem[]; guest?: boolean }) {
+type SavedListProps = { userId: string; initialItems: SavedItem[]; guest?: boolean }
+
+export function SavedList(props: SavedListProps) {
+  return <SavedListContent key={`${props.userId}:${JSON.stringify(props.initialItems)}`} {...props} />
+}
+
+function SavedListContent({ userId, initialItems, guest = false }: SavedListProps) {
   const [items, setItems] = useState(initialItems)
   const [removingId, setRemovingId] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)

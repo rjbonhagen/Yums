@@ -25,6 +25,14 @@ beforeEach(() => {
 })
 
 describe("SavedList", () => {
+  it("replaces private items when the account or server snapshot changes", () => {
+    const { rerender } = render(<SavedList userId="user-1" initialItems={[ITEM]} />)
+    rerender(<SavedList userId="user-2" initialItems={[{ ...ITEM, id: "other", title: "Other account item" }]} />)
+    expect(screen.queryByText("Free pizza")).not.toBeInTheDocument()
+    expect(screen.getByText("Other account item")).toBeInTheDocument()
+    rerender(<SavedList userId="user-2" initialItems={[]} />)
+    expect(screen.queryByText("Other account item")).not.toBeInTheDocument()
+  })
   it("shows an empty-state message with no saved items", () => {
     render(<SavedList userId="user-1" initialItems={[]} />)
     expect(screen.getByText(/nothing saved yet/i)).toBeInTheDocument()

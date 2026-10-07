@@ -17,12 +17,16 @@ import { getPreferences } from "@/lib/server-preferences"
 
 async function loadCommunityReports(): Promise<{ userId: string | null; reports: ReportedEvent[]; unavailable?: boolean }> {
   if (!isSupabaseConfigured()) return { userId: null, reports: [], unavailable: true }
+  try {
   const supabase = await createClient()
   const [{ data: { user } }, reportResult] = await Promise.all([
     supabase.auth.getUser(),
     loadUpcomingReportedEvents(supabase).then((reports) => ({ reports, unavailable: false })).catch(() => ({ reports: [], unavailable: true })),
   ])
   return { userId: user?.id ?? null, ...reportResult }
+  } catch {
+    return { userId: null, reports: [], unavailable: true }
+  }
 }
 
 export default async function FeedPage() {
@@ -83,9 +87,9 @@ export default async function FeedPage() {
 
         {meta.freeFood.source !== "demo" && <NotificationToggle freeFoodEvents={recommendations.filter((r) => r.kind === "free_food" && !r.isSample)} />}
 
-        <RecommendationsView recommendations={recommendations} />
+        <RecommendationsView key={userId ?? "guest"} recommendations={recommendations} />
 
-        {unavailable ? <p role="status" className="text-muted-foreground text-sm">Community reports are unavailable right now.</p> : <CommunityReports userId={userId} reports={reports} />}
+        {unavailable ? <p role="status" className="text-muted-foreground text-sm">Community reports are unavailable right now.</p> : <CommunityReports key={`${userId}:${JSON.stringify(reports)}`} userId={userId} reports={reports} />}
       </main>
     </div>
   )

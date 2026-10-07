@@ -27,10 +27,16 @@ export default async function SavedPage() {
     )
   }
 
-  const supabase = await createClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
+  const account = await (async () => {
+    const client = await createClient()
+    const { data: { user }, error } = await client.auth.getUser()
+    if (error) throw error
+    return { client, user }
+  })().catch(() => null)
+  if (!account) {
+    return <Shell><p role="status" className="text-muted-foreground text-sm">Couldn&apos;t check your account. Account saves are unavailable; refresh to retry.</p><GuestSavedList /></Shell>
+  }
+  const { client: supabase, user } = account
 
   if (!user) {
     return (
