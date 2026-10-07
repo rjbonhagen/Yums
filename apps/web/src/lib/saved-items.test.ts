@@ -46,6 +46,7 @@ const ROW = {
   latitude: 37.87,
   longitude: -122.26,
   start_time: "2026-08-29T18:00:00Z",
+  end_time: "2026-08-29T20:00:00Z",
 }
 
 describe("loadSavedItems", () => {
@@ -64,6 +65,7 @@ describe("loadSavedItems", () => {
         latitude: 37.87,
         longitude: -122.26,
         startTime: "2026-08-29T18:00:00Z",
+        endTime: "2026-08-29T20:00:00Z",
       },
     ])
     expect(calls.from).toEqual(["recommendations"])

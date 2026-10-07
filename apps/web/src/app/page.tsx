@@ -4,6 +4,7 @@ import { Card, CardContent } from "@/components/ui/card"
 import { Nav } from "@/components/nav"
 import { buildRecommendations } from "@/lib/recommendations"
 import { isToday } from "@/lib/event-time"
+export const revalidate = 120
 
 const FEATURES = [
   {
@@ -32,7 +33,7 @@ const STEPS = [
 
 export default async function HomePage() {
   const { recommendations, meta } = await buildRecommendations({ maxTravelMinutes: 20 })
-  const todayRecommendations = recommendations.filter((r) => r.kind !== "free_food" || isToday(r.startTime))
+  const todayRecommendations = recommendations.filter((r) => r.kind !== "free_food" || isToday(r.startTime, new Date(), r.endTime))
   const preview = todayRecommendations.slice(0, 3)
   const freeFoodCount = todayRecommendations.filter((r) => r.kind === "free_food").length
   const eatsCount = recommendations.filter((r) => r.kind === "nearby_eats").length

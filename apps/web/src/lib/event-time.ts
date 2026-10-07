@@ -29,8 +29,8 @@ export function isInCampusWeek(startTime: string, endTime: string | undefined, n
   return end > now && campusDate(start) < addCalendarDays(today, 7)
 }
 
-export function isToday(startTime: string | undefined, now = new Date()): boolean {
+export function isToday(startTime: string | undefined, now = new Date(), endTime?: string): boolean {
   if (!startTime) return false
   const date = new Date(startTime)
-  return Number.isFinite(date.getTime()) && campusDate(date) === campusDate(now)
+  return Number.isFinite(date.getTime()) && (campusDate(date) === campusDate(now) || (date < now && eventEnd(startTime, endTime).date > now))
 }

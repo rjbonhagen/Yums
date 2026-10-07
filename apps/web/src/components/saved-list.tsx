@@ -8,7 +8,6 @@ import { formatEventDateTime } from "@/lib/format"
 import { createClient } from "@/lib/supabase/client"
 import { unsaveItem, type SavedItem } from "@/lib/saved-items"
 import { removeGuestItem } from "@/lib/guest-saved-items"
-import { eventEnd } from "@/lib/event-time"
 
 /** Client component so items can be removed in place, without a full page
  * reload — /saved's server component just fetches the initial list and
@@ -48,7 +47,7 @@ export function SavedList({ userId, initialItems, guest = false }: { userId: str
             <div>
               <p className="font-medium">{item.title}</p>
               {item.isSample && <p className="text-xs text-amber-700">Sample listing · not a real offer</p>}
-              {item.startTime && eventEnd(item.startTime, item.endTime).date <= new Date() && <p className="text-muted-foreground text-xs">Past event · saved snapshot</p>}
+              {item.startTime && new Date(item.endTime ?? item.startTime) <= new Date() && <p className="text-muted-foreground text-xs">{item.endTime ? "Past event" : "Start time has passed — check the source"} · saved snapshot</p>}
               {item.subtitle && <p className="text-muted-foreground text-sm">{item.subtitle}</p>}
               {item.startTime && <p className="text-muted-foreground text-xs">{formatEventDateTime(item.startTime)}</p>}
               {item.sourceUrl && (

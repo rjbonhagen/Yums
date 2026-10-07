@@ -105,7 +105,7 @@ function RecurringGroupCard({
           <div>
             <p className="font-medium">{first.title}</p>
             {first.subtitle && <p className="text-muted-foreground text-sm">{first.subtitle}</p>}
-            <p className="text-muted-foreground text-xs">Recurring · {items.length} upcoming</p>
+            <p className="text-muted-foreground text-xs">Matching event titles · {items.length} upcoming</p>
           </div>
           <Badge variant={first.kind === "free_food" ? "default" : "secondary"}>
             {kindLabel(first.kind, first.estimatedSavings)}

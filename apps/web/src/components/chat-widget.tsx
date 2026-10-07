@@ -64,7 +64,7 @@ export function ChatWidget() {
 
   return (
     <Card role="dialog" aria-label="Yums chat" className="fixed right-4 bottom-4 z-50 flex h-[28rem] max-h-[calc(100dvh-2rem)] w-80 max-w-[calc(100vw-2rem)] flex-col shadow-xl">
-      <CardHeader className="flex-row items-center justify-between space-y-0 py-3">
+      <CardHeader className="flex flex-row items-center justify-between space-y-0 py-3">
         <CardTitle className="text-sm">Yums Assistant</CardTitle>
         <button
           onClick={() => setOpen(false)}

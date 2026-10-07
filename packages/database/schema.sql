@@ -142,6 +142,7 @@ create table recommendations (
   estimated_savings numeric(10, 2) not null default 0,
   distance_minutes int,
   start_time timestamptz,
+  end_time timestamptz,
   source_url text,
   latitude double precision,
   longitude double precision,

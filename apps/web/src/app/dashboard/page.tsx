@@ -21,7 +21,7 @@ export default async function DashboardPage(props: PageProps<"/dashboard">) {
 
   const calendarAccessToken = await getConnectedCalendarAccessToken()
   const { recommendations, meta } = await buildRecommendations({ maxTravelMinutes, optimizeFor: preferences.optimizeFor, calendarAccessToken: calendarAccessToken ?? undefined })
-  const freeFood = recommendations.filter((r) => r.kind === "free_food" && isToday(r.startTime))
+  const freeFood = recommendations.filter((r) => r.kind === "free_food" && isToday(r.startTime, new Date(), r.endTime))
   const weeklyEvents = recommendations.filter((r) => r.kind === "free_food").length
 
   return (
@@ -51,7 +51,7 @@ export default async function DashboardPage(props: PageProps<"/dashboard">) {
               </Badge>
             )}
           </div>
-          <p className="text-muted-foreground mb-4 text-sm">Free food, ranked by value and how close it is.</p>
+          <p className="text-muted-foreground mb-4 text-sm">Today&apos;s upcoming offers, with walking estimates from campus center. All times are in Berkeley.</p>
           <div className="space-y-3">
             {freeFood.length === 0 && (
               <p className="text-muted-foreground text-sm">No free food found on today&apos;s calendar.</p>
@@ -65,7 +65,7 @@ export default async function DashboardPage(props: PageProps<"/dashboard">) {
                     <p className="text-muted-foreground text-sm">{r.subtitle}</p>
                     <p className="text-muted-foreground text-xs">
                       {formatEventDateTime(r.startTime)}
-                      {r.distanceMinutes != null ? ` · ${r.distanceMinutes} min away` : " · distance unknown"}
+                      {r.distanceMinutes != null ? ` · ${r.distanceEstimated ? "~" : ""}${r.distanceMinutes} min away` : " · distance unknown"}
                     </p>
                   </div>
                   <Badge variant="secondary">FREE</Badge>

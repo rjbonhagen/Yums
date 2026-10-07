@@ -1,6 +1,7 @@
 -- Run once on an existing database before using the updated cloud-save path.
 -- Fresh databases use schema.sql, which already includes this constraint.
 begin;
+alter table public.recommendations add column if not exists end_time timestamptz;
 alter table public.recommendations add column if not exists save_key text;
 update public.recommendations
 set save_key = kind || '::' || coalesce(nullif(source_url, ''),

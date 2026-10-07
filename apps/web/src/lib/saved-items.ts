@@ -29,9 +29,10 @@ interface SavedItemRow {
   latitude: number | null
   longitude: number | null
   start_time: string | null
+  end_time: string | null
 }
 
-const SELECT_COLUMNS = "id, kind, title, subtitle, source_url, latitude, longitude, start_time"
+const SELECT_COLUMNS = "id, kind, title, subtitle, source_url, latitude, longitude, start_time, end_time"
 
 function fromRow(row: SavedItemRow): SavedItem {
   return {
@@ -43,6 +44,7 @@ function fromRow(row: SavedItemRow): SavedItem {
     latitude: row.latitude ?? undefined,
     longitude: row.longitude ?? undefined,
     startTime: row.start_time ?? undefined,
+    endTime: row.end_time ?? undefined,
   }
 }
 
@@ -72,6 +74,7 @@ export async function saveRecommendation(
       estimated_savings: r.estimatedSavings,
       distance_minutes: r.distanceMinutes ?? null,
       start_time: r.startTime ?? null,
+      end_time: r.endTime ?? null,
       source_url: r.sourceUrl ?? null,
       latitude: r.latitude ?? null,
       longitude: r.longitude ?? null,

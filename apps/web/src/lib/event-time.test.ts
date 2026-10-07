@@ -12,6 +12,11 @@ describe("campus event windows", () => {
     expect(isInCampusWeek("2026-10-07T06:00:00Z", "2026-10-07T07:00:00Z", now)).toBe(true)
     expect(isInCampusWeek("2026-10-07T05:00:00Z", "2026-10-07T06:30:00Z", now)).toBe(false)
   })
+  it("includes an ongoing overnight offer in Today", () => {
+    const afterMidnight = new Date("2026-10-07T08:00:00Z")
+    expect(isToday("2026-10-07T05:00:00Z", afterMidnight, "2026-10-07T10:00:00Z")).toBe(true)
+    expect(isToday("2026-10-07T05:00:00Z", afterMidnight, "2026-10-07T07:00:00Z")).toBe(false)
+  })
   it("includes only today and the next six campus dates", () => {
     expect(isInCampusWeek("2026-10-13T06:59:00Z", undefined, now)).toBe(true)
     expect(isInCampusWeek("2026-10-13T07:00:00Z", undefined, now)).toBe(false)
