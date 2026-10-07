@@ -44,10 +44,10 @@ export default async function FeedPage() {
           Free food is live from events.berkeley.edu&apos;s public calendar and Cal Link&apos;s club-events
           feed; nearby eats are live from OpenStreetMap.
         </p>
-        {meta.freeFood.source === "mock-fallback" && (
+        {meta.freeFood.source === "demo" && <p role="status" className="rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">Sample demo data · these events and restaurants are examples, not real offers.</p>}
+        {meta.freeFood.source === "unavailable" && (
           <p className="text-muted-foreground text-xs">
-            Couldn&apos;t reach the live events calendar just now ({meta.freeFood.error}) — free food below is
-            from a fallback list.
+            Couldn&apos;t reach the Berkeley calendar just now — its events are omitted.
           </p>
         )}
         {meta.callink.source === "unavailable" && (
@@ -82,7 +82,7 @@ export default async function FeedPage() {
           </p>
         )}
 
-        <NotificationToggle freeFoodEvents={recommendations.filter((r) => r.kind === "free_food")} />
+        <NotificationToggle freeFoodEvents={recommendations.filter((r) => r.kind === "free_food" && !r.isSample)} />
 
         <RecommendationsView recommendations={recommendations} />
 

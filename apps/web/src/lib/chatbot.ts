@@ -25,7 +25,8 @@ export async function answerDeterministically(message: string): Promise<string> 
       .slice(0, 5)
       .map((r) => `- ${r.title}${r.subtitle ? ` at ${r.subtitle}` : ""}${r.startTime ? `, ${formatTime(r.startTime)}` : ""}`)
     const notes = [
-      meta.freeFood.source === "mock-fallback" ? "live calendar was unreachable, showing fallback" : null,
+      meta.freeFood.source === "unavailable" ? "Berkeley calendar unavailable, its events omitted" : null,
+      meta.freeFood.source === "demo" ? "sample demo data, not real offers" : null,
       meta.callink.source === "unavailable" ? "Cal Link was unreachable, club events omitted" : null,
     ].filter((n): n is string => n != null)
     const note = notes.length > 0 ? ` (${notes.join("; ")})` : ""
@@ -42,7 +43,7 @@ export async function answerDeterministically(message: string): Promise<string> 
       return "No nearby eats found."
     }
     const lines = eats.slice(0, 5).map((e) => `- ${e.title}${e.distanceMinutes != null ? ` (${e.distanceMinutes} min away)` : ""}`)
-    return `Real cafes/restaurants near campus (no live discount data exists, so no savings claims here):\n${lines.join("\n")}`
+    return `${meta.nearbyEats.source === "demo" ? "Sample restaurants for the demo, not real listings" : "Real cafes/restaurants near campus"} (prices and discounts are not verified):\n${lines.join("\n")}`
   }
 
   if (/budget|spend|afford|save|savings/.test(text)) {
@@ -82,11 +83,12 @@ export async function answerWithLLM(message: string, history: ChatMessage[] = []
   const apiKey = process.env.OPENAI_API_KEY
   if (!apiKey) throw new Error("OPENAI_API_KEY is not configured")
 
-  const { recommendations } = await buildRecommendations({ maxTravelMinutes: 20 })
+  const { recommendations, meta } = await buildRecommendations({ maxTravelMinutes: 20 })
   const freeFood = recommendations.filter((r) => r.kind === "free_food").slice(0, 8)
   const nearbyEats = recommendations.filter((r) => r.kind === "nearby_eats").slice(0, 8)
 
   const context = [
+    meta.freeFood.source === "demo" ? "ALL LISTINGS BELOW ARE SAMPLE DEMO DATA. Identify them as examples, never as actual offers." : "Source results may be incomplete; an empty list does not prove no offers exist.",
     `Free food events this week at ${university.name} (a limited source list; times in Berkeley; do not invent more):`,
     ...(freeFood.length > 0
       ? freeFood.map(

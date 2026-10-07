@@ -83,6 +83,7 @@ export type RecommendationKind = "free_food" | "nearby_eats" | "grocery" | "dini
 export interface Recommendation {
   id: string
   kind: RecommendationKind
+  isSample?: boolean
   title: string
   subtitle?: string
   /** Reserved for verified savings values; current discovery sources have

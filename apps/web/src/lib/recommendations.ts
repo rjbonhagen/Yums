@@ -4,7 +4,7 @@ import type { Recommendation } from "@yums/shared"
 import { berkeleyLiveSource, callinkSource, ingestSource, type ExtractedFoodEvent } from "@yums/event-ingestion"
 import { fetchNearbyPlaces } from "./nearby-places"
 import { haversineMinutes } from "./geo"
-import { freeFoodEvents as fallbackFreeFoodEvents } from "./mock-data"
+import { demoFoodEvents } from "./mock-data"
 import { eventEnd, isInCampusWeek } from "./event-time"
 import { fetchBusyIntervals, scheduleScoreFromBusyIntervals, type BusyInterval } from "./google-calendar"
 
@@ -72,7 +72,7 @@ function normalizeLiveEvent(e: ExtractedFoodEvent, i: number): NormalizedFoodEve
   }
 }
 
-function normalizeFallbackEvent(e: (typeof fallbackFreeFoodEvents)[number]): NormalizedFoodEvent {
+function normalizeFallbackEvent(e: ReturnType<typeof demoFoodEvents>[number]): NormalizedFoodEvent {
   return {
     id: e.id,
     title: e.title,
@@ -98,9 +98,9 @@ export interface RecommendationParams {
 }
 
 export interface RecommendationsMeta {
-  freeFood: { source: "live" | "mock-fallback"; error?: string }
-  callink: { source: "live" | "unavailable"; error?: string }
-  nearbyEats: { source: "live" | "unavailable"; error?: string }
+  freeFood: { source: "live" | "unavailable" | "demo"; error?: string }
+  callink: { source: "live" | "unavailable" | "demo"; error?: string }
+  nearbyEats: { source: "live" | "unavailable" | "demo"; error?: string }
   schedule: { source: "live" | "placeholder" | "unavailable"; error?: string }
 }
 
@@ -112,6 +112,7 @@ export interface RecommendationsResult {
 export async function buildRecommendations(params: RecommendationParams): Promise<RecommendationsResult> {
   const { maxTravelMinutes, calendarAccessToken } = params
   const weights = params.optimizeFor === "fast" ? { ...DEFAULT_WEIGHTS, savingsWeight: 0.1, proximityWeight: 0.5 } : DEFAULT_WEIGHTS
+  const demo = process.env.YUMS_DEMO_MODE === "true"
   const recs: Recommendation[] = []
   const meta: RecommendationsMeta = {
     freeFood: { source: "live" },
@@ -127,9 +128,12 @@ export async function buildRecommendations(params: RecommendationParams): Promis
   const now = new Date()
   const weekAhead = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000)
   const [foodResult, callinkResult, placesResult, calendarResult] = await Promise.allSettled([
-    getCachedBerkeleyEvents(),
-    getCachedCallinkEvents(),
-    getCachedNearbyPlaces(),
+    demo ? Promise.resolve([]) : getCachedBerkeleyEvents(),
+    demo ? Promise.resolve([]) : getCachedCallinkEvents(),
+    demo ? Promise.resolve([
+      { id: "sample-cafe", name: "Sample campus cafe", latitude: 37.8705, longitude: -122.259, address: "Sample listing · no verified prices" },
+      { id: "sample-restaurant", name: "Sample nearby restaurant", latitude: 37.869, longitude: -122.26, address: "Sample listing · no verified prices" },
+    ]) : getCachedNearbyPlaces(),
     calendarAccessToken
       ? fetchBusyIntervals(calendarAccessToken, now, weekAhead)
       : Promise.resolve<BusyInterval[]>([]),
@@ -153,8 +157,8 @@ export async function buildRecommendations(params: RecommendationParams): Promis
     foodEvents = foodResult.value.map(normalizeLiveEvent)
   } else {
     const err = foodResult.reason
-    meta.freeFood = { source: "mock-fallback", error: err instanceof Error ? err.message : "fetch failed" }
-    foodEvents = fallbackFreeFoodEvents.map(normalizeFallbackEvent)
+    meta.freeFood = { source: "unavailable", error: err instanceof Error ? err.message : "fetch failed" }
+    foodEvents = []
   }
 
   // Cal Link: real club/org events from callink.berkeley.edu, with real
@@ -167,6 +171,13 @@ export async function buildRecommendations(params: RecommendationParams): Promis
   } else {
     const err = callinkResult.reason
     meta.callink = { source: "unavailable", error: err instanceof Error ? err.message : "fetch failed" }
+  }
+
+  if (demo) {
+    foodEvents = demoFoodEvents(now).map(normalizeFallbackEvent)
+    meta.freeFood = { source: "demo" }
+    meta.callink = { source: "demo" }
+    meta.nearbyEats = { source: "demo" }
   }
 
   for (const event of foodEvents) {
@@ -198,6 +209,7 @@ export async function buildRecommendations(params: RecommendationParams): Promis
     recs.push({
       id: event.id,
       kind: "free_food",
+      isSample: demo,
       title: event.food ? `Free ${event.food}` : event.title,
       subtitle: event.locationName ? `${event.organization} · ${event.locationName}` : event.organization,
       estimatedSavings,
@@ -234,6 +246,7 @@ export async function buildRecommendations(params: RecommendationParams): Promis
       recs.push({
         id: `place-${place.id}`,
         kind: "nearby_eats",
+        isSample: demo,
         title: place.name,
         subtitle: place.address,
         estimatedSavings: 0,
@@ -241,6 +254,7 @@ export async function buildRecommendations(params: RecommendationParams): Promis
         distanceEstimated: true,
         latitude: place.latitude,
         longitude: place.longitude,
+        sourceUrl: demo ? undefined : `https://www.openstreetmap.org/node/${place.id}`,
         score,
       })
     }

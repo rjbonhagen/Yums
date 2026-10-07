@@ -28,16 +28,17 @@ export default async function DashboardPage(props: PageProps<"/dashboard">) {
     <div className="flex flex-1 flex-col">
       <Nav />
       <main className="mx-auto w-full max-w-3xl flex-1 space-y-8 px-4 py-8">
+        {meta.freeFood.source === "demo" && <p role="status" className="rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">Sample demo data · these events are examples, not real offers.</p>}
         <section>
           <div className="mb-1 flex items-center gap-2">
             <h1 className="text-2xl font-semibold">Today at {university.name}</h1>
-            {meta.freeFood.source === "mock-fallback" && (
+            {meta.freeFood.source === "unavailable" && (
               <Badge
                 variant="outline"
                 className="border-amber-300 bg-amber-50 text-amber-700 dark:border-amber-900 dark:bg-amber-950 dark:text-amber-400"
                 title={meta.freeFood.error}
               >
-                Live calendar unreachable — showing fallback
+                Live calendar unavailable — events omitted
               </Badge>
             )}
             {meta.callink.source === "unavailable" && (
@@ -60,6 +61,7 @@ export default async function DashboardPage(props: PageProps<"/dashboard">) {
                 <CardContent className="flex items-center justify-between py-4">
                   <div>
                     <p className="font-medium">{r.title}</p>
+                    {r.isSample && <p className="text-xs text-amber-700">Sample event</p>}
                     <p className="text-muted-foreground text-sm">{r.subtitle}</p>
                     <p className="text-muted-foreground text-xs">
                       {formatEventDateTime(r.startTime)}

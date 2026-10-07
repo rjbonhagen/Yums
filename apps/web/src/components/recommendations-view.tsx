@@ -42,6 +42,7 @@ function RecommendationCard({
       <CardContent className="flex items-start justify-between gap-4 py-4">
         <div>
           <p className="font-medium">{r.title}</p>
+          {r.isSample && <p className="text-xs text-amber-700">Sample listing · not a real offer</p>}
           {r.subtitle && <p className="text-muted-foreground text-sm">{r.subtitle}</p>}
           <p className="text-muted-foreground text-xs">
             {formatEventDateTime(r.startTime)}

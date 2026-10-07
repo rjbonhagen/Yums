@@ -67,13 +67,14 @@ function mockIngestSource(impl: (source: { key: string }) => Promise<unknown[]>)
 }
 
 beforeEach(() => {
+  vi.stubEnv("YUMS_DEMO_MODE", "false")
   vi.useFakeTimers()
   vi.setSystemTime(new Date("2026-09-01T18:00:00Z"))
   vi.mocked(ingestSource).mockReset()
   vi.mocked(fetchNearbyPlaces).mockReset()
 })
 
-afterEach(() => vi.useRealTimers())
+afterEach(() => { vi.useRealTimers(); vi.unstubAllEnvs() })
 
 describe("buildRecommendations", () => {
   it("reports every source as live when all three succeed", async () => {
@@ -95,7 +96,7 @@ describe("buildRecommendations", () => {
     expect(recommendations.some((r) => r.title === "Caffé Strada")).toBe(true)
   })
 
-  it("falls back to the mock free-food fixture only when the Berkeley fetch throws, and discloses it", async () => {
+  it("omits Berkeley events during an outage without injecting sample offers", async () => {
     mockIngestSource(async (source) => {
       if (source.key === "berkeley-live") throw new Error("events.berkeley.edu returned 503")
       return [liveCallinkEvent]
@@ -104,11 +105,12 @@ describe("buildRecommendations", () => {
 
     const { recommendations, meta } = await buildRecommendations({ maxTravelMinutes: 20 })
 
-    expect(meta.freeFood).toEqual({ source: "mock-fallback", error: "events.berkeley.edu returned 503" })
+    expect(meta.freeFood).toEqual({ source: "unavailable", error: "events.berkeley.edu returned 503" })
     // Cal Link's independent success is unaffected by Berkeley's failure.
     expect(meta.callink).toEqual({ source: "live" })
     // Some free_food recs came from the (non-empty) mock fixture, not silently zero.
-    expect(recommendations.some((r) => r.kind === "free_food")).toBe(true)
+    expect(recommendations.filter((r) => r.kind === "free_food")).toHaveLength(1)
+    expect(recommendations.some((r) => r.isSample)).toBe(false)
   })
 
   it("omits Cal Link events (never fabricates a replacement) when Cal Link fails, without touching Berkeley's result", async () => {
@@ -205,5 +207,15 @@ describe("buildRecommendations", () => {
     const fast = await buildRecommendations({ maxTravelMinutes: 10, optimizeFor: "fast" })
     expect(cheap.recommendations[0].kind).toBe("free_food")
     expect(fast.recommendations[0].kind).toBe("nearby_eats")
+  })
+
+  it("uses clearly marked sample listings only when demo mode is explicitly enabled", async () => {
+    vi.stubEnv("YUMS_DEMO_MODE", "true")
+    const { recommendations, meta } = await buildRecommendations({ maxTravelMinutes: 20 })
+    expect(meta.freeFood.source).toBe("demo")
+    expect(recommendations).toHaveLength(5)
+    expect(recommendations.every((r) => r.isSample)).toBe(true)
+    expect(ingestSource).not.toHaveBeenCalled()
+    expect(fetchNearbyPlaces).not.toHaveBeenCalled()
   })
 })
