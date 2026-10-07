@@ -101,6 +101,8 @@ export interface Recommendation {
   longitude?: number
   startTime?: string
   sourceUrl?: string
+  endTime?: string
+  durationEstimated?: boolean
   /** free_food only: `${organization}::${original event title}` — the
    * *original* title from the source, before any "Free {food}" display
    * transformation, since that transformed title isn't a safe grouping

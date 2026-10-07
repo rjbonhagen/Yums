@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest"
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 
 // buildRecommendations()'s entire job is "never fabricate, always disclose
 // degradation" (docs/architecture.md) — these tests exercise that guarantee
@@ -67,9 +67,13 @@ function mockIngestSource(impl: (source: { key: string }) => Promise<unknown[]>)
 }
 
 beforeEach(() => {
+  vi.useFakeTimers()
+  vi.setSystemTime(new Date("2026-09-01T18:00:00Z"))
   vi.mocked(ingestSource).mockReset()
   vi.mocked(fetchNearbyPlaces).mockReset()
 })
+
+afterEach(() => vi.useRealTimers())
 
 describe("buildRecommendations", () => {
   it("reports every source as live when all three succeed", async () => {
@@ -179,5 +183,18 @@ describe("buildRecommendations", () => {
     const { meta } = await buildRecommendations({ maxTravelMinutes: 20 })
 
     expect(meta.schedule).toEqual({ source: "placeholder" })
+  })
+
+  it("excludes expired and out-of-week source events and retains real end times", async () => {
+    mockIngestSource(async (source) => source.key === "callink-live" ? [] : [
+      { ...liveBerkeleyEvent, endTime: "2026-09-01T22:00:00Z" },
+      { ...liveBerkeleyEvent, sourceUrl: "expired", startTime: "2026-09-01T16:00:00Z", endTime: "2026-09-01T17:00:00Z" },
+      { ...liveBerkeleyEvent, sourceUrl: "far-future", startTime: "2026-09-20T20:00:00Z" },
+    ])
+    vi.mocked(fetchNearbyPlaces).mockResolvedValue([])
+    const { recommendations } = await buildRecommendations({ maxTravelMinutes: 20 })
+    expect(recommendations).toHaveLength(1)
+    expect(recommendations[0].endTime).toBe("2026-09-01T22:00:00.000Z")
+    expect(recommendations[0].durationEstimated).toBe(false)
   })
 })

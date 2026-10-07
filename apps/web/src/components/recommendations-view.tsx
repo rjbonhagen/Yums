@@ -45,6 +45,7 @@ function RecommendationCard({
           {r.subtitle && <p className="text-muted-foreground text-sm">{r.subtitle}</p>}
           <p className="text-muted-foreground text-xs">
             {formatEventDateTime(r.startTime)}
+            {r.durationEstimated ? " · duration estimated at 1 hour" : ""}
             {r.startTime && r.distanceMinutes != null ? " · " : ""}
             {r.distanceMinutes != null
               ? `${r.distanceEstimated ? "~" : ""}${r.distanceMinutes} min away`
@@ -116,6 +117,7 @@ function RecurringGroupCard({
             <li key={r.id} className="flex items-center justify-between gap-3">
               <span className="text-muted-foreground text-xs">
                 {formatEventDateTime(r.startTime)}
+                {r.durationEstimated ? " · duration estimated at 1 hour" : ""}
                 {r.distanceMinutes != null ? ` · ${r.distanceEstimated ? "~" : ""}${r.distanceMinutes} min away` : ""}
               </span>
               <div className="flex items-center gap-2">

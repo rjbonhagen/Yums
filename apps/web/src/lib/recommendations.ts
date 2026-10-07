@@ -5,6 +5,7 @@ import { berkeleyLiveSource, callinkSource, ingestSource, type ExtractedFoodEven
 import { fetchNearbyPlaces } from "./nearby-places"
 import { haversineMinutes } from "./geo"
 import { freeFoodEvents as fallbackFreeFoodEvents } from "./mock-data"
+import { eventEnd, isInCampusWeek } from "./event-time"
 import { fetchBusyIntervals, scheduleScoreFromBusyIntervals, type BusyInterval } from "./google-calendar"
 
 const PLACEHOLDER_SCHEDULE_SCORE = 0.7 // used until a calendar is connected (see RecommendationsParams.calendarAccessToken)
@@ -49,6 +50,7 @@ interface NormalizedFoodEvent {
   latitude?: number
   longitude?: number
   startTime: string
+  endTime?: string
   sourceUrl: string
   confidenceScore: number
   food?: string
@@ -63,6 +65,7 @@ function normalizeLiveEvent(e: ExtractedFoodEvent, i: number): NormalizedFoodEve
     latitude: e.latitude,
     longitude: e.longitude,
     startTime: e.startTime,
+    endTime: e.endTime,
     sourceUrl: e.sourceUrl,
     confidenceScore: e.confidenceScore,
     food: e.food,
@@ -78,6 +81,7 @@ function normalizeFallbackEvent(e: (typeof fallbackFreeFoodEvents)[number]): Nor
     latitude: e.location.latitude,
     longitude: e.location.longitude,
     startTime: e.startTime,
+    endTime: e.endTime,
     sourceUrl: e.sourceUrl,
     confidenceScore: e.confidenceScore,
     food: e.food,
@@ -164,6 +168,7 @@ export async function buildRecommendations(params: RecommendationParams): Promis
   }
 
   for (const event of foodEvents) {
+    if (!isInCampusWeek(event.startTime, event.endTime, now)) continue
     const hasCoords = event.latitude != null && event.longitude != null
     const minutesAway = hasCoords
       ? haversineMinutes(CAMPUS_CENTER.lat, CAMPUS_CENTER.lng, event.latitude!, event.longitude!)
@@ -174,10 +179,10 @@ export async function buildRecommendations(params: RecommendationParams): Promis
     // available; otherwise the documented flat placeholder (see
     // RecommendationParams.calendarAccessToken and lib/google-calendar.ts).
     const eventStart = new Date(event.startTime)
-    const eventEnd = new Date(eventStart.getTime() + 60 * 60 * 1000) // events here have no endTime field; assume 1hr
+    const end = eventEnd(event.startTime, event.endTime)
     const scheduleScore =
       calendarAccessToken && meta.schedule.source === "live"
-        ? scheduleScoreFromBusyIntervals(busyIntervals, eventStart, eventEnd)
+        ? scheduleScoreFromBusyIntervals(busyIntervals, eventStart, end.date)
         : PLACEHOLDER_SCHEDULE_SCORE
 
     const score = scoreOpportunity({
@@ -199,6 +204,8 @@ export async function buildRecommendations(params: RecommendationParams): Promis
       latitude: event.latitude,
       longitude: event.longitude,
       startTime: event.startTime,
+      endTime: end.date.toISOString(),
+      durationEstimated: end.estimated,
       sourceUrl: event.sourceUrl,
       // event.title here is the original (pre-"Free {food}"-transform)
       // title — see the Recommendation.seriesKey comment in

@@ -36,6 +36,7 @@ export default async function FeedPage() {
       <Nav />
       <main className="mx-auto w-full max-w-3xl flex-1 space-y-4 px-4 py-8">
         <h1 className="text-2xl font-semibold">Campus Feed</h1>
+        <p className="text-muted-foreground text-sm">Today and the next six days · times in Berkeley (Pacific Time).</p>
         <p className="text-muted-foreground mb-2 text-sm">
           Free food is live from events.berkeley.edu&apos;s public calendar and Cal Link&apos;s club-events
           feed; nearby eats are live from OpenStreetMap.

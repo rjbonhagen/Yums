@@ -3,6 +3,7 @@ import { Badge } from "@/components/ui/badge"
 import { Card, CardContent } from "@/components/ui/card"
 import { Nav } from "@/components/nav"
 import { buildRecommendations } from "@/lib/recommendations"
+import { isToday } from "@/lib/event-time"
 
 const FEATURES = [
   {
@@ -31,8 +32,9 @@ const STEPS = [
 
 export default async function HomePage() {
   const { recommendations } = await buildRecommendations({ maxTravelMinutes: 20 })
-  const preview = recommendations.slice(0, 3)
-  const freeFoodCount = recommendations.filter((r) => r.kind === "free_food").length
+  const todayRecommendations = recommendations.filter((r) => r.kind !== "free_food" || isToday(r.startTime))
+  const preview = todayRecommendations.slice(0, 3)
+  const freeFoodCount = todayRecommendations.filter((r) => r.kind === "free_food").length
   const eatsCount = recommendations.filter((r) => r.kind === "nearby_eats").length
   const closest = recommendations.find((r) => r.distanceMinutes != null)
 

@@ -6,6 +6,7 @@ import { buildRecommendations } from "@/lib/recommendations"
 import { getConnectedCalendarAccessToken } from "@/lib/google-calendar"
 import { university } from "@/lib/mock-data"
 import { formatEventDateTime } from "@/lib/format"
+import { isToday } from "@/lib/event-time"
 
 // No force-dynamic: see the same note in api/recommendations/route.ts —
 // this page already renders per-request (searchParams + cookies() via
@@ -19,7 +20,7 @@ export default async function DashboardPage(props: PageProps<"/dashboard">) {
 
   const calendarAccessToken = await getConnectedCalendarAccessToken()
   const { recommendations, meta } = await buildRecommendations({ maxTravelMinutes, calendarAccessToken: calendarAccessToken ?? undefined })
-  const freeFood = recommendations.filter((r) => r.kind === "free_food")
+  const freeFood = recommendations.filter((r) => r.kind === "free_food" && isToday(r.startTime))
   const projectedSpend = Math.max(0, budget - recommendations.reduce((sum, r) => sum + r.estimatedSavings, 0) * 0.4)
   const projectedSavings = Math.max(0, budget - projectedSpend)
 

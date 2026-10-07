@@ -4,17 +4,18 @@
 // Cal Link has no upper bound and can return events days/weeks out (see
 // callink-live.ts) — showing only a time with no date is misleading for
 // those, so this always makes "not today" explicit.
+import { CAMPUS_TIME_ZONE, campusDate, addCalendarDays } from "./event-time"
+
 export function formatEventDateTime(iso?: string, now: Date = new Date()): string {
   if (!iso) return ""
   const date = new Date(iso)
-  const time = date.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })
+  if (!Number.isFinite(date.getTime())) return "Time unavailable"
+  const time = date.toLocaleTimeString("en-US", { timeZone: CAMPUS_TIME_ZONE, hour: "numeric", minute: "2-digit" })
 
-  if (date.toDateString() === now.toDateString()) return time
+  if (campusDate(date) === campusDate(now)) return time
 
-  const tomorrow = new Date(now)
-  tomorrow.setDate(tomorrow.getDate() + 1)
-  if (date.toDateString() === tomorrow.toDateString()) return `Tomorrow, ${time}`
+  if (campusDate(date) === addCalendarDays(campusDate(now), 1)) return `Tomorrow, ${time}`
 
-  const dayLabel = date.toLocaleDateString([], { weekday: "short", month: "short", day: "numeric" })
+  const dayLabel = date.toLocaleDateString("en-US", { timeZone: CAMPUS_TIME_ZONE, weekday: "short", month: "short", day: "numeric" })
   return `${dayLabel}, ${time}`
 }
