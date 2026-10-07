@@ -3,7 +3,7 @@ import { scoreOpportunity, DEFAULT_WEIGHTS } from "@yums/shared"
 import type { Recommendation } from "@yums/shared"
 import { berkeleyLiveSource, callinkSource, ingestSource, type ExtractedFoodEvent } from "@yums/event-ingestion"
 import { fetchNearbyPlaces } from "./nearby-places"
-import { haversineMinutes } from "./geo"
+import { haversineMinutes, validCoordinates } from "./geo"
 import { demoFoodEvents } from "./mock-data"
 import { eventEnd, isInCampusWeek } from "./event-time"
 import { fetchBusyIntervals, scheduleScoreFromBusyIntervals, type BusyInterval } from "./google-calendar"
@@ -56,9 +56,9 @@ interface NormalizedFoodEvent {
   food?: string
 }
 
-function normalizeLiveEvent(e: ExtractedFoodEvent, i: number): NormalizedFoodEvent {
+function normalizeLiveEvent(e: ExtractedFoodEvent): NormalizedFoodEvent {
   return {
-    id: `live-${i}-${e.sourceUrl}`,
+    id: `live-${e.sourceUrl}-${Date.parse(e.startTime)}`,
     title: e.title,
     organization: e.organization,
     locationName: e.locationName,
@@ -178,9 +178,18 @@ export async function buildRecommendations(params: RecommendationParams): Promis
     meta.nearbyEats = { source: "demo" }
   }
 
+  // Source order can change between refreshes. Identity is the source URL
+  // plus occurrence time, so repeated pages collapse but recurring dates stay.
+  const uniqueFood = new Map<string, NormalizedFoodEvent>()
+  const quality = (event: NormalizedFoodEvent) => Number(!eventEnd(event.startTime, event.endTime).estimated)
+    + Number(validCoordinates(event.latitude, event.longitude)) + Number(Boolean(event.locationName))
   for (const event of foodEvents) {
+    const previous = uniqueFood.get(event.id)
+    if (!previous || quality(event) > quality(previous)) uniqueFood.set(event.id, event)
+  }
+  for (const event of uniqueFood.values()) {
     if (!isInCampusWeek(event.startTime, event.endTime, now)) continue
-    const hasCoords = event.latitude != null && event.longitude != null
+    const hasCoords = validCoordinates(event.latitude, event.longitude)
     const minutesAway = hasCoords
       ? haversineMinutes(CAMPUS_CENTER.lat, CAMPUS_CENTER.lng, event.latitude!, event.longitude!)
       : undefined
@@ -213,8 +222,8 @@ export async function buildRecommendations(params: RecommendationParams): Promis
       estimatedSavings,
       distanceMinutes: minutesAway,
       distanceEstimated: hasCoords ? true : undefined,
-      latitude: event.latitude,
-      longitude: event.longitude,
+      latitude: hasCoords ? event.latitude : undefined,
+      longitude: hasCoords ? event.longitude : undefined,
       startTime: event.startTime,
       endTime: end.date.toISOString(),
       durationEstimated: end.estimated,
@@ -231,7 +240,10 @@ export async function buildRecommendations(params: RecommendationParams): Promis
   // for student-discount data, so this never claims a savings figure —
   // see the RecommendationKind comment in packages/shared/types.ts.
   if (placesResult.status === "fulfilled") {
+    const seenPlaces = new Set<string>()
     for (const place of placesResult.value) {
+      if (!validCoordinates(place.latitude, place.longitude) || seenPlaces.has(place.id)) continue
+      seenPlaces.add(place.id)
       const minutesAway = haversineMinutes(CAMPUS_CENTER.lat, CAMPUS_CENTER.lng, place.latitude, place.longitude)
       const score = scoreOpportunity({
         savingsScore: 0,

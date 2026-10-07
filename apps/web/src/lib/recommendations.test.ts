@@ -82,6 +82,30 @@ beforeEach(() => {
 afterEach(() => { vi.useRealTimers(); vi.unstubAllEnvs() })
 
 describe("buildRecommendations", () => {
+  it("deduplicates source occurrences, retains recurring dates, and keeps IDs stable across reorder", async () => {
+    const nextOccurrence = { ...liveBerkeleyEvent, startTime: "2026-09-02T20:00:00Z" }
+    mockIngestSource(async (source) => source.key === "berkeley-live" ? [liveBerkeleyEvent, liveBerkeleyEvent, nextOccurrence] : [])
+    vi.mocked(fetchNearbyPlaces).mockResolvedValue([nearbyPlace, nearbyPlace])
+    const first = await buildRecommendations({ maxTravelMinutes: 20 })
+    expect(first.recommendations.filter((r) => r.kind === "free_food")).toHaveLength(2)
+    expect(first.recommendations.filter((r) => r.kind === "nearby_eats")).toHaveLength(1)
+    mockIngestSource(async (source) => source.key === "berkeley-live" ? [nextOccurrence, liveBerkeleyEvent] : [])
+    const second = await buildRecommendations({ maxTravelMinutes: 20 })
+    expect(second.recommendations.map((r) => r.id).sort()).toEqual(first.recommendations.map((r) => r.id).sort())
+  })
+  it("keeps the richer duplicate snapshot and never renders invalid source coordinates", async () => {
+    mockIngestSource(async (source) => source.key === "berkeley-live" ? [
+      { ...liveBerkeleyEvent, latitude: Infinity, longitude: NaN },
+      { ...liveBerkeleyEvent, endTime: "2026-09-01T22:00:00Z" },
+      { ...liveCallinkEvent, latitude: 999, longitude: 999 },
+    ] : [])
+    vi.mocked(fetchNearbyPlaces).mockResolvedValue([{ ...nearbyPlace, latitude: NaN }])
+    const { recommendations } = await buildRecommendations({ maxTravelMinutes: 20 })
+    expect(recommendations).toHaveLength(2)
+    expect(recommendations.find((r) => r.title === liveBerkeleyEvent.title)).toMatchObject({ endTime: "2026-09-01T22:00:00.000Z", durationEstimated: false })
+    expect(recommendations.find((r) => r.title === liveCallinkEvent.title)).toMatchObject({ latitude: undefined, longitude: undefined, distanceMinutes: undefined })
+    expect(recommendations.every((r) => Number.isFinite(r.score))).toBe(true)
+  })
   it("reports every source as live when all three succeed", async () => {
     mockIngestSource(async (source) =>
       source.key === "berkeley-live" ? [liveBerkeleyEvent] : [liveCallinkEvent],
