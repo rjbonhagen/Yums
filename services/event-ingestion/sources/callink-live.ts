@@ -77,7 +77,7 @@ export const callinkSource: CampusEventSource = {
 
     return body.value.map((e) => {
       const description = e.description ? stripHtml(e.description) : undefined
-      const hasFreeFoodBenefit = e.benefitNames?.some((b) => b.toLowerCase().includes("free food")) ?? false
+      const hasFreeFoodBenefit = e.benefitNames?.some((b) => b.trim().toLowerCase() === "free food") ?? false
 
       // benefitNames is Cal Link's own organizer-set tag, not a guess — fold
       // it into the description text so the existing keyword extractor
@@ -103,6 +103,7 @@ export const callinkSource: CampusEventSource = {
         latitude: latitude != null && !Number.isNaN(latitude) ? latitude : undefined,
         longitude: longitude != null && !Number.isNaN(longitude) ? longitude : undefined,
         sourceUrl: `https://callink.berkeley.edu/event/${e.id}`,
+        freeFoodConfirmed: hasFreeFoodBenefit,
       }
     })
   },

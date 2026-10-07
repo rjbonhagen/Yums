@@ -29,19 +29,38 @@ describe("extractDeterministic", () => {
     expect(result.confidenceScore).toBe(0.9)
   })
 
-  it("gives mid confidence (0.75) for a specific food keyword like pizza without 'free'", () => {
+  it("omits food without evidence that it is free", () => {
     const result = extractDeterministic(event({ description: "Come by for pizza and networking" }))
-    expect(result.confidenceScore).toBe(0.75)
+    expect(result.confidenceScore).toBe(0)
   })
 
   it("gives low confidence (0.5) for a generic food mention", () => {
     const result = extractDeterministic(event({ description: "Food will be provided" }))
-    expect(result.confidenceScore).toBe(0.5)
+    expect(result.confidenceScore).toBe(0)
   })
 
   it("extracts a comma-joined food phrase from known keywords", () => {
-    const result = extractDeterministic(event({ description: "Pizza and boba provided" }))
+    const result = extractDeterministic(event({ description: "Free pizza and boba provided" }))
     expect(result.food).toBe("pizza, boba")
+  })
+
+  it.each([
+    "Pizza costs $5", "Free admission, pizza costs $5", "No free food today",
+    "Food is not free", "There won't be free pizza", "Gluten-free pizza social",
+    "Discussion about free food policy", "Free food with purchase",
+    "Coffee tasting", "Lunch seminar about food insecurity",
+  ])("does not advertise an ambiguous or paid offer: %s", (description) => {
+    expect(extractDeterministic(event({ description })).confidenceScore).toBe(0)
+  })
+
+  it.each(["Complimentary refreshments provided", "Lunch is free", "Free boba after the meeting"])("accepts an explicit offer: %s", (description) => {
+    expect(extractDeterministic(event({ description })).confidenceScore).toBe(0.9)
+  })
+
+  it("accepts an explicit organizer benefit without inventing a food type", () => {
+    const result = extractDeterministic(event({ freeFoodConfirmed: true }))
+    expect(result.confidenceScore).toBe(0.9)
+    expect(result.food).toBeUndefined()
   })
 
   it("only checks title and description, not organization", () => {

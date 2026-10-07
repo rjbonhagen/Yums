@@ -8,6 +8,7 @@ export interface CampusEvent {
   latitude?: number
   longitude?: number
   sourceUrl: string
+  freeFoodConfirmed?: boolean // Explicit organizer-set Free Food benefit.
 }
 
 export interface CampusEventSource {
