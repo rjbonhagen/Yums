@@ -50,10 +50,62 @@ Invitation-mode sign-in avoids creating new accounts through magic links;
 Supabase's global new-signup switch must also be disabled by the project owner.
 See [pilot setup](pilot-setup.md) for configuration and operator steps.
 
-Local verification after these changes: 156 tests across 23 files, lint,
+Local verification after these changes: 198 tests across 29 files, lint,
 live-mode production build, and production dependency audit all pass. No
 production dependency vulnerabilities were reported. Database migrations were
 tested in local PostgreSQL; they have not been applied to the remote project.
+
+Six additional deployment-configuration tests pass. `npm run check:pilot`
+currently fails as expected: no local Supabase environment is configured.
+The production server was started explicitly with live mode and invite mode;
+these flags must also be configured in the eventual host environment.
+
+Source occurrence IDs now remain stable across reordered responses. Duplicate
+source URL/start-time pairs and duplicate restaurant IDs collapse; distinct
+recurring dates remain. Invalid coordinates cannot reach distance scoring or
+map markers. Tests cover richer duplicate snapshots and repeated occurrences.
+
+Reports now have application validation for a future start within seven days,
+field lengths, and safe http/https links. Database constraints prevent clients
+from bypassing content limits. A repeatable migration preserves legacy records
+and blocks invalid legacy reports from approval until corrected.
+
+Calendar credentials are stored only after an explicit connection request and
+a successful Google availability probe. Ordinary Google sign-in does not
+create a Calendar connection. Disconnect deletes only the current account's
+stored connection; it does not revoke Google's external authorization grant.
+Mocked tests cover consent boundaries, refresh errors, callback failures,
+reconnect, scoped disconnect, sign-out failures, and private-view refreshes.
+
+October 7 browser rehearsal against the live-mode production server verified
+desktop onboarding with a $42 target and eight-minute walking preference,
+feed preference propagation, saving a real source event, persistence after
+reload, removal, empty search results, unavailable-map guidance, guest chat
+using live event titles/times, and the
+unconfigured invitation-only sign-in state. The
+390-pixel mobile feed has no horizontal overflow. Screenshots are in
+`docs/screenshots/pilot-mobile.jpg`. The current feed returned 40 nearby places
+and two source listings for Cal-nival. Those listings have different source
+URLs and start times; cross-source duplicates are not automatically merged.
+No browser console errors were observed during this rehearsal.
+
+Freshness uses two-minute outer event caches, with a five-minute Berkeley
+source fetch cache and two-minute Cal Link fetch cache. Nearby places refresh
+on a ten-minute cache. These are request-triggered refresh intervals, not a
+guarantee of real-time availability. Source failures stay visible; no samples
+are substituted. Calendar response errors cannot be mistaken for a free
+schedule.
+
+## Verification remaining before launch
+
+| Requirement | Current evidence | Remaining verification |
+| --- | --- | --- |
+| Live discovery | Public sources and local production browser | Hosted smoke check and ongoing operator review |
+| Account persistence and isolation | Component mocks and local PostgreSQL policies | Two invited accounts on the actual Supabase project, across devices |
+| Moderation and chat allowance | Local PostgreSQL migrations and regression tests | Apply reviewed migrations and check remote policies/allowance |
+| Invitation-only access | Client flag and mocked sign-in tests | Disable remote sign-ups/anonymous access and verify email delivery |
+| Calendar | Mocked consent, refresh, disconnect and outage tests | Real Google consent and refresh, if enabled |
+| Deployment | Local production build and configuration checker | Choose host, configure HTTPS/redirects/environment, authorize publishing |
 
 Still required: project configuration and migration application, hosting setup,
 real-account verification, Calendar consent/refresh checks if enabled, and

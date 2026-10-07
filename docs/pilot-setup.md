@@ -15,6 +15,9 @@ For an existing database, review and apply these migrations in order:
 1. `20261007_saved_identity.sql`: preserves latest duplicate saved snapshots.
 2. `20261007_report_moderation.sql`: existing reports enter pending review.
 3. `20261007_chat_allowance.sql`: adds persistent provider-attempt limits.
+4. `20261007_report_validation.sql`: enforces content limits on new report writes
+   while preserving legacy records for review. Existing invalid records must be
+   corrected before approval; the initial schema already includes these limits.
 
 Back up existing data before migration. Verify row-level security and account
 behavior with two invited test accounts before inviting the rest of the pilot.
@@ -35,7 +38,8 @@ See [Supabase access configuration](https://supabase.com/docs/guides/auth/genera
 and [magic-link options](https://supabase.com/docs/reference/javascript/auth-signinwithotp).
 
 Set the site URL to the chosen hosted HTTPS origin and allow its
-`/auth/callback` redirect. Also retain localhost callbacks for local testing.
+`/auth/callback` redirect. When enabling Calendar, also allow the callback
+with `?calendar=connect`. Retain localhost callbacks for local testing.
 Configure an email sender suitable for the invited users and verify delivery.
 Use the public project URL and anon/publishable client key for the app's public
 configuration. Never place a service-role key in a `NEXT_PUBLIC_` variable.
@@ -79,6 +83,21 @@ belong in the hosting environment. Rebuild after changing public variables.
 Do not enable provider chat until the allowance migration is verified.
 Account limits do not replace a provider project spend cap or host traffic
 protection; configure those for the intended pilot size.
+
+Use Node.js 22, install from the repository root with `npm ci`, then run
+`npm test`, `npm run test:pilot-config`, `npm run lint`, and `npm run build`.
+Run `npm run check:pilot` with the actual deployment environment before
+publishing. Locally it also reads the ignored `apps/web/.env.local`, when
+present. It prints setting names rather than credential values, rejects
+sample mode and secret/service-role public keys, and requires invitation
+mode and a hosted HTTPS project origin. It checks key shape only; successful
+output does not prove that credentials work or that remote settings are safe.
+
+Calendar is optional. Connect explicitly from the signed-in account page;
+regular Google sign-in does not enable Calendar access. Verify availability,
+refresh, and reconnect with an existing Google identity. Disconnect removes
+the app's stored credentials for that account. Users can separately revoke
+the Google grant in their Google account settings.
 
 ## Acceptance and recovery
 

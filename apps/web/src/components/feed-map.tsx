@@ -55,7 +55,7 @@ export function FeedMap({ places }: { places: MappablePlace[] }) {
   if (!process.env.NEXT_PUBLIC_MAPBOX_TOKEN) {
     return (
       <p className="text-muted-foreground p-4 text-sm">
-        Map view isn&apos;t available in this demo. Use the list to browse events and places.
+        Map view isn&apos;t available right now. Use the list to browse events and places.
       </p>
     )
   }
