@@ -88,6 +88,7 @@ export default function ReportPage() {
                   <Label htmlFor="title">What&apos;s free?</Label>
                   <Input
                     id="title"
+                    maxLength={160}
                     value={title}
                     onChange={(e) => setTitle(e.target.value)}
                     placeholder="Free boba at the ASUC table"
@@ -97,13 +98,14 @@ export default function ReportPage() {
                   <Label htmlFor="location">Where</Label>
                   <Input
                     id="location"
+                    maxLength={160}
                     value={locationName}
                     onChange={(e) => setLocationName(e.target.value)}
                     placeholder="Sproul Plaza"
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="startTime">When</Label>
+                  <Label htmlFor="startTime">When (your local time)</Label>
                   <Input
                     id="startTime"
                     type="datetime-local"
@@ -115,6 +117,7 @@ export default function ReportPage() {
                   <Label htmlFor="description">Details (optional)</Label>
                   <Input
                     id="description"
+                    maxLength={2000}
                     value={description}
                     onChange={(e) => setDescription(e.target.value)}
                     placeholder="While supplies last"
@@ -124,6 +127,7 @@ export default function ReportPage() {
                   <Label htmlFor="sourceUrl">Link (optional)</Label>
                   <Input
                     id="sourceUrl"
+                    maxLength={2048}
                     type="url"
                     value={sourceUrl}
                     onChange={(e) => setSourceUrl(e.target.value)}

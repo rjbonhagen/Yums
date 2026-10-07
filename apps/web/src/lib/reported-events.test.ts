@@ -1,5 +1,8 @@
-import { describe, it, expect, vi } from "vitest"
-import { loadUpcomingReportedEvents, submitReportedEvent, deleteReportedEvent } from "./reported-events"
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest"
+import { loadUpcomingReportedEvents, submitReportedEvent, deleteReportedEvent, validateReportedEvent } from "./reported-events"
+
+beforeEach(() => { vi.useFakeTimers(); vi.setSystemTime(new Date("2026-09-01T17:00:00Z")) })
+afterEach(() => vi.useRealTimers())
 
 function fakeSupabase(result: { data?: unknown; error?: unknown }) {
   const calls: Record<string, unknown[]> = {}
@@ -24,6 +27,7 @@ function fakeSupabase(result: { data?: unknown; error?: unknown }) {
       calls.gte = args
       return chain
     }),
+    lte: vi.fn((...args: unknown[]) => { calls.lte = args; return chain }),
     eq: vi.fn((...args: unknown[]) => {
       calls.eq = [...(calls.eq ?? []), args]
       return chain
@@ -72,6 +76,7 @@ describe("loadUpcomingReportedEvents", () => {
     ])
     expect(calls.from).toEqual(["user_reported_events"])
     expect(calls.gte[0]).toBe("start_time")
+    expect(calls.lte).toEqual(["start_time", "2026-09-08T17:00:00.000Z"])
   })
 
   it("throws on a database error", async () => {
@@ -93,7 +98,7 @@ describe("submitReportedEvent", () => {
     expect(insertedRow).toMatchObject({
       user_id: "user-1",
       title: "Free samosas outside Sproul",
-      start_time: "2026-09-01T18:00:00Z",
+      start_time: "2026-09-01T18:00:00.000Z",
       description: null,
       location_name: null,
       source_url: null,
@@ -110,5 +115,27 @@ describe("deleteReportedEvent", () => {
       ["id", "report-1"],
       ["user_id", "user-1"],
     ])
+  })
+})
+
+describe("report validation", () => {
+  const valid = { title: " Free pizza ", startTime: "2026-09-01T18:00:00Z" }
+  it("normalizes input and accepts future offers with ordinary source links", () => {
+    expect(validateReportedEvent({ ...valid, sourceUrl: " https://example.com/flyer ", locationName: " Sproul " })).toMatchObject({
+      title: "Free pizza", startTime: "2026-09-01T18:00:00.000Z", sourceUrl: "https://example.com/flyer", locationName: "Sproul",
+    })
+  })
+  it.each(["javascript:alert(1)", "data:text/html,hello", "/relative", "https://user:password@example.com/"])("rejects unsafe source link %s", (sourceUrl) => {
+    expect(() => validateReportedEvent({ ...valid, sourceUrl })).toThrow(/source link/)
+  })
+  it.each(["invalid", "2026-08-31T18:00:00Z", "2026-09-10T18:00:00Z"])("rejects unusable start time %s", (startTime) => {
+    expect(() => validateReportedEvent({ ...valid, startTime })).toThrow(/future event/)
+  })
+  it("rejects oversized and blank fields before contacting the database", async () => {
+    for (const field of [{ title: " " }, { title: "x".repeat(161) }, { description: "x".repeat(2001) }, { locationName: "x".repeat(161) }]) {
+      const { supabase } = fakeSupabase({ data: ROW })
+      await expect(submitReportedEvent(supabase as never, "user-1", { ...valid, ...field })).rejects.toThrow()
+      expect(supabase.from).not.toHaveBeenCalled()
+    }
   })
 })

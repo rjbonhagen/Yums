@@ -47,6 +47,24 @@ beforeEach(async () => {
 afterAll(async () => { await db?.close() })
 
 describe("database constraints and account isolation", () => {
+  it("rejects invalid report content even when callers bypass the app", async () => {
+    for (const title of [" ", "x".repeat(161)]) {
+      await expect(db.query("insert into public.user_reported_events (user_id, title, start_time) values ($1, $2, now())", [A, title])).rejects.toThrow(/reports_content_limits/)
+    }
+    for (const source of ["javascript:alert(1)", "data:text/html,hello", "https://user:password@example.com/"]) {
+      await expect(db.query("insert into public.user_reported_events (user_id, title, start_time, source_url) values ($1, 'Free food', now(), $2)", [A, source])).rejects.toThrow(/reports_content_limits/)
+    }
+  })
+  it("adds repeatable report validation without deleting legacy records", async () => {
+    await db.exec(`reset role; alter table public.user_reported_events drop constraint reports_content_limits;
+      insert into public.user_reported_events (user_id, title, start_time) values ('${A}', '', now());`)
+    const migration = await readFile(new URL("./migrations/20261007_report_validation.sql", import.meta.url), "utf8")
+    await db.exec(migration)
+    await db.exec(migration)
+    expect((await db.query("select title from public.user_reported_events where title = ''")).rows).toHaveLength(1)
+    await expect(db.query("update public.user_reported_events set moderation_status = 'approved' where title = ''")).rejects.toThrow(/reports_content_limits/)
+    await db.exec("delete from public.user_reported_events where title = '';")
+  })
   it("limits provider attempts atomically, prevents client resets, and isolates accounts", async () => {
     expect((await db.query("select consume_chat_allowance() as allowed")).rows).toEqual([{ allowed: true }])
     expect((await db.query("select consume_chat_allowance() as allowed")).rows).toEqual([{ allowed: false }])

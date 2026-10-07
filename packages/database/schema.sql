@@ -170,6 +170,15 @@ create table user_reported_events (
   source_url text,
   moderation_status text not null default 'pending'
     check (moderation_status in ('pending', 'approved', 'rejected')),
+  constraint reports_content_limits check (
+    char_length(btrim(title)) between 1 and 160
+    and (description is null or char_length(description) <= 2000)
+    and (location_name is null or char_length(location_name) <= 160)
+    and (source_url is null or (
+      char_length(source_url) <= 2048 and source_url ~* '^https?://[^[:space:]]+$'
+      and source_url !~* '^https?://[^/]*@'
+    ))
+  ),
   created_at timestamptz not null default now()
 );
 
