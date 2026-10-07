@@ -1,6 +1,7 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { Suspense, useEffect, useState } from "react"
+import { useSearchParams } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -16,10 +17,16 @@ import { createClient, isSupabaseConfigured } from "@/lib/supabase/client"
  * apps/web/src/lib/preferences.ts).
  */
 export default function LoginPage() {
+  return <Suspense fallback={<p className="p-8">Loading sign-in…</p>}><LoginForm /></Suspense>
+}
+
+function LoginForm() {
+  const callbackError = useSearchParams().get("error")
   const [email, setEmail] = useState("")
   const [status, setStatus] = useState<"idle" | "sending" | "sent" | "error">("idle")
   const [error, setError] = useState<string | null>(null)
   const [calendarError, setCalendarError] = useState<string | null>(null)
+  const [calendarNotice, setCalendarNotice] = useState<string | null>(null)
   const [signedInEmail, setSignedInEmail] = useState<string | null>(null)
   const [googleStatus, setGoogleStatus] = useState<"idle" | "redirecting" | "error">("idle")
   const [googleError, setGoogleError] = useState<string | null>(null)
@@ -29,6 +36,7 @@ export default function LoginPage() {
     createClient()
       .auth.getUser()
       .then(({ data: { user } }) => setSignedInEmail(user?.email ?? null))
+      .catch(() => setError("Couldn't check your account. Try signing in again."))
   }, [])
 
   async function sendMagicLink() {
@@ -37,7 +45,7 @@ export default function LoginPage() {
     try {
       const supabase = createClient()
       const { error: authError } = await supabase.auth.signInWithOtp({
-        email,
+        email: email.trim(),
         options: {
           emailRedirectTo: `${window.location.origin}/auth/callback`,
           shouldCreateUser: process.env.NEXT_PUBLIC_INVITE_ONLY !== "true",
@@ -80,14 +88,20 @@ export default function LoginPage() {
   // provider configured in the Supabase project dashboard.
   async function connectGoogleCalendar() {
     setCalendarError(null)
+    setCalendarNotice(null)
     try {
       const supabase = createClient()
-      const { error: linkError } = await supabase.auth.linkIdentity({
+      const { data: { user }, error: accountError } = await supabase.auth.getUser()
+      if (accountError || !user) throw new Error("Sign in before connecting Calendar.")
+      const connect = user.identities?.some((identity) => identity.provider === "google")
+        ? supabase.auth.signInWithOAuth.bind(supabase.auth)
+        : supabase.auth.linkIdentity.bind(supabase.auth)
+      const { error: linkError } = await connect({
         provider: "google",
         options: {
           scopes: "https://www.googleapis.com/auth/calendar.freebusy",
           queryParams: { access_type: "offline", prompt: "consent" },
-          redirectTo: `${window.location.origin}/auth/callback`,
+          redirectTo: `${window.location.origin}/auth/callback?calendar=connect`,
         },
       })
       if (linkError) throw linkError
@@ -96,10 +110,13 @@ export default function LoginPage() {
     }
   }
 
+  const errorMessage = error ?? (callbackError === "auth-failed" ? "Sign-in could not be completed. Request a fresh link and try again." : null)
+  const calendarMessage = calendarError ?? (callbackError === "calendar-failed" ? "Calendar connection could not be confirmed. Try connecting again." : null)
+
   return (
     <div className="flex flex-1 flex-col">
       <Nav />
-      <main className="flex flex-1 items-center justify-center px-4 py-12">
+      <main className="flex flex-1 flex-col items-center justify-center px-4 py-12">
         <Card className="w-full max-w-md">
           <CardHeader>
             <CardTitle className="text-2xl">Sign in</CardTitle>
@@ -141,20 +158,25 @@ export default function LoginPage() {
                   <div className="bg-border h-px flex-1" />
                 </div>
 
+                <form className="space-y-3" onSubmit={(event) => { event.preventDefault(); sendMagicLink() }}>
                 <div className="space-y-2">
                   <Label htmlFor="email">Email</Label>
                   <Input
                     id="email"
                     type="email"
+                    required
+                    autoComplete="email"
+                    maxLength={254}
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     placeholder="you@berkeley.edu"
                   />
                 </div>
-                {status === "error" && <p className="text-destructive text-xs">{error}</p>}
-                <Button className="w-full" disabled={!email || status === "sending"} onClick={sendMagicLink}>
+                {errorMessage && <p role="alert" className="text-destructive text-xs">{errorMessage}</p>}
+                <Button type="submit" className="w-full" disabled={!email.trim() || status === "sending"}>
                   {status === "sending" ? "Sending…" : "Send magic link"}
                 </Button>
+                </form>
               </>
             )}
           </CardContent>
@@ -170,9 +192,20 @@ export default function LoginPage() {
               </p>
             </CardHeader>
             <CardContent className="space-y-2">
-              {calendarError && <p className="text-destructive text-xs">{calendarError}</p>}
+              {calendarMessage && <p role="alert" className="text-destructive text-xs">{calendarMessage}</p>}
+              {calendarNotice && <p role="status" className="text-muted-foreground text-xs">{calendarNotice}</p>}
               <Button className="w-full" variant="outline" onClick={connectGoogleCalendar}>
                 Connect Google Calendar
+              </Button>
+              <Button className="w-full" variant="outline" onClick={async () => {
+                setCalendarError(null)
+                try {
+                  const response = await fetch("/api/calendar/disconnect", { method: "POST" })
+                  if (!response.ok) throw new Error("disconnect failed")
+                  setCalendarNotice("Stored Calendar connection removed. Reconnect to use your schedule again.")
+                } catch { setCalendarError("Couldn't disconnect Calendar. Try again.") }
+              }}>
+                Disconnect Google Calendar
               </Button>
             </CardContent>
           </Card>
