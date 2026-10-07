@@ -44,7 +44,9 @@ use Supabase snapshots with per-user save-key uniqueness and idempotent upsert.
 Existing databases need the dated migration before using this path; it has
 not been applied to a remote database during this work. RLS scopes preferences,
 saves, and Calendar tokens to each user's auth UID. Community reports are
-separate unverified records, publicly readable and author-editable.
+separate unverified records: approved reports are public, while pending and
+rejected reports are author-only. Authors cannot self-approve or edit approved
+content; a pilot operator reviews reports through the privileged SQL editor.
 
 ## Optional services and limits
 
@@ -52,8 +54,11 @@ Without provider credentials the app still runs: map/auth/report views explain
 the unavailable state, guest saves work, and chat uses deterministic replies.
 Configured chat receives bounded request/history sizes and source-grounded
 context. Provider failures fall back to deterministic replies. Request bounds
-are not a distributed rate limit: public paid chat needs service-level usage
-controls before deployment. Model extraction remains intentionally unimplemented.
+are supplemented by a persistent PostgreSQL allowance: verified accounts receive
+up to 20 provider attempts per UTC day, with five seconds between attempts.
+Guests, exhausted accounts, and allowance errors use deterministic replies.
+Host traffic protection and provider aggregate spend caps remain deployment
+tasks. Model extraction remains intentionally unimplemented.
 
 `YUMS_DEMO_MODE=true` substitutes explicit sample listings and avoids discovery
 network calls. Samples are never a live outage fallback. Provider-backed

@@ -4,6 +4,11 @@ A UC Berkeley food-discovery demo: find campus events offering free food,
 browse nearby restaurants, and rank recommendations for free food or shorter
 walks. Prices, nutrition, attendance, and actual savings are not tracked.
 
+An invited Berkeley pilot is being prepared with live feeds, account persistence,
+reviewed community submissions, and per-account paid-chat limits. See
+[pilot setup](docs/pilot-setup.md) and [release status](docs/pilot-release.md).
+Remote account configuration and deployment have not yet been verified.
+
 ![Desktop feed](docs/screenshots/feed-desktop.jpg)
 
 More screenshots: [mobile feed](docs/screenshots/feed-mobile.jpg),
@@ -79,6 +84,12 @@ editor. For an existing database, apply
 cloud saves. It preserves the newest duplicate snapshot and adds per-user
 uniqueness. No remote database changes were made during this work.
 
+For the invited pilot, also apply the report moderation and chat allowance
+migrations described in [pilot setup](docs/pilot-setup.md). New databases need
+the initial schema plus the chat allowance migration. Existing reports enter
+pending review; only approved reports are shared. Paid provider replies require
+a verified account and a database allowance; failures use deterministic replies.
+
 Configure Supabase site URL and auth redirect URL for your localhost address
 (`/auth/callback`). Google sign-in requires the Google provider in Supabase;
 Calendar linking also requires the FreeBusy scope and the app's Google OAuth
@@ -98,8 +109,8 @@ local saves use localStorage, while account saves use Supabase row-level securit
 - Restaurant listings have no verified menu prices, discounts, or nutrition.
 - Browser reminders require an open feed tab; there is no background push.
 - Optional credential-backed integrations were not live-verified in this checkout.
-- This is a local portfolio demo. Public paid chat needs service-level usage limits;
-  public community reports need moderation before accepting real users.
+- Remote migrations, invited-account checks, email delivery, host traffic limits,
+  and provider spend limits must be verified before accepting pilot users.
 
 See [architecture](docs/architecture.md), [sources](docs/data-sources.md),
 [product scope](docs/product.md), and [roadmap](docs/roadmap.md).

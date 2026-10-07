@@ -32,7 +32,29 @@ but its identifier and configuration have not been verified.
 
 October 7: found and corrected ignored Berkeley query parameters; added proper
 date-window pagination and description/location fields. Cal Link now includes
-recently started events. Live-mode build and rehearsal are the next checks.
+recently started events. Live-mode production checks returned live status for
+all three discovery sources: one qualifying food offer and 40 nearby places.
 
-Still required: account project configuration, moderation and usage controls,
-hosting preparation, real-account verification, and deployment authorization.
+Community submissions now enter pending review; only approved records are
+shared, authors see their own pending/rejected records, and approved content
+cannot be changed by its author. A repeatable migration covers existing reports.
+Database tests verify visibility, denied self-approval, and approved-content
+protection. Approval is a manual pilot-operator task in the Supabase SQL editor.
+
+Paid chat now requires verified authentication and a persistent database
+allowance: 20 provider attempts per UTC day and five seconds between attempts.
+Guests, exhausted accounts, and database failures receive deterministic replies.
+Usage counts failed provider attempts as well as successful replies.
+
+Invitation-mode sign-in avoids creating new accounts through magic links;
+Supabase's global new-signup switch must also be disabled by the project owner.
+See [pilot setup](pilot-setup.md) for configuration and operator steps.
+
+Local verification after these changes: 156 tests across 23 files, lint,
+live-mode production build, and production dependency audit all pass. No
+production dependency vulnerabilities were reported. Database migrations were
+tested in local PostgreSQL; they have not been applied to the remote project.
+
+Still required: project configuration and migration application, hosting setup,
+real-account verification, Calendar consent/refresh checks if enabled, and
+deployment authorization. The local safeguards alone do not prove launch readiness.

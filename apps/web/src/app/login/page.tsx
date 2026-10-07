@@ -38,7 +38,10 @@ export default function LoginPage() {
       const supabase = createClient()
       const { error: authError } = await supabase.auth.signInWithOtp({
         email,
-        options: { emailRedirectTo: `${window.location.origin}/auth/callback` },
+        options: {
+          emailRedirectTo: `${window.location.origin}/auth/callback`,
+          shouldCreateUser: process.env.NEXT_PUBLIC_INVITE_ONLY !== "true",
+        },
       })
       if (authError) throw authError
       setStatus("sent")
@@ -101,6 +104,7 @@ export default function LoginPage() {
           <CardHeader>
             <CardTitle className="text-2xl">Sign in</CardTitle>
             <p className="text-muted-foreground text-sm">
+              {process.env.NEXT_PUBLIC_INVITE_ONLY === "true" && "Invited Berkeley pilot users only. "}
               Get a magic link so your budget and preferences sync across devices instead of staying in
               this browser&apos;s local storage.
             </p>
