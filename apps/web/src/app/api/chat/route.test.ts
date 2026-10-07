@@ -19,6 +19,22 @@ beforeEach(() => {
 })
 
 describe("POST /api/chat", () => {
+  it("rejects oversized bodies before invoking either reply path", async () => {
+    const response = await POST(req({ message: "x".repeat(40000) }))
+    expect(response.status).toBe(413)
+    expect(answerWithLLM).not.toHaveBeenCalled()
+    expect(answerDeterministically).not.toHaveBeenCalled()
+  })
+  it("rejects overlong messages and malformed JSON", async () => {
+    expect((await POST(req({ message: "x".repeat(2001) }))).status).toBe(400)
+    expect((await POST(new Request("http://localhost/api/chat", { method: "POST", body: "invalid" }))).status).toBe(400)
+  })
+  it("bounds conversation history passed to the configured provider", async () => {
+    isOpenAIConfigured.mockReturnValue(true)
+    answerWithLLM.mockResolvedValue("ok")
+    await POST(req({ message: "hi", history: Array.from({ length: 15 }, () => ({ role: "user", content: "prior" })) }))
+    expect(answerWithLLM.mock.calls[0][1]).toHaveLength(10)
+  })
   it("400s on an empty message", async () => {
     isOpenAIConfigured.mockReturnValue(false)
     const res = await POST(req({ message: "  " }))
