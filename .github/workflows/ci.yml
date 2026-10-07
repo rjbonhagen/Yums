@@ -12,13 +12,13 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
           cache: npm
       - run: npm ci
       - run: npm test
+      - run: npm run test:pilot-config
       - run: npm run lint --workspace apps/web
       # next build also typechecks the whole apps/web project. No env vars
-      # required — the app runs on mock/reference data and honest fallbacks
-      # without Supabase/Google/OpenAI/Mapbox keys configured (see
-      # apps/web/.env.example).
+      # required for compilation. Live discovery remains available without
+      # optional account, Calendar, chat, or map configuration.
       - run: npm run build --workspace apps/web
