@@ -6,6 +6,23 @@ database; inspect its tables and policies first.
 
 ## Database
 
+Before changing an existing project, run `packages/database/pilot-audit.sql`
+in its Supabase SQL editor as project owner. It runs in a read-only transaction
+and returns table/RLS status, policies, migration columns, constraints, save
+indexes, role grants, function permissions, and the profile-sync trigger.
+It does not return account values or Calendar tokens. Missing tables/columns
+and disabled RLS require review. Confirm all applicable result sets before
+selecting the initial schema or migration path below.
+
+Inspect extra permissive policies as well as the expected policies; another
+policy can broaden access. `chat_usage` should have no client write policies.
+`consume_chat_allowance()` must use security-definer execution with the reviewed
+restricted search path, allow `authenticated`, and deny `anon` and `PUBLIC`.
+Verify the enabled Auth trigger points to the reviewed profile-sync function,
+and saves have uniqueness on `(user_id, save_key)`. Table grants alone do not
+prove data is exposed or protected; RLS and actual client behavior also matter.
+This inventory cannot inspect dashboard Auth settings or prove account isolation.
+
 For a new empty Supabase database, run `packages/database/schema.sql`, then
 `packages/database/migrations/20261007_chat_allowance.sql`.
 The initial schema already includes report moderation, save identity, and
@@ -29,6 +46,9 @@ Back up existing data before migration. Verify row-level security and account
 behavior with two invited test accounts before inviting the rest of the pilot.
 Database tests run locally with a Supabase-compatible auth harness; remote
 policy correctness still needs verification against the actual project.
+Rerun the read-only inventory after authorized migrations, then complete the
+two-account acceptance checks through the app's authenticated clients. The
+privileged SQL editor bypasses RLS and cannot prove those client checks.
 
 ## Accounts
 

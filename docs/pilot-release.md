@@ -50,7 +50,7 @@ Invitation-mode sign-in avoids creating new accounts through magic links;
 Supabase's global new-signup switch must also be disabled by the project owner.
 See [pilot setup](pilot-setup.md) for configuration and operator steps.
 
-Local verification after these changes: 228 tests across 34 files, lint,
+Local verification after these changes: 230 tests across 35 files, lint,
 live-mode production build, and production dependency audit all pass. No
 production dependency vulnerabilities were reported. Database migrations were
 tested in local PostgreSQL; they have not been applied to the remote project.
@@ -59,6 +59,14 @@ Six additional deployment-configuration tests pass. `npm run check:pilot`
 currently fails as expected: no local Supabase environment is configured.
 The production server was started explicitly with live mode and invite mode;
 these flags must also be configured in the eventual host environment.
+
+`packages/database/pilot-audit.sql` now provides a read-only project-owner
+inventory of RLS, policies, required columns/constraints/indexes, role grants,
+privileged functions, and the profile-sync trigger. Local PostgreSQL tests
+cover missing schema, a migrated schema, and deliberately weakened security
+metadata, and verify that account values and tokens are not returned or
+changed. The inventory is a review aid, not an automatic release approval.
+It has not run against the remote Supabase project.
 
 Source occurrence IDs now remain stable across reordered responses. Duplicate
 source URL/start-time pairs and duplicate restaurant IDs collapse; distinct
