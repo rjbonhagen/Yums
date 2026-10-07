@@ -30,7 +30,7 @@ const STEPS = [
 ]
 
 export default async function HomePage() {
-  const { recommendations, meta } = await buildRecommendations({ maxTravelMinutes: 20 })
+  const { recommendations } = await buildRecommendations({ maxTravelMinutes: 20 })
   const preview = recommendations.slice(0, 3)
   const freeFoodCount = recommendations.filter((r) => r.kind === "free_food").length
   const eatsCount = recommendations.filter((r) => r.kind === "nearby_eats").length

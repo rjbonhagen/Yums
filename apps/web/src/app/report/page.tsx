@@ -20,7 +20,7 @@ import { submitReportedEvent } from "@/lib/reported-events"
  */
 export default function ReportPage() {
   const router = useRouter()
-  const [signedInUserId, setSignedInUserId] = useState<string | null | undefined>(undefined)
+  const [signedInUserId, setSignedInUserId] = useState<string | null | undefined>(() => isSupabaseConfigured() ? undefined : null)
   const [title, setTitle] = useState("")
   const [locationName, setLocationName] = useState("")
   const [startTime, setStartTime] = useState("")
@@ -31,12 +31,12 @@ export default function ReportPage() {
 
   useEffect(() => {
     if (!isSupabaseConfigured()) {
-      setSignedInUserId(null)
       return
     }
     createClient()
       .auth.getUser()
       .then(({ data: { user } }) => setSignedInUserId(user?.id ?? null))
+      .catch(() => setSignedInUserId(null))
   }, [])
 
   async function handleSubmit() {
