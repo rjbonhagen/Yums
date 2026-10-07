@@ -1,6 +1,5 @@
 import type { CampusEventSource } from "./types"
 import { extractDeterministic, type ExtractedFoodEvent } from "./extract"
-import { berkeleyMockSource } from "./sources/berkeley-mock"
 import { berkeleyLiveSource } from "./sources/berkeley-live"
 import { callinkSource } from "./sources/callink-live"
 
@@ -10,7 +9,9 @@ export { berkeleyMockSource } from "./sources/berkeley-mock"
 export { berkeleyLiveSource } from "./sources/berkeley-live"
 export { callinkSource } from "./sources/callink-live"
 
-export const sources: CampusEventSource[] = [berkeleyMockSource, berkeleyLiveSource, callinkSource]
+// Default ingestion is live-only. Sample adapters remain an explicit export
+// for test/demo callers and cannot enter an ordinary live ingestion result.
+export const sources: CampusEventSource[] = [berkeleyLiveSource, callinkSource]
 
 export async function ingestAll(): Promise<ExtractedFoodEvent[]> {
   const results = await Promise.all(sources.map((s) => s.fetchEvents()))
