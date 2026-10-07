@@ -16,9 +16,11 @@ import { deleteReportedEvent, type ReportedEvent } from "@/lib/reported-events"
 export function CommunityReports({ userId, reports }: { userId: string | null; reports: ReportedEvent[] }) {
   const [items, setItems] = useState(reports)
   const [removingId, setRemovingId] = useState<string | null>(null)
+  const [error, setError] = useState<string | null>(null)
 
   async function handleRemove(id: string) {
     if (!userId) return
+    setError(null)
     const removed = items.find((i) => i.id === id)
     setItems((prev) => prev.filter((i) => i.id !== id))
     setRemovingId(id)
@@ -26,6 +28,7 @@ export function CommunityReports({ userId, reports }: { userId: string | null; r
       await deleteReportedEvent(createClient(), userId, id)
     } catch {
       if (removed) setItems((prev) => [...prev, removed]) // revert — don't lose the report on a failed delete
+      setError("Couldn't remove this report. Try again.")
     } finally {
       setRemovingId(null)
     }
@@ -33,8 +36,8 @@ export function CommunityReports({ userId, reports }: { userId: string | null; r
 
   return (
     <div className="space-y-3">
-      <div className="flex items-center justify-between gap-2">
-        <div className="flex items-center gap-2">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <h2 className="text-lg font-semibold">Community reports</h2>
           <Badge
             variant="outline"
@@ -47,6 +50,7 @@ export function CommunityReports({ userId, reports }: { userId: string | null; r
           + Report free food
         </Link>
       </div>
+      {error && <p role="alert" className="text-destructive text-sm">{error}</p>}
       {items.length === 0 ? (
         <p className="text-muted-foreground text-sm">No community reports right now.</p>
       ) : (

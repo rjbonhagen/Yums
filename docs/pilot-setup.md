@@ -115,6 +115,10 @@ Before release, use two invited accounts and separate browser sessions:
   and shows an error; retry before expecting cross-device synchronization.
 - Save and remove a real listing; confirm the other account cannot access it.
 - Submit a report; confirm another account cannot see it before approval.
+- Submit using the keyboard and confirm the pending report appears after
+  navigation. Switch accounts while a draft is open; the previous draft must
+  disappear. For an unconfirmed write, inspect your reports before retrying
+  to avoid submitting the same tip twice.
 - Approve it as operator; confirm it appears, still labeled unverified.
 - Attempt self-approval and editing approved content; both must be denied.
 - Verify provider allowance and fallback under exhaustion or database failure.

@@ -69,5 +69,6 @@ describe("CommunityReports", () => {
     await user.click(screen.getByRole("button", { name: "Remove" }))
 
     await waitFor(() => expect(screen.getByText("Free samosas outside Sproul")).toBeInTheDocument())
+    expect(screen.getByRole("alert")).toHaveTextContent("Couldn't remove this report")
   })
 })

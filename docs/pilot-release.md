@@ -50,7 +50,7 @@ Invitation-mode sign-in avoids creating new accounts through magic links;
 Supabase's global new-signup switch must also be disabled by the project owner.
 See [pilot setup](pilot-setup.md) for configuration and operator steps.
 
-Local verification after these changes: 216 tests across 32 files, lint,
+Local verification after these changes: 228 tests across 34 files, lint,
 live-mode production build, and production dependency audit all pass. No
 production dependency vulnerabilities were reported. Database migrations were
 tested in local PostgreSQL; they have not been applied to the remote project.
@@ -88,6 +88,16 @@ unconfigured invitation-only sign-in state. The
 and two source listings for Cal-nival. Those listings have different source
 URLs and start times; cross-source duplicates are not automatically merged.
 No browser console errors were observed during this rehearsal.
+
+Report submission now uses a keyboard-accessible form, verifies the current
+account immediately before writing, and refreshes the feed after success.
+Account changes clear the previous draft and discard obsolete Auth responses
+or submission completions. Validation and unconfirmed writes show accessible
+errors; failed removal restores the report and explains the failure. Ten
+mocked form tests cover these behaviors. No real report has been submitted.
+The package's default `ingestAll()` source list is now live-only; its sample
+adapter remains available only through an explicit export. Two regression
+tests verify that normal ingestion and source failures never invoke samples.
 
 Existing email Auth accounts now receive missing application profiles through
 the initial schema or a reviewed repeatable migration. Local PostgreSQL tests
