@@ -36,7 +36,7 @@ export function ChatWidget() {
         // Sends prior turns so a real LLM (once OPENAI_API_KEY is set, see
         // /api/chat/route.ts) has conversational context; the deterministic
         // fallback ignores it.
-        body: JSON.stringify({ message: trimmed, history: messages }),
+        body: JSON.stringify({ message: trimmed, history: messages.slice(-10) }),
       })
       const data = await res.json()
       setMessages((prev) => [
@@ -63,7 +63,7 @@ export function ChatWidget() {
   }
 
   return (
-    <Card className="fixed right-4 bottom-4 z-50 flex h-[28rem] w-80 flex-col shadow-xl">
+    <Card role="dialog" aria-label="Yums chat" className="fixed right-4 bottom-4 z-50 flex h-[28rem] max-h-[calc(100dvh-2rem)] w-80 max-w-[calc(100vw-2rem)] flex-col shadow-xl">
       <CardHeader className="flex-row items-center justify-between space-y-0 py-3">
         <CardTitle className="text-sm">Yums Assistant</CardTitle>
         <button
@@ -71,11 +71,11 @@ export function ChatWidget() {
           className="text-muted-foreground hover:text-foreground text-sm"
           aria-label="Close chat"
         >
-          ✕
+          Close
         </button>
       </CardHeader>
       <CardContent className="flex flex-1 flex-col gap-3 overflow-hidden pt-0">
-        <div className="flex-1 space-y-2 overflow-y-auto pr-1 text-sm">
+        <div role="log" aria-live="polite" className="flex-1 space-y-2 overflow-y-auto pr-1 text-sm">
           {messages.map((m, i) => (
             <div
               key={i}
@@ -98,12 +98,14 @@ export function ChatWidget() {
           }}
         >
           <Input
+            aria-label="Message to Yums"
+            maxLength={2000}
             value={input}
             onChange={(e) => setInput(e.target.value)}
             placeholder="What's free today?"
             className="text-sm"
           />
-          <Button type="submit" size="sm" disabled={sending}>
+          <Button type="submit" size="sm" disabled={sending || !input.trim()}>
             Send
           </Button>
         </form>

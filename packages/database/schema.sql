@@ -133,6 +133,7 @@ create table calendar_connections (
 create table recommendations (
   id uuid primary key default uuid_generate_v4(),
   user_id uuid references users (id) on delete cascade,
+  save_key text not null,
   -- Must match packages/shared/types.ts's RecommendationKind union exactly.
   kind text not null check (kind in ('free_food', 'nearby_eats')),
   ref_id uuid, -- points at events.id / deals.id depending on kind
@@ -145,7 +146,8 @@ create table recommendations (
   latitude double precision,
   longitude double precision,
   score numeric(6, 4) not null default 0,
-  created_at timestamptz not null default now()
+  created_at timestamptz not null default now(),
+  unique (user_id, save_key)
 );
 
 -- Crowdsourced free-food reports (see apps/web/src/lib/reported-events.ts)

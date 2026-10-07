@@ -15,7 +15,7 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   title: "Yums",
-  description: "The cheapest way to live around campus.",
+  description: "Discover campus events offering free food and nearby places to eat at UC Berkeley.",
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {

@@ -17,8 +17,9 @@ function fakeSupabase(result: { data?: unknown; error?: unknown }) {
       calls.select = [columns]
       return chain
     }),
-    insert: vi.fn((row: unknown) => {
+    upsert: vi.fn((row: unknown, options: unknown) => {
       calls.insert = [row]
+      calls.upsertOptions = [options]
       return chain
     }),
     delete: vi.fn(() => {
@@ -109,6 +110,7 @@ describe("saveRecommendation", () => {
     const saved = await saveRecommendation(supabase as never, "user-1", REC)
 
     expect(saved.id).toBe("rec-1")
+    expect(calls.upsertOptions).toEqual([{ onConflict: "user_id,save_key" }])
     const [insertedRow] = calls.insert as [Record<string, unknown>]
     expect(insertedRow).toMatchObject({
       user_id: "user-1",
@@ -116,6 +118,7 @@ describe("saveRecommendation", () => {
       title: "Free pizza",
       estimated_savings: 8,
       source_url: "https://events.berkeley.edu/1",
+      save_key: "free_food::https://events.berkeley.edu/1::2026-08-29T18:00:00.000Z",
     })
   })
 

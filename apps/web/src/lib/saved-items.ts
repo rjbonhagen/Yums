@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js"
 import type { Recommendation } from "@yums/shared"
+import { savedKey } from "./save-identity"
 
 // Persists to the `recommendations` table (see packages/database/schema.sql
 // for why that table — not a new one — is used for this). A save is a
@@ -15,6 +16,8 @@ export interface SavedItem {
   latitude?: number
   longitude?: number
   startTime?: string
+  endTime?: string
+  isSample?: boolean
 }
 
 interface SavedItemRow {
@@ -60,8 +63,9 @@ export async function saveRecommendation(
 ): Promise<SavedItem> {
   const { data, error } = await supabase
     .from("recommendations")
-    .insert({
+    .upsert({
       user_id: userId,
+      save_key: savedKey(r),
       kind: r.kind,
       title: r.title,
       subtitle: r.subtitle ?? null,
@@ -72,7 +76,7 @@ export async function saveRecommendation(
       latitude: r.latitude ?? null,
       longitude: r.longitude ?? null,
       score: r.score,
-    })
+    }, { onConflict: "user_id,save_key" })
     .select(SELECT_COLUMNS)
     .single()
   if (error) throw error

@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useMemo, useState } from "react"
+import { useEffect, useMemo, useRef, useState } from "react"
 import type { Recommendation } from "@yums/shared"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -11,6 +11,8 @@ import { FeedMap } from "@/components/feed-map"
 import { formatEventDateTime } from "@/lib/format"
 import { createClient, isSupabaseConfigured } from "@/lib/supabase/client"
 import { loadSavedItems, saveRecommendation, unsaveItem } from "@/lib/saved-items"
+import { savedKey } from "@/lib/save-identity"
+import { saveGuestItem, removeGuestItem, useGuestSavedItems } from "@/lib/guest-saved-items"
 
 function kindLabel(kind: string, estimatedSavings: number): string {
   if (kind === "free_food") return "FREE"
@@ -22,10 +24,6 @@ function kindLabel(kind: string, estimatedSavings: number): string {
 // live source, which can return different results next time) — this key
 // is what actually identifies "the same place/event" for save/unsave
 // matching, both here and in lib/saved-items.ts's SavedItem shape.
-function savedKey(r: { kind: string; title: string; sourceUrl?: string }): string {
-  return `${r.kind}::${r.title}::${r.sourceUrl ?? ""}`
-}
-
 function RecommendationCard({
   r,
   signedIn,
@@ -71,7 +69,7 @@ function RecommendationCard({
               onClick={() => onToggleSave(r)}
               aria-pressed={saved}
             >
-              {saved ? "★ Saved" : "☆ Save"}
+              {saved ? "Saved" : "Save"}
             </Button>
           )}
         </div>
@@ -137,7 +135,7 @@ function RecurringGroupCard({
                     aria-pressed={savedByKey.has(savedKey(r))}
                     aria-label={savedByKey.has(savedKey(r)) ? "Unsave" : "Save"}
                   >
-                    {savedByKey.has(savedKey(r)) ? "★" : "☆"}
+                    {savedByKey.has(savedKey(r)) ? "Saved" : "Save"}
                   </Button>
                 )}
               </div>
@@ -190,7 +188,11 @@ export function RecommendationsView({ recommendations }: { recommendations: Reco
   const [kindFilter, setKindFilter] = useState<KindFilter>("all")
   const [search, setSearch] = useState("")
   const [userId, setUserId] = useState<string | null>(null)
-  const [savedByKey, setSavedByKey] = useState<Map<string, string>>(new Map())
+  const [cloudSavedByKey, setSavedByKey] = useState<Map<string, string>>(new Map())
+  const guestItems = useGuestSavedItems()
+  const savedByKey = new Map([...guestItems.filter((item) => !userId || item.isSample).map((item) => [savedKey(item), item.id] as const), ...cloudSavedByKey])
+  const [saveError, setSaveError] = useState<string | null>(null)
+  const savingKeys = useRef(new Set<string>())
 
   useEffect(() => {
     if (!isSupabaseConfigured()) return
@@ -201,17 +203,32 @@ export function RecommendationsView({ recommendations }: { recommendations: Reco
       loadSavedItems(supabase, user.id)
         .then((items) => setSavedByKey(new Map(items.map((it) => [savedKey(it), it.id]))))
         .catch(() => {
-          // Saved state just stays empty — save/unsave still works for new
-          // items, it just can't show which of *these* were already saved.
+          setSaveError("Couldn't load account saves. You can still save new items.")
         })
-    })
+    }).catch(() => setSaveError("Couldn't check your account. Saves will stay in this browser."))
   }, [])
 
   async function handleToggleSave(r: Recommendation) {
-    if (!userId) return
+    const key = savedKey(r)
+    if (savingKeys.current.has(key)) return
+    savingKeys.current.add(key)
+    try { await toggleSave(r) } finally { savingKeys.current.delete(key) }
+  }
+
+  async function toggleSave(r: Recommendation) {
+    setSaveError(null)
+    if (!userId || r.isSample) {
+      try {
+        const existing = savedByKey.get(savedKey(r))
+        if (existing) removeGuestItem(existing)
+        else saveGuestItem(r)
+      } catch { setSaveError("Couldn't save in this browser. Check that site storage is allowed.") }
+      return
+    }
     const supabase = createClient()
     const key = savedKey(r)
     const existingId = savedByKey.get(key)
+    if (existingId?.startsWith("pending:")) return
 
     if (existingId) {
       setSavedByKey((prev) => {
@@ -222,6 +239,7 @@ export function RecommendationsView({ recommendations }: { recommendations: Reco
       try {
         await unsaveItem(supabase, userId, existingId)
       } catch {
+        setSaveError("Couldn't remove the saved item. Try again.")
         setSavedByKey((prev) => new Map(prev).set(key, existingId)) // revert — don't lie about saved state
       }
       return
@@ -233,6 +251,7 @@ export function RecommendationsView({ recommendations }: { recommendations: Reco
       const saved = await saveRecommendation(supabase, userId, r)
       setSavedByKey((prev) => new Map(prev).set(key, saved.id))
     } catch {
+      setSaveError("Couldn't save this item. Try again.")
       setSavedByKey((prev) => {
         const next = new Map(prev)
         next.delete(key)
@@ -250,10 +269,12 @@ export function RecommendationsView({ recommendations }: { recommendations: Reco
     })
   }, [recommendations, kindFilter, search])
 
-  const mappable = filtered.filter((r) => r.latitude != null && r.longitude != null)
+  const mappable = useMemo(() => filtered.filter((r) => r.latitude != null && r.longitude != null), [filtered])
 
   return (
     <div className="space-y-3">
+      {!userId && <p className="text-muted-foreground text-xs">Saves stay in this browser. Sign in to save across devices.</p>}
+      {saveError && <p role="alert" className="text-destructive text-sm">{saveError}</p>}
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex gap-1">
           {KIND_FILTERS.map((f) => (
@@ -263,12 +284,14 @@ export function RecommendationsView({ recommendations }: { recommendations: Reco
               size="sm"
               variant={kindFilter === f.value ? "default" : "outline"}
               onClick={() => setKindFilter(f.value)}
+              aria-pressed={kindFilter === f.value}
             >
               {f.label}
             </Button>
           ))}
         </div>
         <Input
+          aria-label="Search food events and places"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           placeholder="Search by name or location…"
@@ -294,7 +317,7 @@ export function RecommendationsView({ recommendations }: { recommendations: Reco
               <RecurringGroupCard
                 key={entry.seriesKey}
                 items={entry.items}
-                signedIn={userId != null}
+                signedIn={true}
                 savedByKey={savedByKey}
                 onToggleSave={handleToggleSave}
               />
@@ -302,7 +325,7 @@ export function RecommendationsView({ recommendations }: { recommendations: Reco
               <RecommendationCard
                 key={entry.item.id}
                 r={entry.item}
-                signedIn={userId != null}
+                signedIn={true}
                 saved={savedByKey.has(savedKey(entry.item))}
                 onToggleSave={handleToggleSave}
               />

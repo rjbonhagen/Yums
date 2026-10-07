@@ -4,13 +4,13 @@ import { AuthStatus } from "@/components/auth-status"
 export function Nav() {
   return (
     <header className="border-b">
-      <nav className="mx-auto flex max-w-5xl items-center justify-between px-4 py-3">
+      <nav aria-label="Main navigation" className="mx-auto flex max-w-5xl flex-wrap items-center justify-between gap-3 px-4 py-3">
         <div className="flex items-center gap-3">
           <Link href="/" className="font-semibold">
             Yums
           </Link>
         </div>
-        <div className="flex gap-4 text-sm">
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-3 text-sm">
           <Link href="/start" className="text-muted-foreground hover:text-foreground">
             Build My Week
           </Link>
