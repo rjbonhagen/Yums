@@ -12,7 +12,11 @@ windows → deterministic scoring → dashboard/feed/homepage/chat.
 `buildRecommendations()` returns recommendations and source status. Source
 fetches run concurrently and are cached independently: event feeds for two
 minutes, restaurant listings for ten minutes. Per-user Calendar data is never
-stored in these shared source caches. The homepage is cached; preference-aware
+stored in these shared source caches. Cache keys include the time window;
+each new window needs a successful network response. Inner source fetches
+use no-store so a refresh cannot retain an older cached response during an
+extended outage. Results can be up to one window old; they do not prove that
+food is still available. The homepage is cached; preference-aware
 feed/dashboard pages read cookies and render per request.
 
 ## Evidence and timing

@@ -44,7 +44,8 @@ export const callinkSource: CampusEventSource = {
   key: "callink-live",
   async fetchEvents(): Promise<CampusEvent[]> {
     // Include recently started events; the recommendation layer uses real
-    // end times to discard expired offers. Round for shared cache reuse.
+    // end times to discard expired offers. Round the query time to reduce
+    // needless URL variations; recommendation caching is handled separately.
     const bucketMs = 2 * 60 * 1000
     const startsAfter = new Date(Math.floor((Date.now() - 24 * 60 * 60 * 1000) / bucketMs) * bucketMs).toISOString()
     const params = new URLSearchParams({
@@ -55,13 +56,8 @@ export const callinkSource: CampusEventSource = {
 
     const res = await fetch(`${SEARCH_URL}?${params.toString()}`, {
       headers: { Accept: "application/json" },
-      // Club events don't change minute-to-minute; a short revalidate
-      // window matches the pattern used for the other live sources.
-      // cache:'force-cache' makes the opt-in explicit (Next's fetch
-      // caching is opt-in per its docs) rather than relying on revalidate
-      // alone.
-      cache: "force-cache",
-      next: { revalidate: 120 },
+      // The outer recommendation cache must refresh from the network.
+      cache: "no-store",
       signal: AbortSignal.timeout(8000),
     })
 

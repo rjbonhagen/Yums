@@ -35,8 +35,8 @@ export const berkeleyLiveSource: CampusEventSource = {
     let pages = 1
     for (let page = 1; page <= pages; page++) {
       const res = await fetch(`${url}?page=${page}`, {
-        headers: { Accept: "application/json" }, cache: "force-cache",
-        next: { revalidate: 300 }, signal: AbortSignal.timeout(8000),
+        headers: { Accept: "application/json" }, cache: "no-store",
+        signal: AbortSignal.timeout(8000),
       })
       if (!res.ok) throw new Error(`events.berkeley.edu returned ${res.status}`)
       const body = (await res.json()) as LiveWhaleResponse

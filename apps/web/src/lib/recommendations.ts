@@ -1,4 +1,4 @@
-import { unstable_cache } from "next/cache"
+import { cacheLiveSource } from "./source-cache"
 import { scoreOpportunity, DEFAULT_WEIGHTS } from "@yums/shared"
 import type { Recommendation } from "@yums/shared"
 import { berkeleyLiveSource, callinkSource, ingestSource, type ExtractedFoodEvent } from "@yums/event-ingestion"
@@ -16,26 +16,14 @@ const CAMPUS_CENTER = { lat: 37.8719, lng: -122.2585 }
 // context and the Overpass nearby-places query.
 const BBOX: [number, number, number, number] = [37.83, -122.3, 37.9, -122.22]
 
-// /dashboard, /feed, and /api/recommendations all read searchParams and/or
-// cookies() (calendar personalization), which are Request-time APIs — once
-// a render touches one, Next.js stops honoring per-fetch cache: 'force-cache'
-// for that render entirely (verified empirically: identical fetches went
-// from ~65ms cached to 2-6s live the moment any Request-time API was read
-// in the same request). unstable_cache is Next's documented escape hatch
-// for exactly this — it persists a function's result across requests
-// independent of whether the calling route is dynamically rendered. These
-// three live sources don't depend on the request at all (same data for
-// every visitor), so this is a correct, not just fast, use of it.
-const getCachedBerkeleyEvents = unstable_cache(() => ingestSource(berkeleyLiveSource), ["berkeley-live-events"], {
-  revalidate: 120,
-})
-const getCachedCallinkEvents = unstable_cache(() => ingestSource(callinkSource), ["callink-events"], {
-  revalidate: 120,
-})
-const getCachedNearbyPlaces = unstable_cache(
+// Shared public sources have bounded cache windows. Each new window needs
+// a successful network response; a failed refresh cannot retain old results
+// indefinitely. Account preferences and Calendar tokens are never cached here.
+const getCachedBerkeleyEvents = cacheLiveSource(() => ingestSource(berkeleyLiveSource), "berkeley-live-events", 120)
+const getCachedCallinkEvents = cacheLiveSource(() => ingestSource(callinkSource), "callink-events", 120)
+const getCachedNearbyPlaces = cacheLiveSource(
   () => fetchNearbyPlaces(BBOX, ["cafe", "restaurant", "fast_food"]),
-  ["nearby-places", BBOX.join(",")],
-  { revalidate: 600 },
+  `nearby-places:${BBOX.join(",")}`, 600,
 )
 
 function proximityScore(minutesAway: number, maxTravelMinutes: number): number {

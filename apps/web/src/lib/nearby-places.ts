@@ -17,18 +17,12 @@ async function fetchFromOverpass(url: string, query: string): Promise<OverpassRe
     method: "POST",
     headers: {
       "Content-Type": "application/x-www-form-urlencoded",
-      "User-Agent": "Yums/0.1 (student project demo; no production traffic)",
+      "User-Agent": "Yums/0.1 (UC Berkeley invited pilot)",
     },
     body: `data=${encodeURIComponent(query)}`,
-    // cache:'force-cache' is required for this specific fetch (not just the
-    // outer unstable_cache in recommendations.ts) —
-    // empirically, a POST request without its own explicit opt-in stayed
-    // uncached even inside unstable_cache whenever the calling route was
-    // dynamically rendered (searchParams/cookies() elsewhere in the same
-    // request), while GET-based sources cached fine with unstable_cache
-    // alone. Both layers are needed together for POST. See docs/architecture.md.
-    cache: "force-cache",
-    next: { revalidate: 600 },
+    // Shared caching lives in recommendations.ts; refreshing that cache
+    // must reach the source rather than reuse a stale inner fetch cache.
+    cache: "no-store",
     signal: AbortSignal.timeout(6000),
   })
   if (!res.ok) throw new Error(`${url} returned ${res.status}`)
