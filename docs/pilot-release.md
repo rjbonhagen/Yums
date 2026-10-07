@@ -50,7 +50,7 @@ Invitation-mode sign-in avoids creating new accounts through magic links;
 Supabase's global new-signup switch must also be disabled by the project owner.
 See [pilot setup](pilot-setup.md) for configuration and operator steps.
 
-Local verification after these changes: 198 tests across 29 files, lint,
+Local verification after these changes: 208 tests across 30 files, lint,
 live-mode production build, and production dependency audit all pass. No
 production dependency vulnerabilities were reported. Database migrations were
 tested in local PostgreSQL; they have not been applied to the remote project.
@@ -88,6 +88,17 @@ unconfigured invitation-only sign-in state. The
 and two source listings for Cal-nival. Those listings have different source
 URLs and start times; cross-source duplicates are not automatically merged.
 No browser console errors were observed during this rehearsal.
+
+Existing email Auth accounts now receive missing application profiles through
+the initial schema or a reviewed repeatable migration. Local PostgreSQL tests
+verify legacy-account backfill, preserved existing profiles, future account
+creation, and account isolation. This migration has not run remotely.
+Onboarding waits for account preference restoration, discards obsolete reads
+after account changes, verifies the current account again before saving, and
+keeps the form/input visible when synchronization fails. Eight component
+tests cover guest behavior, failure/retry, Auth failure, account changes, and
+cleanup. A fresh production-browser check still reaches the dashboard with
+the entered target and walk preference (`docs/screenshots/pilot-onboarding.jpg`).
 
 Freshness uses two-minute outer event caches, with a five-minute Berkeley
 source fetch cache and two-minute Cal Link fetch cache. Nearby places refresh

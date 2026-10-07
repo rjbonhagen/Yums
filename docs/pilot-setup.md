@@ -8,14 +8,20 @@ database; inspect its tables and policies first.
 
 For a new empty Supabase database, run `packages/database/schema.sql`, then
 `packages/database/migrations/20261007_chat_allowance.sql`.
-The initial schema already includes report moderation and save identity.
+The initial schema already includes report moderation, save identity, and
+profile creation for email Auth accounts that predate the app schema.
 
 For an existing database, review and apply these migrations in order:
 
-1. `20261007_saved_identity.sql`: preserves latest duplicate saved snapshots.
-2. `20261007_report_moderation.sql`: existing reports enter pending review.
-3. `20261007_chat_allowance.sql`: adds persistent provider-attempt limits.
-4. `20261007_report_validation.sql`: enforces content limits on new report writes
+1. `20261007_user_sync.sql`: creates missing profiles for existing email Auth
+   accounts and repairs the new-account trigger. Review any existing customized
+   `on_auth_user_created` trigger first; this migration replaces that named
+   trigger. Existing profile rows remain unchanged. Non-email Auth identities
+   are skipped and are outside this invited email-account pilot.
+2. `20261007_saved_identity.sql`: preserves latest duplicate saved snapshots.
+3. `20261007_report_moderation.sql`: existing reports enter pending review.
+4. `20261007_chat_allowance.sql`: adds persistent provider-attempt limits.
+5. `20261007_report_validation.sql`: enforces content limits on new report writes
    while preserving legacy records for review. Existing invalid records must be
    corrected before approval; the initial schema already includes these limits.
 
@@ -104,6 +110,9 @@ the Google grant in their Google account settings.
 Before release, use two invited accounts and separate browser sessions:
 
 - Sign in, save preferences, reload, and verify persistence from another device.
+- Verify an account created before app-schema installation can save preferences
+  and listings. Check that a failed preference write keeps the entered values
+  and shows an error; retry before expecting cross-device synchronization.
 - Save and remove a real listing; confirm the other account cannot access it.
 - Submit a report; confirm another account cannot see it before approval.
 - Approve it as operator; confirm it appears, still labeled unverified.
