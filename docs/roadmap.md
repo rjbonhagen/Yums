@@ -1,153 +1,80 @@
-# Roadmap
+# Portfolio demo roadmap
 
-Where this project is, what's actually broken or misleading right now,
-and what a sensible build order looks like from here. Every item below is
-based on reading the current code, not a guess — see the file references.
-`docs/product.md` tracks what's *built*; this file tracks what's *next*.
+Reviewed October 7, 2026. Goal: finish a polished portfolio/demo project in
+under a week. Proposed six-day window: October 7–12; adjust daily scope to
+available development time. Make incremental commits for each completed item.
 
-## Phase 0 — Foundation (done)
+## Current state
 
-- Auth: magic-link + Google OAuth sign-in, Google Calendar linking for
-  schedule-awareness (`/login`)
-- Live data: free food events (events.berkeley.edu + Cal Link), real
-  nearby eateries (OpenStreetMap) — see `docs/data-sources.md`
-- Scoring/ranking feed (`/feed`), dashboard (`/dashboard`)
-- Map view (Mapbox), real distance/walking-time math
-- Chatbot: LLM-first (OpenAI, grounded in live data) with a
-  deterministic fallback
-- Test coverage for scoring, geo, event-mapping, and formatting logic
+Yums already has live Berkeley event discovery, nearby restaurants, onboarding,
+ranking, optional Calendar/chat/maps, saved items, community reports, and
+reminders while the feed stays open. GitHub has no open issues or pull requests
+at review time. The issues below are a local backlog, not published issues.
+Prior claims of 98 passing tests and live integration checks are historical.
+This review initially could not run tests/build because dependencies were absent.
 
-## Phase 1 — Fix what's broken or misleading (done)
+## Review findings
 
-Nothing new here — just making the existing surface honest and complete
-before building on top of it.
+| ID | Priority | Issue and code evidence | Done when |
+| --- | --- | --- | --- |
+| R1 | P0 | Generic food mentions become FREE claims: `services/event-ingestion/extract.ts` assigns positive confidence, `index.ts` accepts it, and `apps/web/src/lib/recommendations.ts` calls all results free food. | Require explicit free-food evidence; test paid food, negations, and food discussions. Omit or label uncertain mentions. |
+| R2 | P1 | Preferences are saved but incompletely applied: feed hardcodes 20 minutes; dashboard reads only budget/travel query parameters; transportation and optimization choices do not affect ranking. | Persist travel/budget behavior across direct navigation and reload; implement supported choices or remove them. Validate numeric input. |
+| R3 | P1 | Today includes all returned events; Cal Link has no upper date bound; recommendations do not remove expired events. Normalization drops source end times and Calendar scoring assumes one hour. | Use campus time for Today and a defined weekly window; omit ended events; preserve real end times with an explicit fallback. Test boundary times and conflicts. |
+| R4 | P1 | Dashboard savings use $8 per event and 40% of aggregate value without attendance evidence. | Label assumptions and potential value clearly or remove the projection; never present it as achieved savings. |
+| R5 | P2 | Saves use title/source URL identity, but nearby places have no source URL; database saves have no uniqueness constraint. | Preserve stable source IDs and make saves idempotent; identify expired saved snapshots. |
+| R6 | P1 for demo | No CI workflow found; report read failures silently show an empty list; docs disagree about Calendar verification and LLM extraction is still a stub. | Tests/build/lint run reproducibly; document dated verification; show errors distinctly; rehearse configured and unconfigured paths. |
+| R7 | Before public access | Chat message/history sizes are unbounded and the route has no application rate limit; reports have no moderation workflow. | Bound requests and paid usage before public chat; keep public reports disabled or add moderation. Verify account isolation before inviting users. |
 
-1. [x] **Event dates were missing where they matter.** Berkeley's
-   calendar feed only returns today's events, but Cal Link has no upper
-   bound and can return events days/weeks out — a club event next
-   Tuesday showed identically to one tonight. Fixed:
-   `lib/format.ts`'s `formatEventDateTime()` now shows the date whenever
-   an event isn't today, used by `recommendations-view.tsx` and
-   `dashboard/page.tsx`.
-2. [x] **Dietary preferences were advertised but didn't exist.** The
-   homepage claimed "budget, dietary needs, transportation..." with no
-   backing field or real scoring anywhere. Removed the false claim
-   rather than build fake matching against free-text event descriptions
-   / sparse OSM tags — consistent with this app's no-fabrication
-   standard rather than a compromise of it.
-3. [x] **No empty state on `/feed`.** Fixed — the list view now shows
-   "Nothing found right now" (zero results) or "Nothing matches your
-   filter/search" (filtered to zero) instead of rendering blank.
-4. [x] **Dead code / misleading comments cleaned up.**
-   `/api/events/live/route.ts`'s comment falsely claiming
-   `/api/recommendations` "stays on mock data" is fixed; both routes are
-   kept as a documented public JSON API surface (not deleted — they're
-   correct, just unused by the current web UI).
-5. [x] **`/login` is now reachable from nav** even when Supabase isn't
-   configured — `AuthStatus` still renders the "Sign in" link in that
-   state instead of returning `null`.
+Nearby restaurants have no verified prices or discounts, so the demo should
+show restaurant discovery without promising the cheapest restaurant. Mock
+fallback events need prominent sample labeling and must not imply real offers.
+These findings come from code inspection, not production incident reports.
 
-## Phase 2 — Round out the core experience (done)
+## Six-day delivery plan
 
-6. [x] **Filter/search on `/feed`.** `RecommendationsView` now has an
-   All/Free food/Nearby eats filter plus keyword search over
-   title/subtitle, computed client-side over the already-fetched
-   recommendations.
-7. [x] **Component-level test coverage.** Added
-   `@testing-library/react` + jsdom; `RecommendationsView` and
-   `AuthStatus` now have real component tests (filter/search/empty
-   states, all three auth-config states).
-8. [x] **Real LLM chat path.** `answerWithLLM()` in `chatbot.ts` calls
-   OpenAI directly once `OPENAI_API_KEY` is set, grounded in the same
-   live `buildRecommendations()` data and instructed never to invent
-   facts; `/api/chat/route.ts` falls back to the deterministic path on
-   any failure. Not yet verified against a live OpenAI key in this
-   session (none is configured) — code path and fallback are tested,
-   the actual API call is not.
+| Day | Deliverable | Exit criteria / incremental commit |
+| --- | --- | --- |
+| 1 — Oct 7 | Correct free-food evidence (R1), establish runnable baseline. | Regression cases pass; commit classification fix independently. |
+| 2 — Oct 8 | Correct Today/weekly windows and Calendar duration (R3). | Campus timezone and expired-event cases pass; commit event-time fix. |
+| 3 — Oct 9 | Make onboarding useful and savings honest (R2, R4). | Guest and signed-in navigation preserve supported settings; commit preferences and projection changes separately. |
+| 4 — Oct 10 | Polish the main mobile/desktop journey and save behavior (R5). | Onboard → dashboard → feed → save/remove works; empty/error/sample states are clear; commit UI and persistence changes separately. |
+| 5 — Oct 11 | Reproducible setup, CI, README and portfolio evidence (R6). | Fresh install, tests, build and lint succeed; capture screenshots and a short architecture/limitations explanation; commit verification/docs. |
+| 6 — Oct 12 | Demo rehearsal and buffer. | Rehearse with and without optional keys; fix only demo blockers; commit final fixes. If publishing publicly, meet R7 first or disable exposed paid/community features. |
 
-## Phase 3 — New capabilities (done)
+Dates are a suggested schedule, not effort estimates. If capacity is tight,
+cut optional integration polish and save-identity improvements before cutting
+food/date correctness or reproducibility. Do not add multi-campus support,
+background push, merchant deals, agentic checkout, or LLM extraction this week.
 
-9. [x] **Recurring-event awareness.** Done, conservatively: Cal Link's
-   API has no recurrence metadata at all (confirmed by reading
-   `callink-live.ts` — no series/recurring id field exists), so this
-   deliberately does **not** use fuzzy title matching, which risks
-   merging unrelated events. Instead, `Recommendation.seriesKey`
-   (`${organization}::${original event title}`, set in
-   `recommendations.ts`) is an exact-match-only key computed from the
-   *original* title — not the transformed display title ("Free pizza"),
-   which two unrelated events could both end up with. `/feed`'s List
-   view groups 2+ items sharing a seriesKey into one card listing every
-   upcoming instance, each keeping its own Save button and Source link;
-   a lone item never gets grouped. Map view and per-item save/search
-   are unaffected — grouping is purely a List-view display choice.
-   Covered by a dedicated `recommendations.test.ts` case (confirms
-   seriesKey uses the original title) and three `recommendations-view`
-   component tests (groups real duplicates, doesn't group a lone item,
-   never merges same-display-title-different-series items).
-10. [x] **Notifications/reminders.** Done, with an honest scope limit:
-    `NotificationToggle` schedules a real browser `Notification` ~20 min
-    before each upcoming free-food event's actual `startTime`, via
-    `setTimeout` while `/feed` stays open. This is explicitly **not**
-    push notifications — there's no service worker or backend
-    subscription (that would need VAPID keys and a subscriptions table
-    this app doesn't have) — so closing the tab cancels pending
-    reminders, and the UI says so rather than implying background
-    delivery. Gracefully renders nothing when the browser doesn't
-    support the Notification API, and shows a real "blocked" message
-    when permission is denied rather than silently failing.
-11. [x] **Save/favorite places or events** for a signed-in user. Done:
-    ☆/★ Save toggle on every `/feed` card, a `/saved` page with a
-    working Remove action, persisted to the `recommendations` table
-    (repurposed for this — see its comment in `schema.sql` — rather than
-    a new table, since it already had the right shape). Matches by
-    `kind::title::sourceUrl` since recommendation ids aren't stable
-    across requests. Verified end-to-end against the live Supabase
-    project (insert, list, delete all confirmed via direct SQL).
-12. [x] **Crowdsourced event reporting.** Done: `/report` lets a
-    signed-in student submit free food they found that isn't on either
-    live feed; shown on `/feed` in its own "Community reports" section
-    with an explicit "Unverified — user-submitted" badge — a deliberate
-    design choice to keep it out of `buildRecommendations()`'s
-    scored/ranked list entirely, never blended with the live sources
-    (see the comment on `user_reported_events` in `schema.sql`). Public
-    read (no sign-in needed to see reports, matching the rest of the
-    app), reports scoped to their author for delete. Verified
-    end-to-end against the live Supabase project: submitted a real
-    report, confirmed it via SQL, removed it, confirmed the row was
-    actually gone.
+## Definition of finished
 
-## Phase 4 — Beyond a single-campus demo
+- A coherent Berkeley demo with accurate food claims and date windows.
+- Supported preferences work; estimates and sample data are unmistakable.
+- Main journey looks good on mobile and desktop and supports keyboard use.
+- Tests/build/lint pass, and setup works from documented instructions.
+- README includes screenshots, architecture, current limitations, and demo steps.
+- Changes are committed in reviewable increments and ready to push to GitHub.
 
-Only worth pursuing if this outgrows "student project for one campus."
-Deliberately not started — see reasoning below.
+## Remaining choices
 
-13. **Multi-campus support** — `/start` already has a disabled
-    "University: UC Berkeley — More campuses coming soon" field
-    (`start/page.tsx:150-152`); the schema (`universities` table) already
-    supports it, nothing else does yet.
-14. **Deployment/CI, error monitoring** — not worth the overhead while
-    this stays a local/dev project.
+Weekly capacity is unspecified; prioritize the exit criteria over the daily
+feature count. A hosted public demo is optional and needs a hosting choice and
+public-access safeguards. Goal questions already answered: portfolio/demo,
+under one week. Follow-up: decide whether delivery needs a hosted URL or only
+a reproducible repository and recorded demo.
 
-## Status
+## Verification from this review
 
-Phases 0–3 are complete and verified: 98 tests passing (up from 43 at
-the start of this work), `tsc --noEmit` clean, and every feature checked
-live — either in the browser directly, or end-to-end against the live
-Supabase project (insert → confirm via SQL → delete → confirm gone) for
-anything involving persistence. One thing genuinely NOT verified: the
-real OpenAI API call in `answerWithLLM()`, since no `OPENAI_API_KEY` is
-configured in this environment — its request-building/grounding logic
-and the fallback-to-deterministic wiring are both covered by
-mocked-fetch tests instead.
+After `npm ci`, all 98 tests across 16 files passed and `npm run build`
+succeeded, including TypeScript compilation. Lint reports two errors
+(`report/page.tsx` and `notification-toggle.tsx`, synchronous state updates
+inside effects) and one unused-variable warning (`app/page.tsx`). Include
+these fixes in day 1 before treating the baseline as clean.
 
-Phase 4 is intentionally not started: both items are explicitly
-conditional on the project outgrowing a single-campus student demo,
-which hasn't happened, and multi-campus support in particular would
-require real per-campus event/place sources to be worth anything (no
-fabricated "coming soon" campuses).
-
-GrubHub was considered as a Phase 3 candidate and explicitly dropped:
-no public discount API exists, and scraping it would violate its ToS —
-declined for the same reason this app already rules out scraping
-Instagram for free-food posts (see `docs/data-sources.md`), regardless
-of this being a non-commercial student project.
+`npm audit` reports 20 vulnerabilities: 4 moderate, 14 high, 2 critical.
+The direct Next.js dependency is flagged critical. Review advisory applicability
+and compatible dependency updates on day 1, re-run checks, and resolve relevant
+public-runtime findings before publishing. Do not use a blanket forced audit
+fix: some suggested changes are major downgrades. No dependency versions were
+changed during this review. Live credentials and browser journeys were not
+reverified; passing tests/build do not establish integration or visual correctness.
