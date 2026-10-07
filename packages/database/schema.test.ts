@@ -36,7 +36,10 @@ beforeAll(async () => {
       values ('${A}', 'a-test-token', now()), ('${B}', 'b-test-token', now());
     insert into public.user_reported_events (user_id, title, start_time)
       values ('${A}', 'A report', now()), ('${B}', 'B report', now());
+    update public.user_reported_events set moderation_status = 'approved' where user_id = '${B}';
   `)
+  await db.exec(await readFile(new URL("./migrations/20261007_chat_allowance.sql", import.meta.url), "utf8"))
+  await db.exec("grant select, insert, update, delete on public.chat_usage to authenticated;")
 }, 20000)
 beforeEach(async () => {
   await db.exec(`reset role; set request.jwt.claim.sub = '${A}'; set role authenticated;`)
@@ -44,6 +47,22 @@ beforeEach(async () => {
 afterAll(async () => { await db?.close() })
 
 describe("database constraints and account isolation", () => {
+  it("limits provider attempts atomically, prevents client resets, and isolates accounts", async () => {
+    expect((await db.query("select consume_chat_allowance() as allowed")).rows).toEqual([{ allowed: true }])
+    expect((await db.query("select consume_chat_allowance() as allowed")).rows).toEqual([{ allowed: false }])
+    expect((await db.query("update public.chat_usage set requests = 0 returning user_id")).rows).toHaveLength(0)
+    await expect(db.query("insert into public.chat_usage (user_id, usage_date) values ($1, current_date)", [A])).rejects.toThrow(/row-level security/i)
+    for (let attempt = 1; attempt < 20; attempt++) {
+      await db.exec("reset role; update public.chat_usage set last_request_at = now() - interval '6 seconds'; set role authenticated;")
+      expect((await db.query("select consume_chat_allowance() as allowed")).rows).toEqual([{ allowed: true }])
+    }
+    await db.exec("reset role; update public.chat_usage set last_request_at = now() - interval '6 seconds'; set role authenticated;")
+    expect((await db.query("select consume_chat_allowance() as allowed")).rows).toEqual([{ allowed: false }])
+    await db.exec(`reset role; set request.jwt.claim.sub = '${B}'; set role authenticated;`)
+    expect((await db.query("select consume_chat_allowance() as allowed")).rows).toEqual([{ allowed: true }])
+    await db.exec("reset role; set request.jwt.claim.sub = ''; set role anon;")
+    await expect(db.query("select consume_chat_allowance()")).rejects.toThrow(/permission denied/i)
+  })
   it("isolates account saves, preferences, and Calendar tokens", async () => {
     for (const table of ["recommendations", "user_preferences", "calendar_connections"]) {
       const { rows } = await db.query<{ user_id: string }>(`select user_id from public.${table}`)
@@ -58,9 +77,25 @@ describe("database constraints and account isolation", () => {
     expect((await db.query("select title from public.user_reported_events")).rows).toHaveLength(2)
     const result = await db.query("delete from public.user_reported_events where user_id = $1 returning id", [B])
     expect(result.rows).toHaveLength(0)
-    await db.exec("reset role; set role anon;")
-    expect((await db.query("select title from public.user_reported_events")).rows).toHaveLength(2)
+    await db.exec("reset role; set request.jwt.claim.sub = ''; set role anon;")
+    expect((await db.query("select title from public.user_reported_events")).rows).toHaveLength(1)
     await expect(db.query("delete from public.user_reported_events")).rejects.toThrow(/permission denied/i)
+  })
+  it("prevents authors from publishing reports or changing approved content", async () => {
+    await expect(db.query("update public.user_reported_events set moderation_status = 'approved' where user_id = $1", [A])).rejects.toThrow(/row-level security/i)
+    await expect(db.query("insert into public.user_reported_events (user_id, title, start_time, moderation_status) values ($1, 'Self-approved', now(), 'approved')", [A])).rejects.toThrow(/row-level security/i)
+    await db.exec(`reset role; set request.jwt.claim.sub = '${B}'; set role authenticated;`)
+    expect((await db.query("update public.user_reported_events set title = 'Changed after approval' where user_id = $1 returning id", [B])).rows).toHaveLength(0)
+    await db.exec("reset role; set request.jwt.claim.sub = ''; set role anon;")
+    expect((await db.query("select title from public.user_reported_events")).rows).toEqual([{ title: "B report" }])
+  })
+  it("upgrades existing reports to pending and keeps moderation migration repeatable", async () => {
+    await db.exec("reset role; alter table public.user_reported_events drop column moderation_status cascade;")
+    const migration = await readFile(new URL("./migrations/20261007_report_moderation.sql", import.meta.url), "utf8")
+    await db.exec(migration)
+    await db.exec(migration)
+    await db.exec("set request.jwt.claim.sub = ''; set role anon;")
+    expect((await db.query("select title from public.user_reported_events")).rows).toHaveLength(0)
   })
   it("makes repeated cloud saves idempotent through the uniqueness constraint", async () => {
     for (let index = 0; index < 2; index++) {

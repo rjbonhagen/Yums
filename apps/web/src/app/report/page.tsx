@@ -71,7 +71,7 @@ export default function ReportPage() {
               <Link href="/feed" className="underline underline-offset-4">
                 the feed
               </Link>{" "}
-              labeled as a community report, not verified.
+              after review, labeled as a community report, not verified.
             </p>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -136,7 +136,7 @@ export default function ReportPage() {
                   disabled={!title.trim() || !startTime || status === "submitting"}
                   onClick={handleSubmit}
                 >
-                  {status === "submitting" ? "Submitting…" : "Submit report"}
+                  {status === "submitting" ? "Submitting…" : "Submit for review"}
                 </Button>
               </>
             )}

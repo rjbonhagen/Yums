@@ -46,6 +46,7 @@ const ROW = {
   start_time: "2026-09-01T18:00:00Z",
   source_url: null,
   created_at: "2026-08-29T10:00:00Z",
+  moderation_status: "pending",
 }
 
 describe("loadUpcomingReportedEvents", () => {
@@ -66,6 +67,7 @@ describe("loadUpcomingReportedEvents", () => {
         startTime: "2026-09-01T18:00:00Z",
         sourceUrl: undefined,
         createdAt: "2026-08-29T10:00:00Z",
+        moderationStatus: "pending",
       },
     ])
     expect(calls.from).toEqual(["user_reported_events"])
@@ -95,6 +97,7 @@ describe("submitReportedEvent", () => {
       description: null,
       location_name: null,
       source_url: null,
+      moderation_status: "pending",
     })
   })
 })

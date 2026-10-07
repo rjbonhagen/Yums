@@ -55,6 +55,11 @@ export function CommunityReports({ userId, reports }: { userId: string | null; r
             <CardContent className="flex items-start justify-between gap-4 py-4">
               <div>
                 <p className="font-medium">{item.title}</p>
+                {item.moderationStatus !== "approved" && (
+                  <p className="text-muted-foreground text-xs">
+                    {item.moderationStatus === "pending" ? "Awaiting review · visible only to you" : "Not approved · visible only to you"}
+                  </p>
+                )}
                 {item.locationName && <p className="text-muted-foreground text-sm">{item.locationName}</p>}
                 <p className="text-muted-foreground text-xs">{formatEventDateTime(item.startTime)}</p>
                 {item.description && <p className="text-muted-foreground text-xs">{item.description}</p>}

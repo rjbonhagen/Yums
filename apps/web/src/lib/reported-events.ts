@@ -17,6 +17,7 @@ export interface ReportedEvent {
   startTime: string
   sourceUrl?: string
   createdAt: string
+  moderationStatus: "pending" | "approved" | "rejected"
 }
 
 export interface ReportedEventInput {
@@ -38,10 +39,11 @@ interface ReportedEventRow {
   start_time: string
   source_url: string | null
   created_at: string
+  moderation_status: "pending" | "approved" | "rejected"
 }
 
 const SELECT_COLUMNS =
-  "id, user_id, title, description, location_name, latitude, longitude, start_time, source_url, created_at"
+  "id, user_id, title, description, location_name, latitude, longitude, start_time, source_url, created_at, moderation_status"
 
 function fromRow(row: ReportedEventRow): ReportedEvent {
   return {
@@ -55,12 +57,13 @@ function fromRow(row: ReportedEventRow): ReportedEvent {
     startTime: row.start_time,
     sourceUrl: row.source_url ?? undefined,
     createdAt: row.created_at,
+    moderationStatus: row.moderation_status,
   }
 }
 
 /** Upcoming reports only (startTime in the future) — a report for an
  * event that already happened isn't useful on the feed. Publicly
- * readable, no signed-in session required (RLS: `using (true)`). */
+ * Approved reports are public; pending/rejected records are author-only. */
 export async function loadUpcomingReportedEvents(supabase: SupabaseClient): Promise<ReportedEvent[]> {
   const { data, error } = await supabase
     .from("user_reported_events")
@@ -85,6 +88,7 @@ export async function submitReportedEvent(
       location_name: input.locationName ?? null,
       start_time: input.startTime,
       source_url: input.sourceUrl ?? null,
+      moderation_status: "pending",
     })
     .select(SELECT_COLUMNS)
     .single()

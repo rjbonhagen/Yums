@@ -168,6 +168,8 @@ create table user_reported_events (
   longitude double precision,
   start_time timestamptz not null,
   source_url text,
+  moderation_status text not null default 'pending'
+    check (moderation_status in ('pending', 'approved', 'rejected')),
   created_at timestamptz not null default now()
 );
 
@@ -190,11 +192,12 @@ create policy "users manage own recommendations" on recommendations
 create policy "users manage own calendar connection" on calendar_connections
   for all using (auth.uid() = user_id);
 create policy "anyone can view reported events" on user_reported_events
-  for select using (true);
+  for select using (moderation_status = 'approved' or auth.uid() = user_id);
 create policy "signed-in users can submit reports" on user_reported_events
-  for insert with check (auth.uid() = user_id);
+  for insert with check (auth.uid() = user_id and moderation_status = 'pending');
 create policy "users manage own reports" on user_reported_events
-  for update using (auth.uid() = user_id);
+  for update using (auth.uid() = user_id and moderation_status = 'pending')
+  with check (auth.uid() = user_id and moderation_status = 'pending');
 create policy "users delete own reports" on user_reported_events
   for delete using (auth.uid() = user_id);
 

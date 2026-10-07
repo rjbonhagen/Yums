@@ -7,6 +7,8 @@ const { answerDeterministically, answerWithLLM, isOpenAIConfigured } = vi.hoiste
 }))
 
 vi.mock("@/lib/chatbot", () => ({ answerDeterministically, answerWithLLM, isOpenAIConfigured }))
+const { reserveProviderReply } = vi.hoisted(() => ({ reserveProviderReply: vi.fn() }))
+vi.mock("@/lib/chat-allowance", () => ({ reserveProviderReply }))
 
 const { POST } = await import("./route")
 
@@ -16,9 +18,18 @@ function req(body: unknown) {
 
 beforeEach(() => {
   vi.clearAllMocks()
+  reserveProviderReply.mockResolvedValue(true)
 })
 
 describe("POST /api/chat", () => {
+  it("does not spend provider credits without an authenticated database allowance", async () => {
+    isOpenAIConfigured.mockReturnValue(true)
+    reserveProviderReply.mockResolvedValue(false)
+    answerDeterministically.mockResolvedValue("free reply")
+    const result = await POST(req({ message: "What's free?" }))
+    expect(await result.json()).toEqual({ reply: "free reply", source: "deterministic" })
+    expect(answerWithLLM).not.toHaveBeenCalled()
+  })
   it("rejects oversized bodies before invoking either reply path", async () => {
     const response = await POST(req({ message: "x".repeat(40000) }))
     expect(response.status).toBe(413)

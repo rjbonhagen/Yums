@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server"
 import { answerDeterministically, answerWithLLM, isOpenAIConfigured, type ChatMessage } from "@/lib/chatbot"
+import { reserveProviderReply } from "@/lib/chat-allowance"
 
 function parseHistory(value: unknown): ChatMessage[] {
   if (!Array.isArray(value)) return []
@@ -44,7 +45,7 @@ export async function POST(request: Request) {
   }
   if (message.length > 2000) return NextResponse.json({ error: "message must be at most 2000 characters" }, { status: 400 })
 
-  if (isOpenAIConfigured()) {
+  if (isOpenAIConfigured() && await reserveProviderReply()) {
     try {
       const reply = await answerWithLLM(message, history)
       return NextResponse.json({ reply, source: "llm" })
