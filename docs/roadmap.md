@@ -6,6 +6,28 @@ available development time. Make incremental commits for each completed item.
 
 ## Current state
 
+Local portfolio delivery completed October 7. The original review and six-day
+plan below are retained as the baseline backlog. Current verification is in
+[demo-verification.md](demo-verification.md); the README provides setup and the
+rehearsed walkthrough. Public deployment is deferred and has not been performed.
+
+| Item | Final status and evidence |
+| --- | --- |
+| R1 | Complete: explicit food evidence required; paid, negated, discussion, and withdrawn offers covered by ingestion regression tests. Original titles preserved. |
+| R2 | Complete: supported settings validated and applied through cookies/account preferences across server navigation; browser rehearsal and preference/ranking tests pass. Unsupported choices removed. |
+| R3 | Complete: Pacific Today and seven-date window, ended/ongoing events, source durations, overnight events, and Calendar conflicts covered by tests. |
+| R4 | Complete: speculative savings removed; dashboard shows a budget target and discovery counts. Restaurants have no invented prices. |
+| R5 | Complete: guest saves persist, stable source/date keys and account uniqueness added, end times retained, expired snapshots labeled; browser and database tests pass. |
+| R6 | Complete for local delivery: fresh install, 145 tests, lint, build, production audit, setup example, CI configuration, screenshots, and rehearsal record. Credential-backed services remain explicitly unverified live. CI awaits a GitHub push. |
+| R7 | Request/history bounds and local account-isolation tests complete. Public service-level usage controls, moderation, and deployment account checks remain required before public access. |
+
+Sample mode is explicit and visibly labeled; failed live sources never inject
+sample offers. Navigation, mobile layout, keyboard submission, and unavailable
+integration states were rehearsed. Production dependencies have no current audit
+findings; nine development-only transitive findings remain documented.
+
+## Original review baseline
+
 Yums already has live Berkeley event discovery, nearby restaurants, onboarding,
 ranking, optional Calendar/chat/maps, saved items, community reports, and
 reminders while the feed stays open. GitHub has no open issues or pull requests
@@ -55,15 +77,14 @@ background push, merchant deals, agentic checkout, or LLM extraction this week.
 - README includes screenshots, architecture, current limitations, and demo steps.
 - Changes are committed in reviewable increments and ready to push to GitHub.
 
-## Remaining choices
+## Delivery scope
 
-Weekly capacity is unspecified; prioritize the exit criteria over the daily
-feature count. A hosted public demo is optional and needs a hosting choice and
-public-access safeguards. Goal questions already answered: portfolio/demo,
-under one week. Follow-up: decide whether delivery needs a hosted URL or only
-a reproducible repository and recorded demo.
+Delivery is the reproducible repository, screenshots, and rehearsed local demo.
+A hosted public demo is optional and requires separate authorization, a hosting
+choice, and the remaining R7 safeguards. Multi-campus support, background push,
+merchant deals, checkout, and new model extraction remain deferred.
 
-## Verification from this review
+## Historical verification from the initial review
 
 After `npm ci`, all 98 tests across 16 files passed and `npm run build`
 succeeded, including TypeScript compilation. Lint reports two errors
