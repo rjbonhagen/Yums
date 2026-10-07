@@ -43,14 +43,10 @@ function stripHtml(html: string): string {
 export const callinkSource: CampusEventSource = {
   key: "callink-live",
   async fetchEvents(): Promise<CampusEvent[]> {
-    // Rounded to the current 2-minute bucket (matching the revalidate
-    // window below) rather than the exact current instant — an exact
-    // millisecond timestamp here would make every request's URL unique,
-    // which defeats Next's fetch cache entirely (it keys on URL). Losing
-    // events that start in the last couple minutes to this rounding is an
-    // acceptable trade for actually being cacheable.
+    // Include recently started events; the recommendation layer uses real
+    // end times to discard expired offers. Round for shared cache reuse.
     const bucketMs = 2 * 60 * 1000
-    const startsAfter = new Date(Math.floor(Date.now() / bucketMs) * bucketMs).toISOString()
+    const startsAfter = new Date(Math.floor((Date.now() - 24 * 60 * 60 * 1000) / bucketMs) * bucketMs).toISOString()
     const params = new URLSearchParams({
       top: "100",
       startsAfter,

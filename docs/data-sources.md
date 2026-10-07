@@ -3,18 +3,24 @@
 ## Berkeley calendar
 
 `services/event-ingestion/sources/berkeley-live.ts` reads the public
-`events.berkeley.edu/live/json/events/?days=1&pp=100` endpoint. The adapter
-uses titles, source URLs, and start/end times; it has no venue or description
-fields. Food extraction is therefore limited to title evidence. On failure,
-its events are omitted and source status is unavailable. Coverage is today,
-not a comprehensive weekly calendar.
+LiveWhale JSON endpoint using documented path parameters for Pacific date
+bounds, pagination, and explicit description/location fields. The old query
+parameters were ignored by the source. Live verification on October 7 returned
+544 records for the requested date range, with descriptions and venues.
+Pagination reads all returned pages up to a bounded four-page limit; exceeding
+that limit is disclosed as source unavailability. The recommendation layer
+applies the final seven-date window and excludes ended events. No source
+guarantees complete coverage of every campus offer.
+
+API format: [LiveWhale documentation](https://support.livewhale.com/live/blurbs/json-api).
 
 ## Cal Link
 
 `callink-live.ts` reads the public event-search endpoint. It uses descriptions,
 organizer names, times, and organizer-entered locations/coordinates. An exact
 Free Food benefit is explicit organizer evidence. The source requests the
-first 100 upcoming events; recommendation construction applies the seven-day
+first 100 events starting within the last day or later, retaining recently
+started events until their actual end; recommendation construction applies the seven-day
 window. There is no pagination guarantee or completeness claim. Same-organization,
 same-title grouping is a display heuristic, not verified recurrence metadata.
 

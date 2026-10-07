@@ -149,9 +149,7 @@ export async function buildRecommendations(params: RecommendationParams): Promis
     }
   }
 
-  // Free food: live UC Berkeley events calendar, falling back to the
-  // hand-written mock only if the live fetch itself fails (network error,
-  // upstream down) — not as a default. See docs/data-sources.md.
+  // Source failures are disclosed and never replaced by synthetic offers.
   let foodEvents: NormalizedFoodEvent[]
   if (foodResult.status === "fulfilled") {
     foodEvents = foodResult.value.map(normalizeLiveEvent)
