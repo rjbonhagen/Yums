@@ -50,7 +50,7 @@ Invitation-mode sign-in avoids creating new accounts through magic links;
 Supabase's global new-signup switch must also be disabled by the project owner.
 See [pilot setup](pilot-setup.md) for configuration and operator steps.
 
-Local verification after these changes: 208 tests across 30 files, lint,
+Local verification after these changes: 216 tests across 32 files, lint,
 live-mode production build, and production dependency audit all pass. No
 production dependency vulnerabilities were reported. Database migrations were
 tested in local PostgreSQL; they have not been applied to the remote project.
@@ -100,12 +100,23 @@ tests cover guest behavior, failure/retry, Auth failure, account changes, and
 cleanup. A fresh production-browser check still reaches the dashboard with
 the entered target and walk preference (`docs/screenshots/pilot-onboarding.jpg`).
 
-Freshness uses two-minute outer event caches, with a five-minute Berkeley
-source fetch cache and two-minute Cal Link fetch cache. Nearby places refresh
-on a ten-minute cache. These are request-triggered refresh intervals, not a
-guarantee of real-time availability. Source failures stay visible; no samples
-are substituted. Calendar response errors cannot be mistaken for a free
-schedule.
+Freshness uses two-minute event cache windows and ten-minute nearby-place
+windows. Each new window requires a successful network fetch; old windows
+cannot silently persist through an extended outage. Inner fetch caching is
+disabled. Regression tests simulate expired caches followed by source failures
+and recovery. These tests emulate argument-keyed persistence; they do not
+exercise Next's cache implementation. Results within a window can still be
+that old and do not guarantee that food remains available. Source failures
+stay visible; no samples are substituted. Calendar response errors cannot
+be mistaken for a free schedule.
+
+Production API checks after the cache change returned 42 real source listings
+with all discovery sources marked live. Two sequential requests with different
+walk preferences took 6,225 ms and 11 ms, respectively, confirming shared
+source cache reuse in the running Next server. This is one dated observation,
+not a latency or uptime guarantee. Homepage and dashboard regression tests
+verify that unavailable counts remain unknown and empty-source wording does
+not claim offers are absent when both event sources are unreachable.
 
 ## Verification remaining before launch
 

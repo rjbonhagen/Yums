@@ -9,10 +9,8 @@ import { formatEventDateTime } from "@/lib/format"
 import { isToday } from "@/lib/event-time"
 import { getPreferences } from "@/lib/server-preferences"
 
-// No force-dynamic: see the same note in api/recommendations/route.ts —
-// this page already renders per-request (searchParams + cookies() via
-// getConnectedCalendarAccessToken), so removing it only stops the
-// per-source fetch caching from being silently overridden to no-store.
+// Account preferences and Calendar access render per request; public sources
+// use bounded shared cache windows in recommendations.ts.
 
 export default async function DashboardPage(props: PageProps<"/dashboard">) {
   const searchParams = await props.searchParams
@@ -23,6 +21,7 @@ export default async function DashboardPage(props: PageProps<"/dashboard">) {
   const { recommendations, meta } = await buildRecommendations({ maxTravelMinutes, optimizeFor: preferences.optimizeFor, calendarAccessToken: calendarAccessToken ?? undefined })
   const freeFood = recommendations.filter((r) => r.kind === "free_food" && isToday(r.startTime, new Date(), r.endTime))
   const weeklyEvents = recommendations.filter((r) => r.kind === "free_food").length
+  const foodUnavailable = meta.freeFood.source === "unavailable" && meta.callink.source === "unavailable"
 
   return (
     <div className="flex flex-1 flex-col">
@@ -30,7 +29,7 @@ export default async function DashboardPage(props: PageProps<"/dashboard">) {
       <main className="mx-auto w-full max-w-3xl flex-1 space-y-8 px-4 py-8">
         {meta.freeFood.source === "demo" && <p role="status" className="rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">Sample demo data · these events are examples, not real offers.</p>}
         <section>
-          <div className="mb-1 flex items-center gap-2">
+          <div className="mb-1 flex flex-wrap items-center gap-2">
             <h1 className="text-2xl font-semibold">Today at {university.name}</h1>
             {meta.freeFood.source === "unavailable" && (
               <Badge
@@ -54,7 +53,9 @@ export default async function DashboardPage(props: PageProps<"/dashboard">) {
           <p className="text-muted-foreground mb-4 text-sm">Today&apos;s upcoming offers, with walking estimates from campus center. All times are in Berkeley.</p>
           <div className="space-y-3">
             {freeFood.length === 0 && (
-              <p className="text-muted-foreground text-sm">No free food found on today&apos;s calendar.</p>
+              <p className="text-muted-foreground text-sm">{foodUnavailable
+                ? "Couldn't check today's free-food offers. The campus event sources are unavailable."
+                : "No free food found in the available sources for today."}</p>
             )}
             {freeFood.map((r) => (
               <Card key={r.id}>
@@ -88,7 +89,7 @@ export default async function DashboardPage(props: PageProps<"/dashboard">) {
               </div>
               <div>
                 <p className="text-muted-foreground text-xs">Food events</p>
-                <p className="text-xl font-semibold">{weeklyEvents}</p>
+                <p className="text-xl font-semibold">{foodUnavailable ? "—" : weeklyEvents}</p>
               </div>
               <div>
                 <p className="text-muted-foreground text-xs">Preferred walk</p>

@@ -38,10 +38,11 @@ export default async function HomePage() {
   const freeFoodCount = todayRecommendations.filter((r) => r.kind === "free_food").length
   const eatsCount = recommendations.filter((r) => r.kind === "nearby_eats").length
   const closest = [...todayRecommendations].filter((r) => r.distanceMinutes != null).sort((a, b) => a.distanceMinutes! - b.distanceMinutes!)[0]
+  const foodUnavailable = meta.freeFood.source === "unavailable" && meta.callink.source === "unavailable"
 
   const stats = [
-    { value: String(freeFoodCount), label: "free food events on campus today" },
-    { value: String(eatsCount), label: "nearby places listed" },
+    { value: foodUnavailable ? "—" : String(freeFoodCount), label: "free food events on campus today" },
+    { value: meta.nearbyEats.source === "unavailable" ? "—" : String(eatsCount), label: "nearby places listed" },
     {
       value: closest?.distanceMinutes != null ? `${closest.distanceMinutes} min` : "—",
       label: "closest opportunity right now",
@@ -54,6 +55,8 @@ export default async function HomePage() {
       <main className="flex-1">
       {meta.freeFood.source === "demo" && <p role="status" className="bg-amber-50 px-4 py-3 text-center text-sm text-amber-900">Sample demo data · examples only, not real food offers.</p>}
       {meta.freeFood.source === "unavailable" && <p role="status" className="bg-amber-50 px-4 py-3 text-center text-sm text-amber-900">Berkeley calendar is unavailable. Its events are omitted.</p>}
+      {meta.callink.source === "unavailable" && <p role="status" className="bg-amber-50 px-4 py-3 text-center text-sm text-amber-900">Cal Link is unavailable. Its club events are omitted.</p>}
+      {meta.nearbyEats.source === "unavailable" && <p role="status" className="bg-amber-50 px-4 py-3 text-center text-sm text-amber-900">Nearby places are unavailable from OpenStreetMap right now.</p>}
       {/* Hero */}
       <section className="border-b">
         <div className="mx-auto flex max-w-5xl flex-col items-center px-4 py-24 text-center">
