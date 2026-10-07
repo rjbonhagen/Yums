@@ -32,6 +32,9 @@ language plpgsql
 security definer set search_path = public
 as $$
 begin
+  -- The invited pilot uses email accounts. Other Auth identities can exist
+  -- in the project without a usable pilot profile.
+  if new.email is null or btrim(new.email) = '' then return new; end if;
   insert into public.users (id, email)
   values (new.id, new.email)
   on conflict (id) do nothing;
@@ -42,6 +45,13 @@ $$;
 create trigger on_auth_user_created
   after insert on auth.users
   for each row execute function public.handle_new_auth_user();
+
+-- Auth accounts can predate installation of the app schema. Keep existing
+-- profiles intact and create only missing email-account profiles.
+insert into public.users (id, email)
+select id, email from auth.users
+where email is not null and btrim(email) <> ''
+on conflict (id) do nothing;
 
 create table user_preferences (
   user_id uuid primary key references users (id) on delete cascade,

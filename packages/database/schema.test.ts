@@ -6,6 +6,9 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest"
 let db: PGlite
 const A = "11111111-1111-4111-8111-111111111111"
 const B = "22222222-2222-4222-8222-222222222222"
+const EXISTING = "33333333-3333-4333-8333-333333333333"
+const LEGACY = "44444444-4444-4444-8444-444444444444"
+const NON_EMAIL = "55555555-5555-4555-8555-555555555555"
 
 beforeAll(async () => {
   db = await PGlite.create()
@@ -17,6 +20,7 @@ beforeAll(async () => {
     create function auth.uid() returns uuid language sql stable as
       $$ select nullif(current_setting('request.jwt.claim.sub', true), '')::uuid $$;
     create function uuid_generate_v4() returns uuid language sql as $$ select gen_random_uuid() $$;
+    insert into auth.users values ('${EXISTING}', 'existing@example.test');
   `)
   const schema = await readFile(new URL("./schema.sql", import.meta.url), "utf8")
   await db.exec(schema.replace('create extension if not exists "uuid-ossp";', ""))
@@ -47,6 +51,31 @@ beforeEach(async () => {
 afterAll(async () => { await db?.close() })
 
 describe("database constraints and account isolation", () => {
+  it("creates app profiles for Auth accounts that predate the schema", async () => {
+    await db.exec("reset role;")
+    expect((await db.query("select email from public.users where id = $1", [EXISTING])).rows).toEqual([{ email: "existing@example.test" }])
+    await db.query("insert into public.user_preferences (user_id) values ($1)", [EXISTING])
+  })
+  it("backfills missing profiles repeatably without overwriting existing profiles", async () => {
+    await db.exec(`reset role;
+      drop trigger on_auth_user_created on auth.users;
+      insert into auth.users values ('${LEGACY}', 'legacy@example.test'), ('${NON_EMAIL}', null);
+      update public.users set email = 'preserved@example.test' where id = '${EXISTING}';`)
+    const migration = await readFile(new URL("./migrations/20261007_user_sync.sql", import.meta.url), "utf8")
+    await db.exec(migration)
+    await db.exec(migration)
+    expect((await db.query("select email from public.users where id = $1", [LEGACY])).rows).toEqual([{ email: "legacy@example.test" }])
+    expect((await db.query("select email from public.users where id = $1", [EXISTING])).rows).toEqual([{ email: "preserved@example.test" }])
+    expect((await db.query("select id from public.users where id = $1", [NON_EMAIL])).rows).toHaveLength(0)
+    const nextAccount = "66666666-6666-4666-8666-666666666666"
+    const nextNonEmail = "77777777-7777-4777-8777-777777777777"
+    await db.query("insert into auth.users (id, email) values ($1, 'next@example.test'), ($2, null)", [nextAccount, nextNonEmail])
+    expect((await db.query("select email from public.users where id = $1", [nextAccount])).rows).toEqual([{ email: "next@example.test" }])
+    expect((await db.query("select id from public.users where id = $1", [nextNonEmail])).rows).toHaveLength(0)
+    await db.query("insert into public.user_preferences (user_id) values ($1)", [LEGACY])
+    await db.exec(`set request.jwt.claim.sub = '${LEGACY}'; set role authenticated;`)
+    expect((await db.query("select user_id from public.user_preferences")).rows).toEqual([{ user_id: LEGACY }])
+  })
   it("rejects invalid report content even when callers bypass the app", async () => {
     for (const title of [" ", "x".repeat(161)]) {
       await expect(db.query("insert into public.user_reported_events (user_id, title, start_time) values ($1, $2, now())", [A, title])).rejects.toThrow(/reports_content_limits/)
