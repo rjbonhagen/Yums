@@ -8,6 +8,7 @@ import { getConnectedCalendarAccessToken } from "@/lib/google-calendar"
 import { isSupabaseConfigured } from "@/lib/supabase/client"
 import { createClient } from "@/lib/supabase/server"
 import { loadUpcomingReportedEvents, type ReportedEvent } from "@/lib/reported-events"
+import { getPreferences } from "@/lib/server-preferences"
 
 // No force-dynamic: see the same note in api/recommendations/route.ts —
 // this page reads cookies() via getConnectedCalendarAccessToken so it
@@ -25,9 +26,10 @@ async function loadCommunityReports(): Promise<{ userId: string | null; reports:
 }
 
 export default async function FeedPage() {
+  const preferences = await getPreferences()
   const calendarAccessToken = await getConnectedCalendarAccessToken()
   const [{ recommendations, meta }, { userId, reports }] = await Promise.all([
-    buildRecommendations({ maxTravelMinutes: 20, calendarAccessToken: calendarAccessToken ?? undefined }),
+    buildRecommendations({ maxTravelMinutes: preferences.maxTravelMinutes, optimizeFor: preferences.optimizeFor, calendarAccessToken: calendarAccessToken ?? undefined }),
     loadCommunityReports(),
   ])
 
@@ -37,6 +39,7 @@ export default async function FeedPage() {
       <main className="mx-auto w-full max-w-3xl flex-1 space-y-4 px-4 py-8">
         <h1 className="text-2xl font-semibold">Campus Feed</h1>
         <p className="text-muted-foreground text-sm">Today and the next six days · times in Berkeley (Pacific Time).</p>
+        <p className="text-muted-foreground text-xs">Ranked for {preferences.optimizeFor === "fast" ? "shorter walks" : "free food"} · preferred walk: {preferences.maxTravelMinutes} minutes from campus center. Longer walks may still appear.</p>
         <p className="text-muted-foreground mb-2 text-sm">
           Free food is live from events.berkeley.edu&apos;s public calendar and Cal Link&apos;s club-events
           feed; nearby eats are live from OpenStreetMap.

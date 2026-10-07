@@ -1,5 +1,5 @@
 import { unstable_cache } from "next/cache"
-import { scoreOpportunity } from "@yums/shared"
+import { scoreOpportunity, DEFAULT_WEIGHTS } from "@yums/shared"
 import type { Recommendation } from "@yums/shared"
 import { berkeleyLiveSource, callinkSource, ingestSource, type ExtractedFoodEvent } from "@yums/event-ingestion"
 import { fetchNearbyPlaces } from "./nearby-places"
@@ -90,6 +90,7 @@ function normalizeFallbackEvent(e: (typeof fallbackFreeFoodEvents)[number]): Nor
 
 export interface RecommendationParams {
   maxTravelMinutes: number
+  optimizeFor?: "cheapest" | "fast"
   // Real Google Calendar access token (see /login's "Connect Google
   // Calendar" and apps/web/src/lib/google-calendar.ts). Absent for most
   // callers — scheduleScore then stays the documented flat placeholder.
@@ -110,6 +111,7 @@ export interface RecommendationsResult {
 
 export async function buildRecommendations(params: RecommendationParams): Promise<RecommendationsResult> {
   const { maxTravelMinutes, calendarAccessToken } = params
+  const weights = params.optimizeFor === "fast" ? { ...DEFAULT_WEIGHTS, savingsWeight: 0.1, proximityWeight: 0.5 } : DEFAULT_WEIGHTS
   const recs: Recommendation[] = []
   const meta: RecommendationsMeta = {
     freeFood: { source: "live" },
@@ -191,7 +193,7 @@ export async function buildRecommendations(params: RecommendationParams): Promis
       scheduleScore,
       preferenceScore: 0.6,
       confidenceScore: event.confidenceScore,
-    })
+    }, weights)
 
     recs.push({
       id: event.id,
@@ -227,7 +229,7 @@ export async function buildRecommendations(params: RecommendationParams): Promis
         scheduleScore: 0.5,
         preferenceScore: 0.5,
         confidenceScore: 0.9, // OSM listing exists; not evidence of a current deal
-      })
+      }, weights)
 
       recs.push({
         id: `place-${place.id}`,

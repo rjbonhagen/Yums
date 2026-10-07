@@ -7,6 +7,7 @@ import { getConnectedCalendarAccessToken } from "@/lib/google-calendar"
 import { university } from "@/lib/mock-data"
 import { formatEventDateTime } from "@/lib/format"
 import { isToday } from "@/lib/event-time"
+import { getPreferences } from "@/lib/server-preferences"
 
 // No force-dynamic: see the same note in api/recommendations/route.ts —
 // this page already renders per-request (searchParams + cookies() via
@@ -15,11 +16,11 @@ import { isToday } from "@/lib/event-time"
 
 export default async function DashboardPage(props: PageProps<"/dashboard">) {
   const searchParams = await props.searchParams
-  const budget = Number(searchParams.budget ?? 60)
-  const maxTravelMinutes = Number(searchParams.maxTravelMinutes ?? 20)
+  const preferences = await getPreferences(searchParams)
+  const { budget, maxTravelMinutes } = preferences
 
   const calendarAccessToken = await getConnectedCalendarAccessToken()
-  const { recommendations, meta } = await buildRecommendations({ maxTravelMinutes, calendarAccessToken: calendarAccessToken ?? undefined })
+  const { recommendations, meta } = await buildRecommendations({ maxTravelMinutes, optimizeFor: preferences.optimizeFor, calendarAccessToken: calendarAccessToken ?? undefined })
   const freeFood = recommendations.filter((r) => r.kind === "free_food" && isToday(r.startTime))
   const projectedSpend = Math.max(0, budget - recommendations.reduce((sum, r) => sum + r.estimatedSavings, 0) * 0.4)
   const projectedSavings = Math.max(0, budget - projectedSpend)

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { buildRecommendations } from "@/lib/recommendations"
 import { getConnectedCalendarAccessToken } from "@/lib/google-calendar"
+import { getPreferences } from "@/lib/server-preferences"
 
 // No force-dynamic (that would force every fetch() to no-store). This
 // route still renders dynamically anyway since it reads searchParams and
@@ -13,10 +14,11 @@ import { getConnectedCalendarAccessToken } from "@/lib/google-calendar"
 // regardless of whether the calling route is dynamically rendered.
 
 export async function GET(request: NextRequest) {
-  const maxTravelMinutes = Number(request.nextUrl.searchParams.get("maxTravelMinutes") ?? 20)
+  const preferences = await getPreferences(Object.fromEntries(request.nextUrl.searchParams))
   const calendarAccessToken = await getConnectedCalendarAccessToken()
   const { recommendations, meta } = await buildRecommendations({
-    maxTravelMinutes,
+    maxTravelMinutes: preferences.maxTravelMinutes,
+    optimizeFor: preferences.optimizeFor,
     calendarAccessToken: calendarAccessToken ?? undefined,
   })
   return NextResponse.json({ recommendations, meta })

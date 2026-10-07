@@ -12,22 +12,18 @@ import {
   loadPreferencesFromSupabase,
   saveLocalPreferences,
   savePreferencesToSupabase,
+  normalizePreferences,
   type WeeklyPreferences,
 } from "@/lib/preferences"
 import { createClient, isSupabaseConfigured } from "@/lib/supabase/client"
 
 const OPTIMIZE_OPTIONS = [
-  { value: "cheapest", label: "Cheapest" },
-  { value: "healthy", label: "Healthy" },
-  { value: "high_protein", label: "High Protein" },
-  { value: "fast", label: "Fast" },
+  { value: "cheapest", label: "Free food first" },
+  { value: "fast", label: "Shorter walks" },
 ] as const
 
 const TRANSPORT_OPTIONS = [
   { value: "walking", label: "Walking" },
-  { value: "bike", label: "Bike" },
-  { value: "car", label: "Car" },
-  { value: "transit", label: "Transit" },
 ] as const
 
 export default function StartPage() {
@@ -70,13 +66,18 @@ export default function StartPage() {
         const saved = await loadPreferencesFromSupabase(supabase, user.id)
         if (saved) applyPrefs(saved)
       } catch {
-        // No row yet for a brand-new user — nothing to restore, not an error.
+        const saved = loadLocalPreferences()
+        if (saved) applyPrefs(saved)
       }
+    }).catch(() => {
+      const saved = loadLocalPreferences()
+      if (saved) applyPrefs(saved)
     })
   }, [])
 
   async function buildMyWeek() {
-    const prefs: WeeklyPreferences = { budget, optimizeFor, transportation, maxTravelMinutes }
+    const prefs = normalizePreferences({ budget, optimizeFor, transportation, maxTravelMinutes })
+    saveLocalPreferences(prefs)
 
     if (userId && isSupabaseConfigured()) {
       setSaving(true)
@@ -101,6 +102,7 @@ export default function StartPage() {
       maxTravelMinutes: String(maxTravelMinutes),
     })
     router.push(`/dashboard?${params.toString()}`)
+    router.refresh()
   }
 
   return (
@@ -111,19 +113,23 @@ export default function StartPage() {
         <CardHeader>
           <CardTitle className="text-2xl">Yums</CardTitle>
           <p className="text-muted-foreground text-sm">
-            The cheapest way to live around campus.
+            Find free food and nearby eats around campus.
           </p>
           {restored && (
             <p className="text-muted-foreground text-xs">Restored your last saved preferences.</p>
           )}
         </CardHeader>
         <CardContent className="space-y-6">
+          <form className="space-y-6" onSubmit={(event) => { event.preventDefault(); void buildMyWeek() }}>
           <div className="space-y-2">
             <Label htmlFor="budget">How much do you want to spend this week?</Label>
             <Input
               id="budget"
               type="number"
               min={0}
+              max={1000}
+              step="0.01"
+              required
               value={budget}
               onChange={(e) => setBudget(Number(e.target.value))}
               className="text-lg"
@@ -139,6 +145,7 @@ export default function StartPage() {
                   type="button"
                   variant={optimizeFor === opt.value ? "default" : "outline"}
                   onClick={() => setOptimizeFor(opt.value)}
+                  aria-pressed={optimizeFor === opt.value}
                 >
                   {opt.label}
                 </Button>
@@ -149,7 +156,7 @@ export default function StartPage() {
           <div className="space-y-2">
             <Label>University</Label>
             <Input value="UC Berkeley" disabled />
-            <p className="text-muted-foreground text-xs">More campuses coming soon.</p>
+            <p className="text-muted-foreground text-xs">This demo covers UC Berkeley.</p>
           </div>
 
           <div className="space-y-2">
@@ -166,6 +173,7 @@ export default function StartPage() {
                 </Button>
               ))}
             </div>
+            <p className="text-muted-foreground text-xs">Walking estimates start at campus center. Nutrition and other travel modes aren&apos;t available.</p>
           </div>
 
           <div className="space-y-2">
@@ -174,14 +182,17 @@ export default function StartPage() {
               id="maxTravel"
               type="number"
               min={1}
+              max={120}
+              required
               value={maxTravelMinutes}
               onChange={(e) => setMaxTravelMinutes(Number(e.target.value))}
             />
           </div>
 
-          <Button className="w-full" size="lg" onClick={buildMyWeek} disabled={saving}>
+          <Button type="submit" className="w-full" size="lg" disabled={saving}>
             {saving ? "Saving…" : "Build My Week"}
           </Button>
+          </form>
         </CardContent>
       </Card>
       </main>

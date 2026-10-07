@@ -197,4 +197,13 @@ describe("buildRecommendations", () => {
     expect(recommendations[0].endTime).toBe("2026-09-01T22:00:00.000Z")
     expect(recommendations[0].durationEstimated).toBe(false)
   })
+
+  it("changes ordering when the user prioritizes shorter walks", async () => {
+    mockIngestSource(async (source) => source.key === "callink-live" ? [] : [{ ...liveBerkeleyEvent, latitude: 37.9 }])
+    vi.mocked(fetchNearbyPlaces).mockResolvedValue([{ ...nearbyPlace, latitude: 37.8719, longitude: -122.2585 }])
+    const cheap = await buildRecommendations({ maxTravelMinutes: 10, optimizeFor: "cheapest" })
+    const fast = await buildRecommendations({ maxTravelMinutes: 10, optimizeFor: "fast" })
+    expect(cheap.recommendations[0].kind).toBe("free_food")
+    expect(fast.recommendations[0].kind).toBe("nearby_eats")
+  })
 })
