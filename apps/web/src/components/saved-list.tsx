@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
@@ -23,20 +23,64 @@ function SavedListContent({ userId, initialItems, guest = false }: SavedListProp
   const [items, setItems] = useState(initialItems)
   const [removingId, setRemovingId] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const session = useRef({ active: true, valid: true })
+  const pending = useRef(new Set<string>())
+
+  useEffect(() => {
+    const tracked = session.current
+    tracked.active = true
+    if (guest) return () => { tracked.active = false }
+    const supabase = createClient()
+    function invalidate() {
+      tracked.valid = false
+      setItems([])
+      setError("Your account changed. Refresh to load your saved items.")
+    }
+    supabase.auth.getUser().then(({ data: { user }, error }) => {
+      if (!tracked.active) return
+      if (error) setError("Couldn't check your account. Refresh before removing items.")
+      else if (user?.id !== userId) invalidate()
+    }).catch(() => {
+      if (tracked.active) setError("Couldn't check your account. Refresh before removing items.")
+    })
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, next) => {
+      if (tracked.active && (event === "SIGNED_IN" || event === "SIGNED_OUT") && next?.user.id !== userId) invalidate()
+    })
+    return () => { tracked.active = false; subscription.unsubscribe() }
+  }, [guest, userId])
 
   async function handleRemove(id: string) {
+    if (!session.current.valid || pending.current.has(id)) return
+    pending.current.add(id)
     setError(null)
     const removed = items.find((i) => i.id === id)
-    setItems((prev) => prev.filter((i) => i.id !== id))
     setRemovingId(id)
+    const current = () => session.current.active && session.current.valid
     try {
-      if (guest) removeGuestItem(id)
-      else await unsaveItem(createClient(), userId, id)
+      if (guest) {
+        removeGuestItem(id)
+        setItems((prev) => prev.filter((i) => i.id !== id))
+      } else {
+        const supabase = createClient()
+        const { data: { user }, error } = await supabase.auth.getUser()
+        if (!current()) return
+        if (error) throw error
+        if (user?.id !== userId) {
+          session.current.valid = false
+          setItems([])
+          setError("Your account changed. Refresh to load your saved items.")
+          return
+        }
+        setItems((prev) => prev.filter((i) => i.id !== id))
+        await unsaveItem(supabase, userId, id)
+      }
     } catch {
-      if (removed) setItems((prev) => [...prev, removed]) // revert — don't lose the item on a failed delete
+      if (!current()) return
+      if (removed) setItems((prev) => prev.some((item) => item.id === id) ? prev : [...prev, removed])
       setError("Couldn't remove this item. Try again.")
     } finally {
-      setRemovingId(null)
+      pending.current.delete(id)
+      if (current()) setRemovingId(null)
     }
   }
 
