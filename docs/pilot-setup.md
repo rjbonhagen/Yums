@@ -14,6 +14,16 @@ It does not return account values or Calendar tokens. Missing tables/columns
 and disabled RLS require review. Confirm all applicable result sets before
 selecting the initial schema or migration path below.
 
+Run `npm run check:supabase` locally for a preliminary connection check using
+the public settings in `apps/web/.env.local`. It checks Auth signup/anonymous
+settings and required table columns with GET requests and `limit=0`; it requests
+no account rows and makes no remote changes. Missing schema is reported with
+the relevant migration filename. A passing result does not replace the SQL
+audit: it cannot verify RLS, unique indexes, profile triggers, report validation
+constraints, quota-function permissions, email delivery, callback allowlists,
+or signed-in account behavior. Network or key failures leave the checks failed.
+Public configuration is never printed, and redirects are rejected.
+
 Inspect extra permissive policies as well as the expected policies; another
 policy can broaden access. `chat_usage` should have no client write policies.
 `consume_chat_allowance()` must use security-definer execution with the reviewed

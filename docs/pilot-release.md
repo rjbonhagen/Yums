@@ -2,8 +2,8 @@
 
 The next release serves invited UC Berkeley users with real source data and
 account persistence. This extends the completed local portfolio demo. No
-hosting provider is configured yet; an existing Supabase project is available
-but its identifier and configuration have not been verified.
+hosting provider is configured yet. Supabase public connection settings are
+configured locally; the remaining remote release gates below are unverified.
 
 ## Release requirements
 
@@ -55,8 +55,8 @@ live-mode production build, and production dependency audit all pass. No
 production dependency vulnerabilities were reported. Database migrations were
 tested in local PostgreSQL; they have not been applied to the remote project.
 
-Six additional deployment-configuration tests pass. `npm run check:pilot`
-currently fails as expected: no local Supabase environment is configured.
+Six deployment-configuration tests passed before Supabase connection.
+`npm run check:pilot` now passes with the ignored local Supabase configuration.
 The production server was started explicitly with live mode and invite mode;
 these flags must also be configured in the eventual host environment.
 
@@ -149,15 +149,33 @@ not claim offers are absent when both event sources are unreachable.
 
 ## Verification remaining before launch
 
+October 7 connected-project check: the public key is accepted, and zero-row
+queries confirm `users`, `user_preferences`, and saved-item `save_key`/`end_time`
+columns are available. The user confirmed real sign-in and a saved listing in
+the app. That confirms one account's observed save, not cross-device persistence
+or isolation. The saved-item migration was applied by the project owner after
+a missing-column error; its remote unique index and policies remain unaudited.
+No account records were read in the public connection check.
+
+The new `npm run check:supabase` reports remaining setup failures: public signup
+is still enabled, `user_reported_events.moderation_status` is unavailable, and
+`chat_usage` is absent from the public schema cache. Anonymous sign-ins are
+disabled. Review the read-only SQL audit and existing-database migrations in
+`pilot-setup.md` before changing the project. Report validation/profile triggers
+also require that audit; a public zero-row query cannot prove their presence.
+Five checker regression tests cover read-only/zero-row requests, invalid keys
+and origins, missing migrations, permissive/unknown Auth settings, network
+failure, and sanitized output. Eleven total configuration/checker tests pass.
+
 | Requirement | Current evidence | Remaining verification |
 | --- | --- | --- |
 | Live discovery | Public sources and local production browser | Hosted smoke check and ongoing operator review |
-| Account persistence and isolation | Component mocks and local PostgreSQL policies | Two invited accounts on the actual Supabase project, across devices |
+| Account persistence and isolation | User-confirmed sign-in/save for one account; component mocks and local PostgreSQL policies | Sign-out/reload, preferences, two invited accounts and devices |
 | Moderation and chat allowance | Local PostgreSQL migrations and regression tests | Apply reviewed migrations and check remote policies/allowance |
 | Invitation-only access | Client flag and mocked sign-in tests | Disable remote sign-ups/anonymous access and verify email delivery |
 | Calendar | Mocked consent, refresh, disconnect and outage tests | Real Google consent and refresh, if enabled |
 | Deployment | Local production build and configuration checker | Choose host, configure HTTPS/redirects/environment, authorize publishing |
 
-Still required: project configuration and migration application, hosting setup,
+Still required: remaining project configuration and reviewed migrations, hosting setup,
 real-account verification, Calendar consent/refresh checks if enabled, and
 deployment authorization. The local safeguards alone do not prove launch readiness.

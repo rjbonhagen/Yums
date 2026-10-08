@@ -1,6 +1,6 @@
 # Demo verification
 
-Verified October 7, 2026 on Windows, branch `codex/clean-history`.
+Verified October 7, 2026 on Windows.
 Delivery is a reproducible local Berkeley portfolio demo; no public deployment,
 GitHub push, or remote database migration was performed.
 

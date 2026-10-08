@@ -13,7 +13,8 @@
     "lint": "npm run lint --workspace apps/web",
     "start": "npm run start --workspace apps/web",
     "check:pilot": "node --env-file-if-exists=apps/web/.env.local scripts/check-pilot.mjs",
-    "test:pilot-config": "node --test scripts/pilot-config.test.mjs"
+    "test:pilot-config": "node --test scripts/pilot-config.test.mjs scripts/supabase-readiness.test.mjs",
+    "check:supabase": "node --env-file-if-exists=apps/web/.env.local scripts/check-supabase.mjs"
   },
   "devDependencies": {
     "@electric-sql/pglite": "^0.5.8",
