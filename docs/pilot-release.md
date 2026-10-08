@@ -50,7 +50,7 @@ Invitation-mode sign-in avoids creating new accounts through magic links;
 Supabase's global new-signup switch must also be disabled by the project owner.
 See [pilot setup](pilot-setup.md) for configuration and operator steps.
 
-Local verification after these changes: 238 tests across 36 files, lint,
+Local verification after these changes: 244 tests across 37 files, lint,
 live-mode production build, and production dependency audit all pass. No
 production dependency vulnerabilities were reported. Database migrations were
 tested in local PostgreSQL; they have not been applied to the remote project.
@@ -166,6 +166,14 @@ also require that audit; a public zero-row query cannot prove their presence.
 Five checker regression tests cover read-only/zero-row requests, invalid keys
 and origins, missing migrations, permissive/unknown Auth settings, network
 failure, and sanitized output. Eleven total configuration/checker tests pass.
+
+Feed saves now track Auth account changes, clear previous account state, verify
+the current account immediately before a cloud save/removal, and ignore obsolete
+load/write results after an account change or unmount. Saves wait until account
+restoration finishes so a late initial read cannot erase a new optimistic save.
+Six component regression tests cover write failure/retry, fresh-account mismatch
+and Auth failure, delayed save/load/delete results, sign-out, and subscription
+cleanup. These are mocked client tests; real two-account verification remains.
 
 | Requirement | Current evidence | Remaining verification |
 | --- | --- | --- |

@@ -193,23 +193,60 @@ export function RecommendationsView({ recommendations }: { recommendations: Reco
   const savedByKey = new Map([...guestItems.filter((item) => !userId || item.isSample).map((item) => [savedKey(item), item.id] as const), ...cloudSavedByKey])
   const [saveError, setSaveError] = useState<string | null>(null)
   const savingKeys = useRef(new Set<string>())
+  const account = useRef<{ id: string | null | undefined; revision: number; active: boolean; loading: boolean }>({ id: undefined, revision: 0, active: true, loading: true })
 
   useEffect(() => {
-    if (!isSupabaseConfigured()) return
+    const trackedAccount = account.current
+    account.current.active = true
+    const initialRevision = account.current.revision
+    if (!isSupabaseConfigured()) {
+      account.current.id = null
+      account.current.loading = false
+      return () => { trackedAccount.active = false; trackedAccount.revision++ }
+    }
     const supabase = createClient()
-    supabase.auth.getUser().then(({ data: { user } }) => {
-      setUserId(user?.id ?? null)
+    function restore(user: { id: string } | null) {
+      account.current.id = user?.id ?? null
+      account.current.loading = Boolean(user)
+      const revision = ++account.current.revision
+      setUserId(account.current.id)
+      setSavedByKey(new Map())
+      setSaveError(null)
       if (!user) return
       loadSavedItems(supabase, user.id)
-        .then((items) => setSavedByKey(new Map(items.map((it) => [savedKey(it), it.id]))))
-        .catch(() => {
-          setSaveError("Couldn't load account saves. You can still save new items.")
+        .then((items) => {
+          if (account.current.active && revision === account.current.revision) {
+            setSavedByKey(new Map(items.map((it) => [savedKey(it), it.id])))
+          }
         })
-    }).catch(() => setSaveError("Couldn't check your account. Saves will stay in this browser."))
+        .catch(() => {
+          if (account.current.active && revision === account.current.revision) {
+            setSaveError("Couldn't load account saves. You can still save new items.")
+          }
+        })
+        .finally(() => {
+          if (account.current.active && revision === account.current.revision) account.current.loading = false
+        })
+    }
+    supabase.auth.getUser().then(({ data: { user }, error }) => {
+      if (!account.current.active || account.current.revision !== initialRevision) return
+      if (error) throw error
+      restore(user)
+    }).catch(() => {
+      if (account.current.active && account.current.revision === initialRevision) {
+        setSaveError("Couldn't check your account. Refresh before saving.")
+      }
+    })
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      if (!account.current.active || (event !== "SIGNED_IN" && event !== "SIGNED_OUT")) return
+      if ((session?.user.id ?? null) === account.current.id) return
+      restore(session?.user ?? null)
+    })
+    return () => { trackedAccount.active = false; trackedAccount.revision++; subscription.unsubscribe() }
   }, [])
 
   async function handleToggleSave(r: Recommendation) {
-    const key = savedKey(r)
+    const key = `${account.current.revision}:${savedKey(r)}`
     if (savingKeys.current.has(key)) return
     savingKeys.current.add(key)
     try { await toggleSave(r) } finally { savingKeys.current.delete(key) }
@@ -217,6 +254,14 @@ export function RecommendationsView({ recommendations }: { recommendations: Reco
 
   async function toggleSave(r: Recommendation) {
     setSaveError(null)
+    if (account.current.id === undefined && !r.isSample) {
+      setSaveError("Your account isn't ready. Refresh before saving.")
+      return
+    }
+    if (account.current.loading && !r.isSample) {
+      setSaveError("Account saves are loading. Try again in a moment.")
+      return
+    }
     if (!userId || r.isSample) {
       try {
         const existing = savedByKey.get(savedKey(r))
@@ -226,6 +271,20 @@ export function RecommendationsView({ recommendations }: { recommendations: Reco
       return
     }
     const supabase = createClient()
+    const revision = account.current.revision
+    const current = () => account.current.active && revision === account.current.revision
+    try {
+      const { data: { user }, error } = await supabase.auth.getUser()
+      if (!current()) return
+      if (error) throw error
+      if (user?.id !== userId) {
+        setSaveError("Your account changed. Refresh before saving.")
+        return
+      }
+    } catch {
+      if (current()) setSaveError("Couldn't check your account. Try again.")
+      return
+    }
     const key = savedKey(r)
     const existingId = savedByKey.get(key)
     if (existingId?.startsWith("pending:")) return
@@ -239,6 +298,7 @@ export function RecommendationsView({ recommendations }: { recommendations: Reco
       try {
         await unsaveItem(supabase, userId, existingId)
       } catch {
+        if (!current()) return
         setSaveError("Couldn't remove the saved item. Try again.")
         setSavedByKey((prev) => new Map(prev).set(key, existingId)) // revert — don't lie about saved state
       }
@@ -249,8 +309,10 @@ export function RecommendationsView({ recommendations }: { recommendations: Reco
     setSavedByKey((prev) => new Map(prev).set(key, optimisticId))
     try {
       const saved = await saveRecommendation(supabase, userId, r)
+      if (!current()) return
       setSavedByKey((prev) => new Map(prev).set(key, saved.id))
     } catch {
+      if (!current()) return
       setSaveError("Couldn't save this item. Try again.")
       setSavedByKey((prev) => {
         const next = new Map(prev)
