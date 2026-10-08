@@ -1,3 +1,14 @@
+*
+!package.json
+!package-lock.json
+!apps/
+!apps/**
+!packages/
+!packages/**
+!services/
+!services/**
+!scripts/
+!scripts/**
 **/node_modules
 **/.next
 **/.env*
@@ -13,4 +24,9 @@
 **/GEMINI.md
 **/skills-lock.json
 **/*.log
+**/.npmrc
+**/.netrc
+**/*.pem
+**/*.key
+**/*.p12
 docs/screenshots

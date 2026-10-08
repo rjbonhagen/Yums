@@ -45,8 +45,17 @@ docker build --platform linux/amd64 --build-arg NEXT_PUBLIC_SUPABASE_URL --build
 docker run --rm -p 3000:3000 yums:pilot
 ```
 
+In a second terminal, run `npm run check:host` against that container. It verifies
+health JSON/cache headers, login HTML, and one referenced static asset. For a
+hosted origin use `npm run check:host -- https://YOUR-HOST`. This is a process
+and packaging check, not a replacement for the signed-in release gates below.
+CI now includes a Linux container build and smoke check using placeholder
+public settings, without a registry push or deployment. That job has not run
+remotely; an authorized push/PR is required before its result can be inspected.
+
 Docker reads those build arguments from the calling shell's environment. The
-root `.dockerignore` excludes local environment files, credentials directories,
+root `.dockerignore` allows only package manifests and application/package/service/script
+directories, then excludes local environment files, credentials directories,
 dependencies, and old build output. The image contains the public Supabase
 configuration, which Next.js embeds into client code. Never pass service-role
 keys or optional provider/Calendar secrets as build arguments. Changing public

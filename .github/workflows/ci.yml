@@ -2,7 +2,7 @@ name: CI
 
 on:
   push:
-    branches: [main]
+    branches: [main, master, pilot-release]
   pull_request:
 
 jobs:
@@ -21,4 +21,32 @@ jobs:
       # next build also typechecks the whole apps/web project. No env vars
       # required for compilation. Live discovery remains available without
       # optional account, Calendar, chat, or map configuration.
-      - run: npm run build --workspace apps/web
+      - run: npm run build
+  container:
+    needs: test
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Build pilot container with placeholder public settings
+        run: >-
+          docker build --platform linux/amd64
+          --build-arg NEXT_PUBLIC_SUPABASE_URL=https://placeholder.supabase.co
+          --build-arg NEXT_PUBLIC_SUPABASE_ANON_KEY=sb_publishable_ci_placeholder
+          -t yums:ci .
+      - name: Start local container
+        run: docker run -d --name yums-smoke -p 127.0.0.1:3000:3000 yums:ci
+      - name: Wait for process health
+        run: curl --fail --retry 10 --retry-connrefused --retry-delay 1 --max-time 3 http://localhost:3000/api/health
+      - name: Check packaged server and assets
+        run: npm run check:host
+      - name: Container logs
+        if: failure()
+        run: docker logs yums-smoke
+      - name: Stop local container
+        if: always()
+        run: docker rm -f yums-smoke

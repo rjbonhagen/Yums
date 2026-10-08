@@ -193,3 +193,13 @@ delayed failure after sign-out. The full suite, lint, and production build pass.
 Still required: remaining project configuration and reviewed migrations, hosting setup,
 real-account verification, Calendar consent/refresh checks if enabled, and
 deployment authorization. The local safeguards alone do not prove launch readiness.
+
+The root CI build now includes standalone asset packaging. A separate CI job
+builds and starts the Linux container with placeholder public settings, checks
+health/login/static assets, and removes the test container; it has no registry
+push or deployment step. This workflow is prepared but has not run remotely.
+`npm run check:host` passed against the local standalone server. The Docker
+context is restricted to manifests and source/script directories with local
+environment files, credential files, dependencies, and build output excluded.
+The October 7 read-only Supabase recheck still fails on enabled public signup,
+missing report moderation, and missing quota schema. No remote changes were made.
