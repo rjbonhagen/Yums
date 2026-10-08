@@ -1,9 +1,9 @@
 # Berkeley invited pilot
 
 The next release serves invited UC Berkeley users with real source data and
-account persistence. This extends the completed local portfolio demo. No
-hosting provider is configured yet. Supabase public connection settings are
-configured locally; the remaining remote release gates below are unverified.
+account persistence. This extends the completed local portfolio demo. AWS is
+selected, but no cloud resources are configured yet. Supabase public connection
+settings are configured locally; the remaining remote gates are unverified.
 
 ## Release requirements
 
@@ -188,7 +188,7 @@ delayed failure after sign-out. The full suite, lint, and production build pass.
 | Moderation and chat allowance | Local PostgreSQL migrations and regression tests | Apply reviewed migrations and check remote policies/allowance |
 | Invitation-only access | Client flag and mocked sign-in tests | Disable remote sign-ups/anonymous access and verify email delivery |
 | Calendar | Mocked consent, refresh, disconnect and outage tests | Real Google consent and refresh, if enabled |
-| Deployment | Local production build and configuration checker | Choose host, configure HTTPS/redirects/environment, authorize publishing |
+| Deployment | AWS selected; standalone server smoke tested locally; Dockerfile and AWS checklist prepared | Linux image build/test, AWS account/region/cost review, HTTPS/redirects and authorized publishing |
 
 Still required: remaining project configuration and reviewed migrations, hosting setup,
 real-account verification, Calendar consent/refresh checks if enabled, and

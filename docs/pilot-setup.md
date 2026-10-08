@@ -106,12 +106,12 @@ so time-sensitive tips do not sit pending until their event has passed.
 
 ## Hosting preparation
 
-No hosting provider has been selected. If using Vercel, import the repository,
-select the Next.js app with root directory `apps/web`, and allow source files
-outside the root so the shared workspace packages are included. Keep the
-root npm lockfile and workspace installation. Verify the dashboard's generated
-install/build commands before publishing; this configuration has not been
-tested on Vercel yet. See [Vercel monorepo setup](https://vercel.com/docs/monorepos).
+AWS is the selected provider. See [AWS pilot deployment](aws-pilot.md) for the
+prepared Docker/ECS path, local image checks, public build configuration,
+HTTPS/Auth setup, release gates, and recovery. Amplify's documented Next.js
+support does not cover this project's Next.js 16 version. No image upload or
+AWS resource creation is authorized or performed. The Linux container and
+hosted flow must still be verified before inviting users.
 
 Set `YUMS_DEMO_MODE=false` at build and runtime, public Supabase settings,
 and `NEXT_PUBLIC_INVITE_ONLY=true`. Optional map/chat/Calendar credentials

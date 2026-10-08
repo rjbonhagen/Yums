@@ -1,0 +1,16 @@
+**/node_modules
+**/.next
+**/.env*
+**/.git
+**/.aws
+**/.agents
+**/.codex
+**/.claude
+**/.cursor
+**/.mcp.json
+**/AGENTS.md
+**/CLAUDE.md
+**/GEMINI.md
+**/skills-lock.json
+**/*.log
+docs/screenshots
