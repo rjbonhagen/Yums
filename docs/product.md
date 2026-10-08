@@ -1,7 +1,10 @@
 # Product scope
 
-Yums is a single-campus portfolio demo for UC Berkeley: discover explicit
-free-food offers and nearby restaurants, with honest source and sample states.
+Yums is preparing for a small invited UC Berkeley pilot: discover explicit
+free-food offers and nearby restaurants, save listings across devices, and
+submit community tips for review. The local portfolio demo is complete; the
+pilot still requires remote account/security checks and authorized hosting.
+See [roadmap](roadmap.md) and [release evidence](pilot-release.md).
 
 Built:
 - Budget target, preferred walking time, and free-food/shorter-walks ranking.
@@ -10,7 +13,8 @@ Built:
 - Today and seven-day feeds use Berkeley's timezone and source event durations.
 - Search, type filters, optional map, exact-title recurring-event grouping.
 - Browser-local saved snapshots and optional per-account cloud saves.
-- Optional Calendar conflict ranking, grounded chat, and community reports.
+- Optional Calendar conflict ranking and grounded chat. Community reports
+  require operator approval before shared display; remote setup is pending.
 - Open-tab browser reminders for real events; no sample-event reminders.
 - Explicit sample mode for reproducible demos; no mock offers during outages.
 

@@ -1,101 +1,71 @@
-# Portfolio demo roadmap
+# Berkeley pilot roadmap
 
-Reviewed October 7, 2026. Goal: finish a polished portfolio/demo project in
-under a week. Proposed six-day window: October 7–12; adjust daily scope to
-available development time. Make incremental commits for each completed item.
+Reviewed October 7, 2026. Target: a small invited UC Berkeley pilot before
+October 14. The release serves real users with live offers and account-backed
+saves/preferences. AWS is the chosen host; Supabase is connected locally.
+The [portfolio roadmap](portfolio-roadmap.md) records the completed earlier
+scope. Current verification is tracked in [pilot release](pilot-release.md).
+
+## Release outcome
+
+An invited student can sign in, find a current offer, save it across devices,
+and submit a tip for operator review. Users cannot access another account's
+private records or approve their own reports. Source outages are visible, and
+sample data is never substituted into the pilot feed.
 
 ## Current state
 
-Local portfolio delivery completed October 7. The original review and six-day
-plan below are retained as the baseline backlog. Current verification is in
-[demo-verification.md](demo-verification.md); the README provides setup and the
-rehearsed walkthrough. Public deployment is deferred and has not been performed.
+- Real Supabase sign-in and saving confirmed by one user. Cross-device
+  persistence, preference sync, and two-account isolation remain unverified.
+- Local account-change protections, source validation/freshness, moderation,
+  and quota safeguards implemented. 248 regression tests and 11 configuration
+  tests pass; lint and the production build pass.
+- Root builds package a standalone Node server and its assets. Local health,
+  login, feed, and a static asset respond successfully. Dockerfile, container
+  CI, and the AWS checklist are prepared; Linux container/CI/hosting checks
+  have not run. No image upload or AWS resources have been created.
+- Remote public sign-ups remain enabled. Report moderation and quota schema
+  are missing. Remote validation constraints, profile triggers, policy/index
+  correctness, email delivery, and callback allowlists still need review.
 
-| Item | Final status and evidence |
-| --- | --- |
-| R1 | Complete: explicit food evidence required; paid, negated, discussion, and withdrawn offers covered by ingestion regression tests. Original titles preserved. |
-| R2 | Complete: supported settings validated and applied through cookies/account preferences across server navigation; browser rehearsal and preference/ranking tests pass. Unsupported choices removed. |
-| R3 | Complete: Pacific Today and seven-date window, ended/ongoing events, source durations, overnight events, and Calendar conflicts covered by tests. |
-| R4 | Complete: speculative savings removed; dashboard shows a budget target and discovery counts. Restaurants have no invented prices. |
-| R5 | Complete: guest saves persist, stable source/date keys and account uniqueness added, end times retained, expired snapshots labeled; browser and database tests pass. |
-| R6 | Complete for local delivery: fresh install, 145 tests, lint, build, production audit, setup example, CI configuration, screenshots, and rehearsal record. Credential-backed services remain explicitly unverified live. CI awaits a GitHub push. |
-| R7 | Request/history bounds and local account-isolation tests complete. Public service-level usage controls, moderation, and deployment account checks remain required before public access. |
+## Six-day sequence
 
-Sample mode is explicit and visibly labeled; failed live sources never inject
-sample offers. Navigation, mobile layout, keyboard submission, and unavailable
-integration states were rehearsed. Production dependencies have no current audit
-findings; nine development-only transitive findings remain documented.
+Dates are target order, not a claim that work or external approval is complete.
+Do not advance through a gate without its evidence.
 
-## Original review baseline
-
-Yums already has live Berkeley event discovery, nearby restaurants, onboarding,
-ranking, optional Calendar/chat/maps, saved items, community reports, and
-reminders while the feed stays open. GitHub has no open issues or pull requests
-at review time. The issues below are a local backlog, not published issues.
-Prior claims of 98 passing tests and live integration checks are historical.
-This review initially could not run tests/build because dependencies were absent.
-
-## Review findings
-
-| ID | Priority | Issue and code evidence | Done when |
-| --- | --- | --- | --- |
-| R1 | P0 | Generic food mentions become FREE claims: `services/event-ingestion/extract.ts` assigns positive confidence, `index.ts` accepts it, and `apps/web/src/lib/recommendations.ts` calls all results free food. | Require explicit free-food evidence; test paid food, negations, and food discussions. Omit or label uncertain mentions. |
-| R2 | P1 | Preferences are saved but incompletely applied: feed hardcodes 20 minutes; dashboard reads only budget/travel query parameters; transportation and optimization choices do not affect ranking. | Persist travel/budget behavior across direct navigation and reload; implement supported choices or remove them. Validate numeric input. |
-| R3 | P1 | Today includes all returned events; Cal Link has no upper date bound; recommendations do not remove expired events. Normalization drops source end times and Calendar scoring assumes one hour. | Use campus time for Today and a defined weekly window; omit ended events; preserve real end times with an explicit fallback. Test boundary times and conflicts. |
-| R4 | P1 | Dashboard savings use $8 per event and 40% of aggregate value without attendance evidence. | Label assumptions and potential value clearly or remove the projection; never present it as achieved savings. |
-| R5 | P2 | Saves use title/source URL identity, but nearby places have no source URL; database saves have no uniqueness constraint. | Preserve stable source IDs and make saves idempotent; identify expired saved snapshots. |
-| R6 | P1 for demo | No CI workflow found; report read failures silently show an empty list; docs disagree about Calendar verification and LLM extraction is still a stub. | Tests/build/lint run reproducibly; document dated verification; show errors distinctly; rehearse configured and unconfigured paths. |
-| R7 | Before public access | Chat message/history sizes are unbounded and the route has no application rate limit; reports have no moderation workflow. | Bound requests and paid usage before public chat; keep public reports disabled or add moderation. Verify account isolation before inviting users. |
-
-Nearby restaurants have no verified prices or discounts, so the demo should
-show restaurant discovery without promising the cheapest restaurant. Mock
-fallback events need prominent sample labeling and must not imply real offers.
-These findings come from code inspection, not production incident reports.
-
-## Six-day delivery plan
-
-| Day | Deliverable | Exit criteria / incremental commit |
+| Target | Work | Completion evidence |
 | --- | --- | --- |
-| 1 — Oct 7 | Correct free-food evidence (R1), establish runnable baseline. | Regression cases pass; commit classification fix independently. |
-| 2 — Oct 8 | Correct Today/weekly windows and Calendar duration (R3). | Campus timezone and expired-event cases pass; commit event-time fix. |
-| 3 — Oct 9 | Make onboarding useful and savings honest (R2, R4). | Guest and signed-in navigation preserve supported settings; commit preferences and projection changes separately. |
-| 4 — Oct 10 | Polish the main mobile/desktop journey and save behavior (R5). | Onboard → dashboard → feed → save/remove works; empty/error/sample states are clear; commit UI and persistence changes separately. |
-| 5 — Oct 11 | Reproducible setup, CI, README and portfolio evidence (R6). | Fresh install, tests, build and lint succeed; capture screenshots and a short architecture/limitations explanation; commit verification/docs. |
-| 6 — Oct 12 | Demo rehearsal and buffer. | Rehearse with and without optional keys; fix only demo blockers; commit final fixes. If publishing publicly, meet R7 first or disable exposed paid/community features. |
+| Oct 7 | Local safeguards and reproducible release package | Passing regressions/config checks, lint/build, local server/assets, incremental commits. Prepared. |
+| Oct 8 | Supabase audit, reviewed migrations, invitation settings | Project-owner audit before/after changes; Auth signup/anonymous settings; custom SMTP and redirect checks; read-only connection check passes. Requires owner action. |
+| Oct 9 | Real account and report acceptance | Two invited accounts in separate sessions/devices: preferences/saves persist, removal works, private records are isolated, pending reports stay private, operator approval publishes, self-approval is denied. |
+| Oct 10 | Linux container and AWS release review | Container build and smoke check pass; approved AWS account/region/cost limit, image digest, roles, service configuration, and recovery plan are reviewable. No cloud creation yet. |
+| Oct 11 | Authorized hosted rehearsal | HTTPS/callback/email setup and laptop/phone acceptance pass on the chosen AWS endpoint. Hosted source status, logs, restarts, and recovery verified. |
+| Oct 12–13 | Small invited pilot and correction buffer | After authorization, invite 3–5 students, observe the core flow, fix blocking problems, and record feedback and release evidence. |
 
-Dates are a suggested schedule, not effort estimates. If capacity is tight,
-cut optional integration polish and save-identity improvements before cutting
-food/date correctness or reproducibility. Do not add multi-campus support,
-background push, merchant deals, agentic checkout, or LLM extraction this week.
+## Next required external actions
 
-## Definition of finished
+1. Project owner runs [the read-only database audit](../packages/database/pilot-audit.sql)
+   and reviews the existing-database migration sequence in
+   [pilot setup](pilot-setup.md). Back up data before applying reviewed changes.
+   The known missing moderation and quota setup must be resolved; audit the
+   validation constraints and profile trigger rather than assuming they exist.
+2. Disable public sign-ups and confirm anonymous sign-ins remain disabled.
+   Verify email delivery and the local callback before testing accounts.
+3. Supply two existing invited test sessions, or explicitly authorize creating
+   test accounts/invitations. No test invitations have been sent by this work.
+4. Verify the Linux image on a Docker-capable machine or through an authorized
+   GitHub push/PR that runs the prepared container CI. Review
+   [AWS pilot deployment](aws-pilot.md) before authorizing cloud resources.
 
-- A coherent Berkeley demo with accurate food claims and date windows.
-- Supported preferences work; estimates and sample data are unmistakable.
-- Main journey looks good on mobile and desktop and supports keyboard use.
-- Tests/build/lint pass, and setup works from documented instructions.
-- README includes screenshots, architecture, current limitations, and demo steps.
-- Changes are committed in reviewable increments and ready to push to GitHub.
+## Scope and operating rules
 
-## Delivery scope
+Keep optional paid chat, Calendar, and maps disabled unless their configuration
+and acceptance checks are complete. Deterministic chat and the listing view
+remain usable. Do not add multi-campus support, merchant deals, checkout,
+background push, or spending projections during this pilot week.
 
-Delivery is the reproducible repository, screenshots, and rehearsed local demo.
-A hosted public demo is optional and requires separate authorization, a hosting
-choice, and the remaining R7 safeguards. Multi-campus support, background push,
-merchant deals, checkout, and new model extraction remain deferred.
-
-## Historical verification from the initial review
-
-After `npm ci`, all 98 tests across 16 files passed and `npm run build`
-succeeded, including TypeScript compilation. Lint reports two errors
-(`report/page.tsx` and `notification-toggle.tsx`, synchronous state updates
-inside effects) and one unused-variable warning (`app/page.tsx`). Include
-these fixes in day 1 before treating the baseline as clean.
-
-`npm audit` reports 20 vulnerabilities: 4 moderate, 14 high, 2 critical.
-The direct Next.js dependency is flagged critical. Review advisory applicability
-and compatible dependency updates on day 1, re-run checks, and resolve relevant
-public-runtime findings before publishing. Do not use a blanket forced audit
-fix: some suggested changes are major downgrades. No dependency versions were
-changed during this review. Live credentials and browser journeys were not
-reverified; passing tests/build do not establish integration or visual correctness.
+Commit verified milestones with short lowercase messages using the configured
+Git identity. Keep credentials and local tooling out of commits. Pushes,
+deployments, invitations, purchases, and remote database changes require
+explicit authorization. Test/metadata success alone does not prove launch
+readiness; retain dated real-account and hosted evidence before releasing.
