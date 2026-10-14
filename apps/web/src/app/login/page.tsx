@@ -34,6 +34,7 @@ function LoginForm() {
   const [otherGoogleLogins, setOtherGoogleLogins] = useState<UserIdentity[]>([])
   const [unlinking, setUnlinking] = useState(false)
   const [accountNotice, setAccountNotice] = useState<string | null>(null)
+  const [calendarState, setCalendarState] = useState<"checking" | "connected" | "not-connected" | "unavailable">("checking")
 
   useEffect(() => {
     if (!isSupabaseConfigured()) return
@@ -47,6 +48,26 @@ function LoginForm() {
       })
       .catch(() => setError("Couldn't check your account. Try signing in again."))
   }, [])
+
+  useEffect(() => {
+    if (!signedInEmail) return
+    let active = true
+    async function checkCalendar() {
+      try {
+        const supabase = createClient()
+        const { data: { user }, error: accountError } = await supabase.auth.getUser()
+        if (accountError || !user || user.email !== signedInEmail) throw new Error("Account changed")
+        const { data, error: connectionError } = await supabase.from("calendar_connections")
+          .select("user_id").eq("user_id", user.id).maybeSingle()
+        if (connectionError) throw connectionError
+        if (active) setCalendarState(data ? "connected" : "not-connected")
+      } catch {
+        if (active) setCalendarState("unavailable")
+      }
+    }
+    void checkCalendar()
+    return () => { active = false }
+  }, [signedInEmail])
 
   async function removeOtherGoogleLogin(identityId: string) {
     setUnlinking(true)
@@ -228,29 +249,33 @@ function LoginForm() {
         {isSupabaseConfigured() && signedInEmail && (
           <Card className="mt-4 w-full max-w-md">
             <CardHeader>
-              <CardTitle className="text-lg">Schedule awareness</CardTitle>
+              <CardTitle className="text-lg">Google Calendar</CardTitle>
               <p className="text-muted-foreground text-sm">
-                Connect Google Calendar so recommendations can tell when you&apos;re actually free, instead
-                of the flat placeholder score used otherwise.
+                Google sign-in connects your calendar after you approve access. Yums uses busy times
+                to find food opportunities that fit your schedule.
               </p>
-              <p className="text-muted-foreground text-sm">Use the same Google email as your Yums account. Connecting Calendar cannot link another account.</p>
             </CardHeader>
             <CardContent className="space-y-2">
               {calendarMessage && <p role="alert" className="text-destructive text-xs">{calendarMessage}</p>}
               {calendarNotice && <p role="status" className="text-muted-foreground text-xs">{calendarNotice}</p>}
-              <Button className="w-full" variant="outline" onClick={connectGoogleCalendar}>
-                Connect Google Calendar
-              </Button>
-              <Button className="w-full" variant="outline" onClick={async () => {
+              <p className="text-sm">{calendarState === "checking" ? "Checking Calendar connection…"
+                : calendarState === "connected" ? "Google Calendar connected."
+                : calendarState === "unavailable" ? "Couldn't check your Calendar connection. Reload to try again."
+                : "Calendar isn't connected. Sign in with Google and approve Calendar access, or retry below."}</p>
+              {(calendarState === "not-connected" || callbackError === "calendar-failed") && <Button className="w-full" variant="outline" onClick={connectGoogleCalendar}>
+                Retry Calendar connection
+              </Button>}
+              {calendarState === "connected" && <Button className="w-full" variant="outline" onClick={async () => {
                 setCalendarError(null)
                 try {
                   const response = await fetch("/api/calendar/disconnect", { method: "POST" })
                   if (!response.ok) throw new Error("disconnect failed")
+                  setCalendarState("not-connected")
                   setCalendarNotice("Stored Calendar connection removed. Reconnect to use your schedule again.")
                 } catch { setCalendarError("Couldn't disconnect Calendar. Try again.") }
               }}>
                 Disconnect Google Calendar
-              </Button>
+              </Button>}
             </CardContent>
           </Card>
         )}
