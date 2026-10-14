@@ -17,6 +17,8 @@ jobs:
       - run: npm ci
       - run: npm test
       - run: npm run test:pilot-config
+      - run: node --test scripts/ec2-command.test.mjs
+      - run: bash -n infra/release-ec2.sh
       - run: npm run lint --workspace apps/web
       # next build also typechecks the whole apps/web project. No env vars
       # required for compilation. Live discovery remains available without
