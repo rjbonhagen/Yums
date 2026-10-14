@@ -5,6 +5,27 @@ account persistence. This extends the completed local portfolio demo. AWS is
 selected, but no cloud resources are configured yet. Supabase public connection
 settings are configured locally; the remaining remote gates are unverified.
 
+October 14: the Supabase integration is connected and the remote metadata audit
+completed. Saved-item uniqueness and the enabled profile trigger are present;
+five existing private/report tables had RLS enabled. With explicit owner
+approval, report moderation, chat allowance, and report content-limit migrations
+were applied remotely. Existing reports enter pending review. Follow-up metadata
+checks confirm the approval/ownership policies, content constraint, and quota
+RLS with no client table policies. The content constraint is intentionally NOT
+VALID to preserve legacy rows while enforcing new writes and updates; legacy
+reports still require operator review before approval.
+
+Hosted default privileges granted anon explicit quota-function execution.
+A corrective permissions migration removed it. Remote verification confirms
+anon and PUBLIC cannot execute the function; authenticated can. The repeatable
+local migration now revokes anon explicitly too, with a regression harness
+that models that hosted default. These metadata checks do not replace signed-in
+report acceptance or two-account persistence/isolation testing.
+
+The public connection checker now confirms all required table columns. Public
+sign-ups are still enabled; Auth settings were not changed by these migrations.
+Historical October 7 evidence below predates this remote application.
+
 ## Release requirements
 
 - Live feeds enabled at build and runtime; no sample offers for pilot users.

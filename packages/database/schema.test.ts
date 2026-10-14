@@ -42,6 +42,9 @@ beforeAll(async () => {
       values ('${A}', 'A report', now()), ('${B}', 'B report', now());
     update public.user_reported_events set moderation_status = 'approved' where user_id = '${B}';
   `)
+  // Hosted projects can grant anon explicit function execution by default.
+  // Revoking PUBLIC alone must not leave that independent grant in place.
+  await db.exec("alter default privileges grant execute on functions to anon;")
   await db.exec(await readFile(new URL("./migrations/20261007_chat_allowance.sql", import.meta.url), "utf8"))
   await db.exec("grant select, insert, update, delete on public.chat_usage to authenticated;")
 }, 20000)
@@ -51,6 +54,10 @@ beforeEach(async () => {
 afterAll(async () => { await db?.close() })
 
 describe("database constraints and account isolation", () => {
+  it("denies anonymous quota execution even when project defaults explicitly grant it", async () => {
+    const { rows } = await db.query("select has_function_privilege('anon', 'public.consume_chat_allowance()', 'EXECUTE') as anon_execute, has_function_privilege('authenticated', 'public.consume_chat_allowance()', 'EXECUTE') as authenticated_execute")
+    expect(rows).toEqual([{ anon_execute: false, authenticated_execute: true }])
+  })
   it("creates app profiles for Auth accounts that predate the schema", async () => {
     await db.exec("reset role;")
     expect((await db.query("select email from public.users where id = $1", [EXISTING])).rows).toEqual([{ email: "existing@example.test" }])

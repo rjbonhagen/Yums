@@ -24,6 +24,6 @@ begin
   return found;
 end;
 $$;
-revoke all on function public.consume_chat_allowance() from public;
+revoke all on function public.consume_chat_allowance() from public, anon;
 grant execute on function public.consume_chat_allowance() to authenticated;
 commit;
