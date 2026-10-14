@@ -8,11 +8,11 @@
 
 // Two independent public Overpass instances — both free community
 // infrastructure, so occasional 5xx/timeouts are expected under load. We
-// try the primary, then the mirror, before giving up; callers see that as
+// use the first successful response; callers see a complete outage as
 // a thrown error and degrade gracefully rather than fabricating data.
 const OVERPASS_URLS = ["https://overpass-api.de/api/interpreter", "https://overpass.kumi.systems/api/interpreter"]
 
-async function fetchFromOverpass(url: string, query: string): Promise<OverpassResponse> {
+async function fetchFromOverpass(url: string, query: string, signal: AbortSignal): Promise<OverpassResponse> {
   const res = await fetch(url, {
     method: "POST",
     headers: {
@@ -23,7 +23,7 @@ async function fetchFromOverpass(url: string, query: string): Promise<OverpassRe
     // Shared caching lives in recommendations.ts; refreshing that cache
     // must reach the source rather than reuse a stale inner fetch cache.
     cache: "no-store",
-    signal: AbortSignal.timeout(6000),
+    signal,
   })
   if (!res.ok) throw new Error(`${url} returned ${res.status}`)
   const body = (await res.json()) as OverpassResponse
@@ -32,17 +32,18 @@ async function fetchFromOverpass(url: string, query: string): Promise<OverpassRe
 }
 
 async function postToOverpass(query: string): Promise<OverpassResponse> {
-  // Race both mirrors instead of trying them one after another — a slow
-  // primary used to add its full 6s timeout before the mirror was even
-  // tried, doubling worst-case latency for no benefit.
-  const results = await Promise.allSettled(OVERPASS_URLS.map((url) => fetchFromOverpass(url, query)))
-  const fulfilled = results.find((r) => r.status === "fulfilled")
-  if (fulfilled && fulfilled.status === "fulfilled") return fulfilled.value
-
-  const lastError = results.find((r) => r.status === "rejected")
-  throw lastError && lastError.status === "rejected" && lastError.reason instanceof Error
-    ? lastError.reason
-    : new Error("All Overpass endpoints failed")
+  const controller = new AbortController()
+  try {
+    return await Promise.any(OVERPASS_URLS.map((url) => fetchFromOverpass(
+      url, query, AbortSignal.any([controller.signal, AbortSignal.timeout(6000)]),
+    )))
+  } catch (error) {
+    const failure = error instanceof AggregateError ? error.errors.find((reason) => reason instanceof Error) : error
+    throw failure instanceof Error ? failure : new Error("All Overpass endpoints failed")
+  } finally {
+    // Stop the slower request as soon as a valid result arrives.
+    controller.abort()
+  }
 }
 
 export interface NearbyPlace {
