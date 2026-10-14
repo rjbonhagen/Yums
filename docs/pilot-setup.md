@@ -63,7 +63,8 @@ privileged SQL editor bypasses RLS and cannot prove those client checks.
 ## Accounts
 
 In Supabase Authentication configuration, disable new user sign-ups and
-anonymous sign-ins. Keep email confirmation enabled. The project owner can
+anonymous sign-ins. Disable manual identity linking so different email accounts
+cannot be attached through the Auth API. Keep email confirmation enabled. The project owner can
 invite pilot users from the Authentication dashboard. No invitations have
 been sent during this work.
 
@@ -131,7 +132,11 @@ output does not prove that credentials work or that remote settings are safe.
 
 Calendar is optional. Connect explicitly from the signed-in account page;
 regular Google sign-in does not enable Calendar access. Verify availability,
-refresh, and reconnect with an existing Google identity. Disconnect removes
+refresh, and reconnect with an existing Google identity matching the account's
+email. Calendar consent never calls identity linking. The callback verifies the
+initiating account and Google's verified email before storing credentials;
+choosing a different Yums account signs out that local session. Existing links
+are not removed by disabling manual linking. Disconnect removes
 the app's stored credentials for that account. Users can separately revoke
 the Google grant in their Google account settings.
 

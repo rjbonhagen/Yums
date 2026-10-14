@@ -8,6 +8,20 @@
 const FREEBUSY_URL = "https://www.googleapis.com/calendar/v3/freeBusy"
 const TOKEN_URL = "https://oauth2.googleapis.com/token"
 
+export async function verifyCalendarAccount(accessToken: string, email: string): Promise<void> {
+  const response = await fetch("https://openidconnect.googleapis.com/v1/userinfo", {
+    headers: { Authorization: `Bearer ${accessToken}` },
+    signal: AbortSignal.timeout(6000),
+    cache: "no-store",
+  })
+  if (!response.ok) throw new Error("Could not verify Calendar account")
+  const identity = await response.json() as { email?: string; email_verified?: boolean }
+  if (identity.email_verified !== true || typeof identity.email !== "string"
+    || identity.email.toLowerCase() !== email.toLowerCase()) {
+    throw new Error("Calendar must use the same email as your Yums account")
+  }
+}
+
 export interface BusyInterval {
   start: string // ISO 8601
   end: string

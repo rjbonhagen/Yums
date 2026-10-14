@@ -1,18 +1,21 @@
 import { beforeEach, describe, expect, it, vi } from "vitest"
-const { createClient, exchangeCodeForSession, fetchBusyIntervals, upsert, from, maybeSingle } = vi.hoisted(() => ({
-  createClient: vi.fn(), exchangeCodeForSession: vi.fn(), fetchBusyIntervals: vi.fn(), upsert: vi.fn(), from: vi.fn(), maybeSingle: vi.fn(),
+const { createClient, getUser, signOut, verifyCalendarAccount, exchangeCodeForSession, fetchBusyIntervals, upsert, from, maybeSingle } = vi.hoisted(() => ({
+  createClient: vi.fn(), getUser: vi.fn(), signOut: vi.fn(), verifyCalendarAccount: vi.fn(), exchangeCodeForSession: vi.fn(), fetchBusyIntervals: vi.fn(), upsert: vi.fn(), from: vi.fn(), maybeSingle: vi.fn(),
 }))
 vi.mock("@/lib/supabase/server", () => ({ createClient }))
-vi.mock("@/lib/google-calendar", () => ({ fetchBusyIntervals }))
+vi.mock("@/lib/google-calendar", () => ({ fetchBusyIntervals, verifyCalendarAccount }))
 import { GET } from "./route"
 beforeEach(() => {
   vi.resetAllMocks()
   vi.stubEnv("APP_ORIGIN", "")
   const chain = { select: () => chain, eq: () => chain, maybeSingle, upsert }
   from.mockReturnValue(chain)
-  createClient.mockResolvedValue({ auth: { exchangeCodeForSession }, from })
+  getUser.mockResolvedValue({ data: { user: { id: "verified-user", email: "person@berkeley.edu" } }, error: null })
+  signOut.mockResolvedValue({ error: null })
+  verifyCalendarAccount.mockResolvedValue(undefined)
+  createClient.mockResolvedValue({ auth: { exchangeCodeForSession, getUser, signOut }, from })
   exchangeCodeForSession.mockResolvedValue({ data: { session: {
-    provider_token: "test-provider-token", provider_refresh_token: null, user: { id: "verified-user" },
+    provider_token: "test-provider-token", provider_refresh_token: null, user: { id: "verified-user", email: "person@berkeley.edu" },
   } }, error: null })
   maybeSingle.mockResolvedValue({ data: { refresh_token: "existing-refresh" }, error: null })
   upsert.mockResolvedValue({ error: null })
@@ -55,5 +58,23 @@ describe("auth callback consent boundary", () => {
   it("provides a retry path when the auth service throws", async () => {
     exchangeCodeForSession.mockRejectedValue(new Error("offline"))
     expect((await GET(new Request("http://localhost/auth/callback?code=test"))).headers.get("location")).toContain("auth-failed")
+  })
+  it("rejects a Calendar callback without an initiating account", async () => {
+    getUser.mockResolvedValue({ data: { user: null }, error: null })
+    await GET(new Request("http://localhost/auth/callback?code=test&calendar=connect"))
+    expect(exchangeCodeForSession).not.toHaveBeenCalled()
+  })
+  it("rejects account switching during Calendar consent", async () => {
+    exchangeCodeForSession.mockResolvedValue({ data: { session: { user: { id: "different-user", email: "other@gmail.com" }, provider_token: "test-token" } }, error: null })
+    const response = await GET(new Request("http://localhost/auth/callback?code=test&calendar=connect"))
+    expect(response.headers.get("location")).toContain("calendar-account")
+    expect(signOut).toHaveBeenCalledWith({ scope: "local" })
+    expect(upsert).not.toHaveBeenCalled()
+  })
+  it("rejects an already-linked Google identity with a different email", async () => {
+    verifyCalendarAccount.mockRejectedValue(new Error("email mismatch"))
+    await GET(new Request("http://localhost/auth/callback?code=test&calendar=connect"))
+    expect(upsert).not.toHaveBeenCalled()
+    expect(fetchBusyIntervals).not.toHaveBeenCalled()
   })
 })

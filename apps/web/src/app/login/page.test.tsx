@@ -36,7 +36,7 @@ describe("invited pilot sign-in", () => {
     expect(screen.getByRole("alert")).toHaveTextContent("Request a fresh link")
   })
   it("reconnects an already-linked Google identity with explicit Calendar scopes", async () => {
-    getUser.mockResolvedValue({ data: { user: { email: "person@berkeley.edu", identities: [{ provider: "google" }] } }, error: null })
+    getUser.mockResolvedValue({ data: { user: { email: "person@berkeley.edu", identities: [{ provider: "google", identity_data: { email: "person@berkeley.edu" } }] } }, error: null })
     const user = userEvent.setup()
     render(<LoginPage />)
     await waitFor(() => expect(screen.getByRole("button", { name: "Connect Google Calendar" })).toBeInTheDocument())
@@ -52,5 +52,18 @@ describe("invited pilot sign-in", () => {
     await user.click(await screen.findByRole("button", { name: "Disconnect Google Calendar" }))
     expect(screen.getByRole("alert")).toHaveTextContent("Couldn't disconnect")
     expect(screen.queryByRole("status")).not.toBeInTheDocument()
+  })
+  it.each([{ identities: [] }, { identities: [{ provider: "google", identity_data: { email: "other@gmail.com" } }] }])("never links another Google login when connecting Calendar", async ({ identities }) => {
+    getUser.mockResolvedValue({ data: { user: { email: "person@berkeley.edu", identities } }, error: null })
+    render(<LoginPage />)
+    await userEvent.setup().click(await screen.findByRole("button", { name: "Connect Google Calendar" }))
+    expect(screen.getByRole("alert")).toHaveTextContent("Different accounts cannot be linked")
+    expect(signInWithOAuth).not.toHaveBeenCalled()
+    expect(linkIdentity).not.toHaveBeenCalled()
+  })
+  it("shows an account chooser for ordinary Google sign-in", async () => {
+    render(<LoginPage />)
+    await userEvent.setup().click(screen.getByRole("button", { name: "Continue with Google" }))
+    expect(signInWithOAuth).toHaveBeenCalledWith(expect.objectContaining({ options: expect.objectContaining({ queryParams: { prompt: "select_account" } }) }))
   })
 })

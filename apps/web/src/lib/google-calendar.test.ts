@@ -1,7 +1,18 @@
 import { afterEach, describe, expect, it, vi } from "vitest"
-import { fetchBusyIntervals, refreshAccessToken, scheduleScoreFromBusyIntervals, type BusyInterval } from "./google-calendar"
+import { fetchBusyIntervals, verifyCalendarAccount, refreshAccessToken, scheduleScoreFromBusyIntervals, type BusyInterval } from "./google-calendar"
 
 afterEach(() => { vi.unstubAllGlobals(); vi.unstubAllEnvs() })
+
+describe("Calendar account identity", () => {
+  it.each([{ email: "other@gmail.com", email_verified: true }, { email: "person@berkeley.edu", email_verified: false }, {}])("rejects different or unverified provider accounts", async (identity) => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ ok: true, json: async () => identity }))
+    await expect(verifyCalendarAccount("test-token", "person@berkeley.edu")).rejects.toThrow(/same email/)
+  })
+  it("accepts a verified matching account", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ ok: true, json: async () => ({ email: "Person@berkeley.edu", email_verified: true }) }))
+    await expect(verifyCalendarAccount("test-token", "person@berkeley.edu")).resolves.toBeUndefined()
+  })
+})
 
 describe("Calendar response validation", () => {
   it.each([

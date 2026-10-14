@@ -72,7 +72,7 @@ function LoginForm() {
       const supabase = createClient()
       const { error: authError } = await supabase.auth.signInWithOAuth({
         provider: "google",
-        options: { redirectTo: `${window.location.origin}/auth/callback` },
+        options: { redirectTo: `${window.location.origin}/auth/callback`, queryParams: { prompt: "select_account" } },
       })
       if (authError) throw authError
     } catch (err) {
@@ -81,11 +81,7 @@ function LoginForm() {
     }
   }
 
-  // Real schedule-awareness (docs/architecture.md) — links Google's OAuth
-  // identity to the current session with the calendar.freebusy scope, so
-  // /auth/callback can store a real access/refresh token. Requires a
-  // signed-in session already (magic link above) and a Google OAuth
-  // provider configured in the Supabase project dashboard.
+  // Calendar consent must never link another login to the current account.
   async function connectGoogleCalendar() {
     setCalendarError(null)
     setCalendarNotice(null)
@@ -93,14 +89,15 @@ function LoginForm() {
       const supabase = createClient()
       const { data: { user }, error: accountError } = await supabase.auth.getUser()
       if (accountError || !user) throw new Error("Sign in before connecting Calendar.")
-      const connect = user.identities?.some((identity) => identity.provider === "google")
-        ? supabase.auth.signInWithOAuth.bind(supabase.auth)
-        : supabase.auth.linkIdentity.bind(supabase.auth)
-      const { error: linkError } = await connect({
+      if (!user.email || !user.identities?.some((identity) => identity.provider === "google"
+        && identity.identity_data?.email?.toLowerCase() === user.email?.toLowerCase())) {
+        throw new Error("Sign out and sign in with Google using this account's email before connecting Calendar. Different accounts cannot be linked.")
+      }
+      const { error: linkError } = await supabase.auth.signInWithOAuth({
         provider: "google",
         options: {
           scopes: "https://www.googleapis.com/auth/calendar.freebusy",
-          queryParams: { access_type: "offline", prompt: "consent" },
+          queryParams: { access_type: "offline", prompt: "consent select_account", login_hint: user.email },
           redirectTo: `${window.location.origin}/auth/callback?calendar=connect`,
         },
       })
@@ -110,7 +107,9 @@ function LoginForm() {
     }
   }
 
-  const errorMessage = error ?? (callbackError === "auth-failed" ? "Sign-in could not be completed. Request a fresh link and try again." : null)
+  const errorMessage = error ?? (callbackError === "calendar-account"
+    ? "Calendar used a different account. You were signed out. Sign in again using the Google email that matches your Yums account."
+    : callbackError === "auth-failed" ? "Sign-in could not be completed. Request a fresh link and try again." : null)
   const calendarMessage = calendarError ?? (callbackError === "calendar-failed" ? "Calendar connection could not be confirmed. Try connecting again." : null)
 
   return (
@@ -172,13 +171,13 @@ function LoginForm() {
                     placeholder="you@berkeley.edu"
                   />
                 </div>
-                {errorMessage && <p role="alert" className="text-destructive text-xs">{errorMessage}</p>}
                 <Button type="submit" className="w-full" disabled={!email.trim() || status === "sending"}>
                   {status === "sending" ? "Sending…" : "Send magic link"}
                 </Button>
                 </form>
               </>
             )}
+            {errorMessage && <p role="alert" className="text-destructive text-xs">{errorMessage}</p>}
           </CardContent>
         </Card>
 
@@ -190,6 +189,7 @@ function LoginForm() {
                 Connect Google Calendar so recommendations can tell when you&apos;re actually free, instead
                 of the flat placeholder score used otherwise.
               </p>
+              <p className="text-muted-foreground text-sm">Use the same Google email as your Yums account. Connecting Calendar cannot link another account.</p>
             </CardHeader>
             <CardContent className="space-y-2">
               {calendarMessage && <p role="alert" className="text-destructive text-xs">{calendarMessage}</p>}

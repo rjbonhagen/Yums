@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
-import { fetchBusyIntervals } from "@/lib/google-calendar"
+import { fetchBusyIntervals, verifyCalendarAccount } from "@/lib/google-calendar"
 import { authRedirectOrigin } from "@/lib/auth-origin"
 
 export async function GET(request: Request) {
@@ -14,6 +14,8 @@ export async function GET(request: Request) {
   try {
     if (code) {
       const supabase = await createClient()
+      const initiatingUser = calendarRequested ? (await supabase.auth.getUser()).data.user : null
+      if (calendarRequested && !initiatingUser) return NextResponse.redirect(`${origin}/login?error=calendar-failed`)
       const { data, error } = await supabase.auth.exchangeCodeForSession(code)
       if (!error) {
         // Plain Google sign-in also supplies a provider token. Store Calendar
@@ -21,8 +23,13 @@ export async function GET(request: Request) {
         if (calendarRequested) {
           const token = data.session?.provider_token
           const user = data.session?.user
-          if (!token || !user) return NextResponse.redirect(`${origin}/login?error=calendar-failed`)
+          if (user?.id !== initiatingUser?.id) {
+            await supabase.auth.signOut({ scope: "local" })
+            return NextResponse.redirect(`${origin}/login?error=calendar-account`)
+          }
+          if (!token || !user?.email) return NextResponse.redirect(`${origin}/login?error=calendar-failed`)
           try {
+            await verifyCalendarAccount(token, user.email)
             const now = new Date()
             await fetchBusyIntervals(token, now, new Date(now.getTime() + 60000))
             const previous = await supabase.from("calendar_connections")
