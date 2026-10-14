@@ -140,6 +140,12 @@ are not removed by disabling manual linking. Disconnect removes
 the app's stored credentials for that account. Users can separately revoke
 the Google grant in their Google account settings.
 
+If a Google login with a different email was linked before manual linking was
+disabled, the account page lists it with a removal button. Removal rechecks the
+signed-in account and targets only that different-email Google identity through
+Supabase Auth. It preserves the account's email login and saved items. After
+removal, sign out and use the other Google email to open its separate account.
+
 ## Acceptance and recovery
 
 Before release, use two invited accounts and separate browser sessions:

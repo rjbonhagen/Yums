@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Nav } from "@/components/nav"
 import { createClient, isSupabaseConfigured } from "@/lib/supabase/client"
+import type { UserIdentity } from "@supabase/supabase-js"
 
 /**
  * Sign-in, via magic-link or Google OAuth (identity only — no calendar
@@ -30,14 +31,45 @@ function LoginForm() {
   const [signedInEmail, setSignedInEmail] = useState<string | null>(null)
   const [googleStatus, setGoogleStatus] = useState<"idle" | "redirecting" | "error">("idle")
   const [googleError, setGoogleError] = useState<string | null>(null)
+  const [otherGoogleLogins, setOtherGoogleLogins] = useState<UserIdentity[]>([])
+  const [unlinking, setUnlinking] = useState(false)
+  const [accountNotice, setAccountNotice] = useState<string | null>(null)
 
   useEffect(() => {
     if (!isSupabaseConfigured()) return
     createClient()
       .auth.getUser()
-      .then(({ data: { user } }) => setSignedInEmail(user?.email ?? null))
+      .then(({ data: { user } }) => {
+        setSignedInEmail(user?.email ?? null)
+        setOtherGoogleLogins(user?.identities?.filter((identity) => identity.provider === "google"
+          && typeof identity.identity_data?.email === "string"
+          && identity.identity_data.email.toLowerCase() !== user.email?.toLowerCase()) ?? [])
+      })
       .catch(() => setError("Couldn't check your account. Try signing in again."))
   }, [])
+
+  async function removeOtherGoogleLogin(identityId: string) {
+    setUnlinking(true)
+    setError(null)
+    setAccountNotice(null)
+    try {
+      const supabase = createClient()
+      const { data: { user }, error: accountError } = await supabase.auth.getUser()
+      if (accountError || !user || user.email !== signedInEmail) throw new Error("Your account changed. Reload this page before removing a login.")
+      const identity = user.identities?.find((item) => item.identity_id === identityId
+        && item.provider === "google" && typeof item.identity_data?.email === "string"
+        && item.identity_data.email.toLowerCase() !== user.email?.toLowerCase())
+      if (!identity || (user.identities?.length ?? 0) < 2) throw new Error("This login cannot be removed. Reload and try again.")
+      const { error: unlinkError } = await supabase.auth.unlinkIdentity(identity)
+      if (unlinkError) throw unlinkError
+      setOtherGoogleLogins((identities) => identities.filter((item) => item.identity_id !== identityId))
+      setAccountNotice(`${identity.identity_data?.email} is no longer a login for this account. Sign out, then sign in with that Google account to use it separately. Your saved items remain with ${user.email}.`)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not remove the linked Google login. Try again.")
+    } finally {
+      setUnlinking(false)
+    }
+  }
 
   async function sendMagicLink() {
     setStatus("sending")
@@ -132,9 +164,17 @@ function LoginForm() {
                 preferences will keep saving to this browser only. See apps/web/.env.example.
               </p>
             ) : signedInEmail ? (
-              <p className="text-sm">
-                Signed in as <span className="font-medium">{signedInEmail}</span>.
-              </p>
+              <div className="space-y-3">
+                <p className="text-sm">Signed in as <span className="font-medium">{signedInEmail}</span>.</p>
+                {otherGoogleLogins.map((identity) => (
+                  <div key={identity.identity_id} className="space-y-2 rounded-md border p-3">
+                    <p className="text-sm">Google login <strong>{identity.identity_data?.email}</strong> currently opens this account. Remove this link to use that email as a separate account. Your saved items stay with {signedInEmail}.</p>
+                    <Button variant="outline" disabled={unlinking} onClick={() => removeOtherGoogleLogin(identity.identity_id)}>
+                      {unlinking ? "Removing…" : `Remove linked login ${identity.identity_data?.email}`}
+                    </Button>
+                  </div>
+                ))}
+              </div>
             ) : status === "sent" ? (
               <p className="text-sm">
                 Check <span className="font-medium">{email}</span> for a sign-in link.
@@ -178,6 +218,7 @@ function LoginForm() {
               </>
             )}
             {errorMessage && <p role="alert" className="text-destructive text-xs">{errorMessage}</p>}
+            {accountNotice && <p role="status" className="text-sm">{accountNotice}</p>}
           </CardContent>
         </Card>
 

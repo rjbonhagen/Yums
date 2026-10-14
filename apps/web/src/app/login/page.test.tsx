@@ -1,12 +1,12 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 import { render, screen, waitFor } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
-const { getUser, signInWithOtp, signInWithOAuth, linkIdentity, search } = vi.hoisted(() => ({
-  getUser: vi.fn(), signInWithOtp: vi.fn(), signInWithOAuth: vi.fn(), linkIdentity: vi.fn(), search: vi.fn(),
+const { getUser, signInWithOtp, signInWithOAuth, linkIdentity, unlinkIdentity, search } = vi.hoisted(() => ({
+  getUser: vi.fn(), signInWithOtp: vi.fn(), signInWithOAuth: vi.fn(), linkIdentity: vi.fn(), unlinkIdentity: vi.fn(), search: vi.fn(),
 }))
 vi.mock("@/lib/supabase/client", () => ({
   isSupabaseConfigured: () => true,
-  createClient: () => ({ auth: { getUser, signInWithOtp, signInWithOAuth, linkIdentity } }),
+  createClient: () => ({ auth: { getUser, signInWithOtp, signInWithOAuth, linkIdentity, unlinkIdentity } }),
 }))
 vi.mock("@/components/nav", () => ({ Nav: () => null }))
 vi.mock("next/navigation", () => ({ useSearchParams: search }))
@@ -18,6 +18,42 @@ beforeEach(() => {
   signInWithOtp.mockResolvedValue({ error: null })
   signInWithOAuth.mockResolvedValue({ error: null })
   linkIdentity.mockResolvedValue({ error: null })
+  unlinkIdentity.mockResolvedValue({ error: null })
+})
+
+describe("existing Google login repair", () => {
+  const otherIdentity = { identity_id: "other-google", provider: "google", identity_data: { email: "other@gmail.com" } }
+  const account = { id: "account", email: "person@berkeley.edu", identities: [
+    { identity_id: "email-login", provider: "email", identity_data: { email: "person@berkeley.edu" } },
+    { identity_id: "own-google", provider: "google", identity_data: { email: "person@berkeley.edu" } },
+    otherIdentity,
+  ] }
+  it("removes only the selected different-email Google identity", async () => {
+    getUser.mockResolvedValue({ data: { user: account }, error: null })
+    render(<LoginPage />)
+    await userEvent.setup().click(await screen.findByRole("button", { name: "Remove linked login other@gmail.com" }))
+    expect(unlinkIdentity).toHaveBeenCalledExactlyOnceWith(otherIdentity)
+    expect(screen.getByRole("status")).toHaveTextContent("no longer a login")
+    expect(screen.queryByRole("button", { name: "Remove linked login other@gmail.com" })).not.toBeInTheDocument()
+    expect(screen.queryByRole("button", { name: /Remove linked login person/ })).not.toBeInTheDocument()
+  })
+  it("refuses to change identities after the signed-in account changes", async () => {
+    getUser.mockResolvedValueOnce({ data: { user: account }, error: null })
+    getUser.mockResolvedValue({ data: { user: { ...account, email: "another@berkeley.edu" } }, error: null })
+    render(<LoginPage />)
+    await userEvent.setup().click(await screen.findByRole("button", { name: "Remove linked login other@gmail.com" }))
+    expect(unlinkIdentity).not.toHaveBeenCalled()
+    expect(screen.getByRole("alert")).toHaveTextContent("Your account changed")
+  })
+  it("keeps a failed unlink available for retry", async () => {
+    getUser.mockResolvedValue({ data: { user: account }, error: null })
+    unlinkIdentity.mockResolvedValue({ error: new Error("Unable to remove login") })
+    render(<LoginPage />)
+    await userEvent.setup().click(await screen.findByRole("button", { name: "Remove linked login other@gmail.com" }))
+    expect(screen.getByRole("alert")).toHaveTextContent("Unable to remove login")
+    expect(screen.getByRole("button", { name: "Remove linked login other@gmail.com" })).toBeEnabled()
+    expect(screen.queryByRole("status")).not.toBeInTheDocument()
+  })
 })
 afterEach(() => { vi.unstubAllGlobals(); vi.unstubAllEnvs() })
 describe("invited pilot sign-in", () => {
