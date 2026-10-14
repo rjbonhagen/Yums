@@ -18,5 +18,10 @@ const asset = html.match(/(?:src|href)="(\/_next\/static\/[^"?]+)(?:\?[^\"]*)?"/
 if (!asset) throw new Error("Login has no packaged static asset.")
 const staticResponse = await request(asset[1])
 if (!(await staticResponse.text()).length) throw new Error("Static asset is empty.")
-console.log("Health, login HTML, and a referenced static asset passed.")
+const callback = await fetch(new URL("/auth/callback", target), { redirect: "manual", signal: AbortSignal.timeout(15000) })
+const location = callback.headers.get("location")
+if (callback.status !== 307 || !location || new URL(location).origin !== target.origin || new URL(location).pathname !== "/login") {
+  throw new Error("Auth callback must redirect to login on the public host origin.")
+}
+console.log("Health, login HTML, a referenced static asset, and the Auth callback origin passed.")
 console.log("This does not verify signed-in flows, account isolation, live sources, or remote configuration.")

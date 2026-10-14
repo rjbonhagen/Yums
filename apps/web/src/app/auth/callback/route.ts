@@ -1,9 +1,14 @@
 import { NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
 import { fetchBusyIntervals } from "@/lib/google-calendar"
+import { authRedirectOrigin } from "@/lib/auth-origin"
 
 export async function GET(request: Request) {
-  const { searchParams, origin } = new URL(request.url)
+  const { searchParams } = new URL(request.url)
+  let origin: string
+  try { origin = authRedirectOrigin(request) } catch {
+    return NextResponse.json({ error: "Sign-in is unavailable. Please contact the pilot organizer." }, { status: 503 })
+  }
   const code = searchParams.get("code")
   const calendarRequested = searchParams.get("calendar") === "connect"
   try {

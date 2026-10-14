@@ -7,6 +7,7 @@ vi.mock("@/lib/google-calendar", () => ({ fetchBusyIntervals }))
 import { GET } from "./route"
 beforeEach(() => {
   vi.resetAllMocks()
+  vi.stubEnv("APP_ORIGIN", "")
   const chain = { select: () => chain, eq: () => chain, maybeSingle, upsert }
   from.mockReturnValue(chain)
   createClient.mockResolvedValue({ auth: { exchangeCodeForSession }, from })
@@ -18,6 +19,20 @@ beforeEach(() => {
   fetchBusyIntervals.mockResolvedValue([])
 })
 describe("auth callback consent boundary", () => {
+  it("redirects to localhost rather than the standalone listening address", async () => {
+    const response = await GET(new Request("http://0.0.0.0:3000/auth/callback?code=test", { headers: { host: "localhost:3000" } }))
+    expect(response.headers.get("location")).toBe("http://localhost:3000/start")
+  })
+  it("uses the configured hosted origin behind a proxy", async () => {
+    vi.stubEnv("APP_ORIGIN", "https://pilot.example.test")
+    const response = await GET(new Request("http://0.0.0.0:3000/auth/callback?code=test", { headers: { host: "attacker.example.test", "x-forwarded-host": "attacker.example.test" } }))
+    expect(response.headers.get("location")).toBe("https://pilot.example.test/start")
+  })
+  it("rejects an unconfigured hosted callback before exchanging its code", async () => {
+    const response = await GET(new Request("http://0.0.0.0:3000/auth/callback?code=test", { headers: { host: "attacker.example.test", "x-forwarded-host": "localhost:3000" } }))
+    expect(response.status).toBe(503)
+    expect(exchangeCodeForSession).not.toHaveBeenCalled()
+  })
   it("does not store Calendar tokens during ordinary Google sign-in", async () => {
     const response = await GET(new Request("http://localhost/auth/callback?code=test"))
     expect(response.headers.get("location")).toBe("http://localhost/start")

@@ -46,7 +46,8 @@ docker run --rm -p 3000:3000 yums:pilot
 ```
 
 In a second terminal, run `npm run check:host` against that container. It verifies
-health JSON/cache headers, login HTML, and one referenced static asset. For a
+health JSON/cache headers, login HTML, one referenced static asset, and an
+Auth callback without a code redirecting to the same public origin. For a
 hosted origin use `npm run check:host -- https://YOUR-HOST`. This is a process
 and packaging check, not a replacement for the signed-in release gates below.
 CI now includes a Linux container build and smoke check using placeholder
@@ -91,6 +92,9 @@ Before sending invitations:
 1. Set Supabase Site URL to the final HTTPS origin and allow its exact
    `/auth/callback`. Retain localhost for testing. Add `?calendar=connect` only
    when Calendar is enabled and verified.
+   Set runtime `APP_ORIGIN` to that same HTTPS origin. The standalone server's
+   listening address is not a public callback destination; hosted callbacks
+   fail closed if this setting is missing. Localhost is resolved separately.
 2. Verify SMTP delivery, sign-in, sign-out, preferences, and save/removal on a
    laptop and phone. Verify a second account cannot see private data.
 3. Submit a future report, confirm it stays private until operator approval,

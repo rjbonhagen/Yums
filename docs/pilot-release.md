@@ -22,9 +22,29 @@ local migration now revokes anon explicitly too, with a regression harness
 that models that hosted default. These metadata checks do not replace signed-in
 report acceptance or two-account persistence/isolation testing.
 
-The public connection checker now confirms all required table columns. Public
-sign-ups are still enabled; Auth settings were not changed by these migrations.
+The public connection checker now confirms all required table columns. After
+the migrations, the owner authorized disabling public sign-ups; the saved
+dashboard setting and the public Auth endpoint both confirm sign-ups are
+disabled. Anonymous sign-ins remain disabled. All connection readiness checks
+now pass; these do not replace real account acceptance tests.
 Historical October 7 evidence below predates this remote application.
+
+October 14 sign-in repair: production logs showed an invalid refresh token,
+and a real browser attempt exposed a callback redirect to `0.0.0.0:3000/start`.
+The proxy now rebuilds its forwarded request after cookie rotation/removal and
+applies the SDK's cache-protection headers. Local callbacks use a loopback
+origin; hosted callbacks require a configured runtime `APP_ORIGIN` rather than
+trusting arbitrary forwarded hosts. The hosting smoke check verifies a
+no-code callback redirects to the same public origin. Four cookie-forwarding
+and six callback-origin regressions pass, alongside the existing consent tests.
+The full suite now has 259 tests across 39 files; lint/build pass.
+
+The corrected production browser restored one real account's budget and
+walking settings, successfully saved those same preferences, navigated
+to the dashboard, and retained sign-in across account/dashboard navigation.
+The fresh Google round-trip after the final callback change still needs a
+signed-out rehearsal; the origin is verified by route tests and the running
+no-code callback. Two-account and cross-device checks remain outstanding.
 
 ## Release requirements
 
@@ -71,7 +91,7 @@ Invitation-mode sign-in avoids creating new accounts through magic links;
 Supabase's global new-signup switch must also be disabled by the project owner.
 See [pilot setup](pilot-setup.md) for configuration and operator steps.
 
-Local verification after these changes: 248 tests across 37 files, lint,
+Local verification after these changes: 259 tests across 39 files, lint,
 live-mode production build, and production dependency audit all pass. No
 production dependency vulnerabilities were reported. Database migrations were
 tested in local PostgreSQL; they have not been applied to the remote project.
