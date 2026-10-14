@@ -4,7 +4,7 @@ import { Card, CardContent } from "@/components/ui/card"
 import { Nav } from "@/components/nav"
 import { buildRecommendations } from "@/lib/recommendations"
 import { isToday } from "@/lib/event-time"
-export const revalidate = 120
+export const dynamic = "force-dynamic"
 
 const FEATURES = [
   {

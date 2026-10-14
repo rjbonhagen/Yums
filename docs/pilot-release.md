@@ -91,7 +91,7 @@ Invitation-mode sign-in avoids creating new accounts through magic links;
 Supabase's global new-signup switch must also be disabled by the project owner.
 See [pilot setup](pilot-setup.md) for configuration and operator steps.
 
-Local verification after these changes: 259 tests across 39 files, lint,
+Local verification after these changes: 261 tests across 39 files, lint,
 live-mode production build, and production dependency audit all pass. No
 production dependency vulnerabilities were reported. Database migrations were
 tested in local PostgreSQL; they have not been applied to the remote project.
@@ -244,3 +244,19 @@ context is restricted to manifests and source/script directories with local
 environment files, credential files, dependencies, and build output excluded.
 The October 7 read-only Supabase recheck still fails on enabled public signup,
 missing report moderation, and missing quota schema. No remote changes were made.
+
+October 14 nearby-source recovery: both app endpoint requests hit their
+six-second deadline during an outage. A later direct request using the app's
+query and headers returned 40 places from the primary in 2.4 seconds while
+the mirror still timed out after 25 seconds. These are dated observations,
+not an uptime guarantee. Retrieval now returns the first valid response and
+aborts the remaining fetch instead of waiting for every endpoint to settle.
+Two regressions verify either healthy endpoint can return without waiting for
+the other. Complete outages and malformed replies still show unavailable;
+no sample data or stale fallback is introduced. 261 tests, lint, and build pass.
+The same live verification returned 40 nearby listings from the rebuilt app.
+The homepage then continued to display its cached outage snapshot. It now
+renders source status per request while retaining the shared bounded source
+caches, so recovery is reflected without a separate stale full-page cache.
+The rebuilt homepage no longer shows that outage banner. Source/cache/page
+regressions, lint, and the final standalone build pass.
