@@ -11,8 +11,8 @@ import { createClient, isSupabaseConfigured } from "@/lib/supabase/client"
 import type { UserIdentity } from "@supabase/supabase-js"
 
 /**
- * Sign-in, via magic-link or Google OAuth (identity only — no calendar
- * scope, see signInWithGoogle below). Once a session exists, /start
+ * Sign-in via magic link or Google with Calendar availability consent.
+ * Once a session exists, /start
  * switches from localStorage to the real
  * savePreferencesToSupabase/loadPreferencesFromSupabase path (see
  * apps/web/src/lib/preferences.ts).
@@ -94,12 +94,7 @@ function LoginForm() {
     }
   }
 
-  // Sign-in-only Google OAuth, separate from connectGoogleCalendar below —
-  // no calendar.freebusy scope requested here, so this never triggers
-  // Google's OAuth consent screen for calendar access. If this email
-  // matches an existing magic-link account, Supabase's automatic identity
-  // linking attaches this Google identity to that same user rather than
-  // creating a duplicate.
+  // Google sign-in requests availability access for the same Google account.
   async function signInWithGoogle() {
     setGoogleStatus("redirecting")
     setGoogleError(null)
@@ -107,7 +102,11 @@ function LoginForm() {
       const supabase = createClient()
       const { error: authError } = await supabase.auth.signInWithOAuth({
         provider: "google",
-        options: { redirectTo: `${window.location.origin}/auth/callback`, queryParams: { prompt: "select_account" } },
+        options: {
+          redirectTo: `${window.location.origin}/auth/callback`,
+          scopes: "https://www.googleapis.com/auth/calendar.freebusy",
+          queryParams: { access_type: "offline", prompt: "consent select_account" },
+        },
       })
       if (authError) throw authError
     } catch (err) {
@@ -192,6 +191,7 @@ function LoginForm() {
                 >
                   {googleStatus === "redirecting" ? "Redirecting…" : "Continue with Google"}
                 </Button>
+                <p className="text-muted-foreground text-xs">Google sign-in also connects Calendar availability after you approve access. Yums checks busy times, without reading event titles or details.</p>
                 {googleStatus === "error" && <p className="text-destructive text-xs">{googleError}</p>}
 
                 <div className="flex items-center gap-2">

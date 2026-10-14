@@ -18,12 +18,12 @@ export async function GET(request: Request) {
       if (calendarRequested && !initiatingUser) return NextResponse.redirect(`${origin}/login?error=calendar-failed`)
       const { data, error } = await supabase.auth.exchangeCodeForSession(code)
       if (!error) {
-        // Plain Google sign-in also supplies a provider token. Store Calendar
-        // credentials only for an explicit connection and a successful scope check.
-        if (calendarRequested) {
+        // Google sign-in requests Calendar availability. Magic links have no
+        // provider token. Verify ownership and granted access before storage.
+        if (calendarRequested || data.session?.provider_token) {
           const token = data.session?.provider_token
           const user = data.session?.user
-          if (user?.id !== initiatingUser?.id) {
+          if (calendarRequested && user?.id !== initiatingUser?.id) {
             await supabase.auth.signOut({ scope: "local" })
             return NextResponse.redirect(`${origin}/login?error=calendar-account`)
           }

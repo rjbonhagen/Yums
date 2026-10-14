@@ -105,9 +105,10 @@ describe("invited pilot sign-in", () => {
     expect(signInWithOAuth).not.toHaveBeenCalled()
     expect(linkIdentity).not.toHaveBeenCalled()
   })
-  it("shows an account chooser for ordinary Google sign-in", async () => {
+  it("requests Calendar consent and an account chooser during Google sign-in", async () => {
     render(<LoginPage />)
     await userEvent.setup().click(screen.getByRole("button", { name: "Continue with Google" }))
-    expect(signInWithOAuth).toHaveBeenCalledWith(expect.objectContaining({ options: expect.objectContaining({ queryParams: { prompt: "select_account" } }) }))
+    expect(signInWithOAuth).toHaveBeenCalledWith(expect.objectContaining({ options: expect.objectContaining({ scopes: "https://www.googleapis.com/auth/calendar.freebusy", queryParams: { access_type: "offline", prompt: "consent select_account" } }) }))
+    expect(linkIdentity).not.toHaveBeenCalled()
   })
 })

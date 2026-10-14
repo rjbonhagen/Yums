@@ -130,8 +130,10 @@ sample mode and secret/service-role public keys, and requires invitation
 mode and a hosted HTTPS project origin. It checks key shape only; successful
 output does not prove that credentials work or that remote settings are safe.
 
-Calendar is optional. Connect explicitly from the signed-in account page;
-regular Google sign-in does not enable Calendar access. Verify availability,
+Google sign-in requests Calendar availability consent and connects the same
+Google account after verifying access. Magic-link sign-in does not request
+Google access; connect from the account page afterward. Calendar access can be
+declined without undoing a successful sign-in. Verify availability,
 refresh, and reconnect with an existing Google identity matching the account's
 email. Calendar consent never calls identity linking. The callback verifies the
 initiating account and Google's verified email before storing credentials;
