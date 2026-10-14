@@ -54,6 +54,14 @@ describe("existing Google login repair", () => {
     expect(screen.getByRole("button", { name: "Remove linked login other@gmail.com" })).toBeEnabled()
     expect(screen.queryByRole("status")).not.toBeInTheDocument()
   })
+  it("explains the operator repair step when Supabase blocks removal", async () => {
+    getUser.mockResolvedValue({ data: { user: account }, error: null })
+    unlinkIdentity.mockResolvedValue({ error: { code: "manual_linking_disabled", message: "Manual linking is disabled" } })
+    render(<LoginPage />)
+    await userEvent.setup().click(await screen.findByRole("button", { name: "Remove linked login other@gmail.com" }))
+    expect(screen.getByRole("alert")).toHaveTextContent("temporarily enable login removal")
+    expect(screen.queryByRole("status")).not.toBeInTheDocument()
+  })
 })
 afterEach(() => { vi.unstubAllGlobals(); vi.unstubAllEnvs() })
 describe("invited pilot sign-in", () => {

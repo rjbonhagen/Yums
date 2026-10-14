@@ -145,6 +145,9 @@ disabled, the account page lists it with a removal button. Removal rechecks the
 signed-in account and targets only that different-email Google identity through
 Supabase Auth. It preserves the account's email login and saved items. After
 removal, sign out and use the other Google email to open its separate account.
+Supabase requires manual linking to be enabled for removal too. An operator
+must briefly enable it for an approved repair, wait for the setting to take
+effect, remove the selected identity, and immediately disable it again.
 
 ## Acceptance and recovery
 

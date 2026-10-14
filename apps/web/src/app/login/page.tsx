@@ -61,7 +61,10 @@ function LoginForm() {
         && item.identity_data.email.toLowerCase() !== user.email?.toLowerCase())
       if (!identity || (user.identities?.length ?? 0) < 2) throw new Error("This login cannot be removed. Reload and try again.")
       const { error: unlinkError } = await supabase.auth.unlinkIdentity(identity)
-      if (unlinkError) throw unlinkError
+      if (unlinkError) {
+        if (unlinkError.code === "manual_linking_disabled") throw new Error("The pilot organizer must temporarily enable login removal in Supabase, then disable it again after this link is removed.")
+        throw unlinkError
+      }
       setOtherGoogleLogins((identities) => identities.filter((item) => item.identity_id !== identityId))
       setAccountNotice(`${identity.identity_data?.email} is no longer a login for this account. Sign out, then sign in with that Google account to use it separately. Your saved items remain with ${user.email}.`)
     } catch (err) {
