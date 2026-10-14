@@ -1,0 +1,28 @@
+let instances = Resources.*[ Type == 'AWS::EC2::Instance' ]
+rule instance_protection when %instances !empty {
+  %instances {
+    Properties.MetadataOptions.HttpTokens == 'required'
+    Properties.MetadataOptions.HttpPutResponseHopLimit == 1
+    Properties.KeyName not exists
+    Properties.BlockDeviceMappings.*.Ebs.Encrypted == true
+    Properties.CreditSpecification.CPUCredits == 'standard'
+  }
+}
+let groups = Resources.*[ Type == 'AWS::EC2::SecurityGroup' ]
+rule public_web_ports_only when %groups !empty {
+  %groups.Properties.SecurityGroupIngress.* {
+    IpProtocol == 'tcp'
+    FromPort IN [80, 443]
+    ToPort IN [80, 443]
+  }
+}
+let repositories = Resources.*[ Type == 'AWS::ECR::Repository' ]
+rule release_registry when %repositories !empty {
+  %repositories {
+    Properties.ImageTagMutability == 'IMMUTABLE'
+    Properties.EncryptionConfiguration.EncryptionType == 'AES256'
+    Properties.ImageScanningConfiguration.ScanOnPush == true
+    DeletionPolicy == 'Retain'
+    UpdateReplacePolicy == 'Retain'
+  }
+}

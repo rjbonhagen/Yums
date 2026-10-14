@@ -1,0 +1,284 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: Single-server Yums pilot with encrypted storage, Session Manager access, and a private container registry.
+Parameters:
+  VpcId:
+    Type: AWS::EC2::VPC::Id
+  SubnetId:
+    Type: AWS::EC2::Subnet::Id
+    Description: Public subnet with an internet gateway route.
+  DomainName:
+    Type: String
+    AllowedPattern: '^(?=.{1,253}$)([a-z0-9]([a-z0-9-]*[a-z0-9])?\.)+[a-z]{2,63}$'
+    Description: Hostname controlled by the operator; point its A record at PublicIp.
+  InstanceType:
+    Type: String
+    Default: t3.small
+    AllowedValues: [t3.micro, t3.small, t3.medium]
+  ImageId:
+    Type: AWS::SSM::Parameter::Value<AWS::EC2::Image::Id>
+    Default: /aws/service/ami-amazon-linux-latest/al2023-ami-kernel-default-x86_64
+  GitHubRepository:
+    Type: String
+    Default: rjbonhagen/FoodSavings
+    AllowedPattern: '^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$'
+  ExistingGitHubProviderArn:
+    Type: String
+    Default: ''
+    AllowedPattern: '^$|^arn:aws:iam::[0-9]{12}:oidc-provider/token.actions.githubusercontent.com$'
+    Description: Reuse an existing GitHub OIDC provider if the account has one.
+  AlertEmail:
+    Type: String
+    Default: ''
+    AllowedPattern: '^$|^[^\s@]+@[^\s@]+\.[^\s@]+$'
+    Description: Optional recipient for server alarms and monthly budget alerts.
+Conditions:
+  CreateGitHubProvider: !Equals [!Ref ExistingGitHubProviderArn, '']
+  SendAlerts: !Not [!Equals [!Ref AlertEmail, '']]
+Resources:
+  # Only web traffic is public. Administration uses Session Manager, without SSH keys.
+  WebSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Public HTTP redirects and HTTPS for the invited pilot
+      VpcId: !Ref VpcId
+      SecurityGroupIngress:
+        - {IpProtocol: tcp, FromPort: 80, ToPort: 80, CidrIp: 0.0.0.0/0}
+        - {IpProtocol: tcp, FromPort: 443, ToPort: 443, CidrIp: 0.0.0.0/0}
+      Tags: [{Key: Project, Value: yums}, {Key: Environment, Value: pilot}]
+  Repository:
+    Type: AWS::ECR::Repository
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      ImageTagMutability: IMMUTABLE
+      ImageScanningConfiguration: {ScanOnPush: true}
+      EncryptionConfiguration: {EncryptionType: AES256}
+      Tags: [{Key: Project, Value: yums}]
+  Logs:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      RetentionInDays: 14
+      Tags: [{Key: Project, Value: yums}]
+  # Pull access is confined to this registry. No application database credentials are in this stack.
+  InstanceRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal: {Service: ec2.amazonaws.com}
+            Action: sts:AssumeRole
+      ManagedPolicyArns: [!Sub 'arn:${AWS::Partition}:iam::aws:policy/AmazonSSMManagedInstanceCore']
+      Policies:
+        - PolicyName: pull-release-and-write-logs
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              # ECR authorization tokens do not support repository resource scoping.
+              - {Effect: Allow, Action: 'ecr:GetAuthorizationToken', Resource: '*'}
+              - Effect: Allow
+                Action: [ecr:BatchGetImage, ecr:GetDownloadUrlForLayer, ecr:BatchCheckLayerAvailability]
+                Resource: !GetAtt Repository.Arn
+              - Effect: Allow
+                Action: [logs:CreateLogStream, logs:PutLogEvents]
+                Resource: !GetAtt Logs.Arn
+              - Effect: Allow
+                Action: cloudformation:SignalResource
+                Resource: !Sub 'arn:${AWS::Partition}:cloudformation:${AWS::Region}:${AWS::AccountId}:stack/${AWS::StackName}/*'
+      Tags: [{Key: Project, Value: yums}]
+  InstanceProfile:
+    Type: AWS::IAM::InstanceProfile
+    Properties:
+      Roles: [!Ref InstanceRole]
+  # The host is replaceable; Supabase holds user data. Standard CPU credits prevent surplus charges.
+  Server:
+    Type: AWS::EC2::Instance
+    CreationPolicy:
+      ResourceSignal: {Count: 1, Timeout: PT10M}
+    Properties:
+      ImageId: !Ref ImageId
+      InstanceType: !Ref InstanceType
+      IamInstanceProfile: !Ref InstanceProfile
+      CreditSpecification: {CPUCredits: standard}
+      MetadataOptions: {HttpTokens: required, HttpPutResponseHopLimit: 1}
+      NetworkInterfaces:
+        - DeviceIndex: '0'
+          AssociatePublicIpAddress: true
+          SubnetId: !Ref SubnetId
+          GroupSet: [!Ref WebSecurityGroup]
+      BlockDeviceMappings:
+        - DeviceName: /dev/xvda
+          Ebs: {VolumeType: gp3, VolumeSize: 20, Encrypted: true, DeleteOnTermination: true}
+      Tags: [{Key: Name, Value: !Sub '${AWS::StackName}-web'}, {Key: Project, Value: yums}, {Key: Environment, Value: pilot}]
+      UserData:
+        Fn::Base64: !Sub |
+          #!/bin/bash
+          set -euo pipefail
+          dnf install -y docker aws-cfn-bootstrap
+          trap '/opt/aws/bin/cfn-signal -e $? --stack ${AWS::StackName} --resource Server --region ${AWS::Region}' EXIT
+          systemctl enable --now docker
+          systemctl enable --now amazon-ssm-agent
+          install -d -m 700 /etc/yums
+          install -d -m 755 /opt/yums
+          cat > /etc/yums/host.env <<'CONFIG'
+          AWS_REGION=${AWS::Region}
+          REPOSITORY_URI=${Repository.RepositoryUri}
+          DOMAIN_NAME=${DomainName}
+          LOG_GROUP=${Logs}
+          CONFIG
+          chmod 600 /etc/yums/host.env
+          printf 'APP_ORIGIN=https://${DomainName}\n' > /etc/yums/runtime.env
+          chmod 600 /etc/yums/runtime.env
+          touch /opt/yums/bootstrap-ready
+  Address:
+    Type: AWS::EC2::EIP
+    Properties:
+      Domain: vpc
+      Tags: [{Key: Project, Value: yums}]
+  AddressAssociation:
+    Type: AWS::EC2::EIPAssociation
+    Properties:
+      AllocationId: !GetAtt Address.AllocationId
+      InstanceId: !Ref Server
+  StatusAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: !Sub '${AWS::StackName}-status'
+      AlarmDescription: EC2 system or instance health checks are failing
+      Namespace: AWS/EC2
+      MetricName: StatusCheckFailed
+      Dimensions: [{Name: InstanceId, Value: !Ref Server}]
+      Statistic: Maximum
+      Period: 300
+      EvaluationPeriods: 2
+      Threshold: 0
+      ComparisonOperator: GreaterThanThreshold
+      TreatMissingData: missing
+      AlarmActions: !If [SendAlerts, [!Ref Alerts], !Ref 'AWS::NoValue']
+  CreditAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: !Sub '${AWS::StackName}-credits'
+      AlarmDescription: CPU credits are low; standard mode can throttle the pilot
+      Namespace: AWS/EC2
+      MetricName: CPUCreditBalance
+      Dimensions: [{Name: InstanceId, Value: !Ref Server}]
+      Statistic: Minimum
+      Period: 300
+      EvaluationPeriods: 2
+      Threshold: 10
+      ComparisonOperator: LessThanThreshold
+      TreatMissingData: missing
+      AlarmActions: !If [SendAlerts, [!Ref Alerts], !Ref 'AWS::NoValue']
+  # CloudWatch requires a customer-managed encryption key for encrypted SNS delivery.
+  AlertKey:
+    Type: AWS::KMS::Key
+    Condition: SendAlerts
+    Properties:
+      Description: Encryption for pilot alarm notifications
+      EnableKeyRotation: true
+      PendingWindowInDays: 7
+      KeyPolicy:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal: {AWS: !Sub 'arn:${AWS::Partition}:iam::${AWS::AccountId}:root'}
+            Action: 'kms:*'
+            Resource: '*'
+          - Effect: Allow
+            Principal: {Service: cloudwatch.amazonaws.com}
+            Action: ['kms:GenerateDataKey*', 'kms:Decrypt']
+            Resource: '*'
+            Condition:
+              StringEquals: {'aws:SourceAccount': !Ref 'AWS::AccountId'}
+              ArnEquals:
+                aws:SourceArn:
+                  - !Sub 'arn:${AWS::Partition}:cloudwatch:${AWS::Region}:${AWS::AccountId}:alarm:${AWS::StackName}-status'
+                  - !Sub 'arn:${AWS::Partition}:cloudwatch:${AWS::Region}:${AWS::AccountId}:alarm:${AWS::StackName}-credits'
+  Alerts:
+    Type: AWS::SNS::Topic
+    Condition: SendAlerts
+    Properties:
+      KmsMasterKeyId: !GetAtt AlertKey.Arn
+      Subscription:
+        - {Protocol: email, Endpoint: !Ref AlertEmail}
+  AlertPolicy:
+    Type: AWS::SNS::TopicPolicy
+    Condition: SendAlerts
+    Properties:
+      Topics: [!Ref Alerts]
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal: {Service: cloudwatch.amazonaws.com}
+            Action: sns:Publish
+            Resource: !Ref Alerts
+            Condition:
+              StringEquals: {'aws:SourceAccount': !Ref 'AWS::AccountId'}
+              ArnEquals:
+                aws:SourceArn:
+                  - !Sub 'arn:${AWS::Partition}:cloudwatch:${AWS::Region}:${AWS::AccountId}:alarm:${AWS::StackName}-status'
+                  - !Sub 'arn:${AWS::Partition}:cloudwatch:${AWS::Region}:${AWS::AccountId}:alarm:${AWS::StackName}-credits'
+  # Account-wide alerts track spend before promotional credits. This is not a hard spending cap.
+  Budget:
+    Type: AWS::Budgets::Budget
+    Properties:
+      Budget:
+        BudgetName: !Sub '${AWS::StackName}-monthly'
+        BudgetType: COST
+        TimeUnit: MONTHLY
+        BudgetLimit: {Amount: 30, Unit: USD}
+        CostTypes: {IncludeCredit: false, IncludeRefund: false}
+      NotificationsWithSubscribers: !If
+        - SendAlerts
+        - - Notification: {NotificationType: ACTUAL, ComparisonOperator: GREATER_THAN, Threshold: 80, ThresholdType: PERCENTAGE}
+            Subscribers: [{SubscriptionType: EMAIL, Address: !Ref AlertEmail}]
+          - Notification: {NotificationType: ACTUAL, ComparisonOperator: GREATER_THAN, Threshold: 100, ThresholdType: PERCENTAGE}
+            Subscribers: [{SubscriptionType: EMAIL, Address: !Ref AlertEmail}]
+        - !Ref 'AWS::NoValue'
+  GitHubProvider:
+    Type: AWS::IAM::OIDCProvider
+    Condition: CreateGitHubProvider
+    Properties:
+      Url: https://token.actions.githubusercontent.com
+      ClientIdList: [sts.amazonaws.com]
+  # Deployment is manual and restricted to the repository's protected pilot environment.
+  DeploymentRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Federated: !If [CreateGitHubProvider, !Ref GitHubProvider, !Ref ExistingGitHubProviderArn]
+            Action: sts:AssumeRoleWithWebIdentity
+            Condition:
+              StringEquals:
+                token.actions.githubusercontent.com:aud: sts.amazonaws.com
+                token.actions.githubusercontent.com:sub: !Sub 'repo:${GitHubRepository}:environment:pilot'
+      Policies:
+        - PolicyName: publish-and-deploy-pilot
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - {Effect: Allow, Action: 'ecr:GetAuthorizationToken', Resource: '*'}
+              - Effect: Allow
+                Action: [ecr:BatchCheckLayerAvailability, ecr:InitiateLayerUpload, ecr:UploadLayerPart, ecr:CompleteLayerUpload, ecr:PutImage, ecr:DescribeImages, ecr:BatchGetImage, ecr:GetDownloadUrlForLayer]
+                Resource: !GetAtt Repository.Arn
+              - Effect: Allow
+                Action: ssm:SendCommand
+                Resource:
+                  - !Sub 'arn:${AWS::Partition}:ec2:${AWS::Region}:${AWS::AccountId}:instance/${Server}'
+                  - !Sub 'arn:${AWS::Partition}:ssm:${AWS::Region}::document/AWS-RunShellScript'
+              # Command invocation status has no resource-level permission support.
+              - {Effect: Allow, Action: 'ssm:GetCommandInvocation', Resource: '*'}
+      Tags: [{Key: Project, Value: yums}]
+Outputs:
+  InstanceId: {Description: Pilot server for Session Manager and release commands, Value: !Ref Server}
+  PublicIp: {Description: Point the domain A record at this address, Value: !Ref Address}
+  Origin: {Description: Public app origin after DNS and deployment, Value: !Sub 'https://${DomainName}'}
+  RepositoryUri: {Description: Private release image repository, Value: !GetAtt Repository.RepositoryUri}
+  DeploymentRoleArn: {Description: GitHub pilot environment deployment role, Value: !GetAtt DeploymentRole.Arn}
