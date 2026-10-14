@@ -12,6 +12,7 @@ import { formatEventDateTime } from "@/lib/format"
 import { createClient, isSupabaseConfigured } from "@/lib/supabase/client"
 import { loadSavedItems, saveRecommendation, unsaveItem } from "@/lib/saved-items"
 import { savedKey } from "@/lib/save-identity"
+import { collapseDuplicateListings } from "@/lib/event-listings"
 import { saveGuestItem, removeGuestItem, useGuestSavedItems } from "@/lib/guest-saved-items"
 
 function kindLabel(kind: string, estimatedSavings: number): string {
@@ -190,7 +191,7 @@ export function RecommendationsView({ recommendations }: { recommendations: Reco
   const [userId, setUserId] = useState<string | null>(null)
   const [cloudSavedByKey, setSavedByKey] = useState<Map<string, string>>(new Map())
   const guestItems = useGuestSavedItems()
-  const savedByKey = new Map([...guestItems.filter((item) => !userId || item.isSample).map((item) => [savedKey(item), item.id] as const), ...cloudSavedByKey])
+  const savedByKey = useMemo(() => new Map([...guestItems.filter((item) => !userId || item.isSample).map((item) => [savedKey(item), item.id] as const), ...cloudSavedByKey]), [guestItems, userId, cloudSavedByKey])
   const [saveError, setSaveError] = useState<string | null>(null)
   const savingKeys = useRef(new Set<string>())
   const account = useRef<{ id: string | null | undefined; revision: number; active: boolean; loading: boolean }>({ id: undefined, revision: 0, active: true, loading: true })
@@ -324,12 +325,12 @@ export function RecommendationsView({ recommendations }: { recommendations: Reco
 
   const filtered = useMemo(() => {
     const query = search.trim().toLowerCase()
-    return recommendations.filter((r) => {
+    return collapseDuplicateListings(recommendations, savedByKey).filter((r) => {
       if (kindFilter !== "all" && r.kind !== kindFilter) return false
       if (!query) return true
       return r.title.toLowerCase().includes(query) || (r.subtitle?.toLowerCase().includes(query) ?? false)
     })
-  }, [recommendations, kindFilter, search])
+  }, [recommendations, savedByKey, kindFilter, search])
 
   const mappable = useMemo(() => filtered.filter((r) => r.latitude != null && r.longitude != null), [filtered])
 
