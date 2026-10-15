@@ -102,7 +102,7 @@ describe("RecommendationsView", () => {
     it("collapses two instances of the same exact seriesKey into one card", () => {
       render(<RecommendationsView recommendations={[MEETING_1, MEETING_2]} />)
 
-      expect(screen.getByText(/recurring · 2 upcoming/i)).toBeInTheDocument()
+      expect(screen.getByText(/matching event titles · 2 upcoming/i)).toBeInTheDocument()
       // Both dates still show, individually, inside the group.
       expect(screen.getByText(/Sep 1/)).toBeInTheDocument()
       expect(screen.getByText(/Sep 8/)).toBeInTheDocument()

@@ -1,12 +1,35 @@
 "use client"
 
-import { useEffect, useRef, useState } from "react"
+import { useEffect, useRef, useSyncExternalStore } from "react"
 import type { Recommendation } from "@yums/shared"
 import { Button } from "@/components/ui/button"
 
 const STORAGE_KEY = "yums.notifications-enabled"
 const LEAD_TIME_MS = 20 * 60 * 1000 // notify ~20 min before an event's real startTime
 const MAX_SCHEDULE_AHEAD_MS = 24 * 60 * 60 * 1000 // don't schedule further out than a day
+const CHANGE_EVENT = "yums:notification-settings"
+
+function subscribe(onChange: () => void) {
+  window.addEventListener("storage", onChange)
+  window.addEventListener("focus", onChange)
+  window.addEventListener(CHANGE_EVENT, onChange)
+  return () => {
+    window.removeEventListener("storage", onChange)
+    window.removeEventListener("focus", onChange)
+    window.removeEventListener(CHANGE_EVENT, onChange)
+  }
+}
+
+function getSnapshot() {
+  if (typeof Notification === "undefined") return "unsupported:false"
+  let enabled = false
+  try {
+    enabled = Notification.permission === "granted" && localStorage.getItem(STORAGE_KEY) === "true"
+  } catch { /* Reminders remain off when browser storage is unavailable. */ }
+  return `${Notification.permission}:${enabled}`
+}
+
+function getServerSnapshot() { return "unsupported:false" }
 
 /**
  * Client-side-only reminders — schedules a browser Notification ~20 min
@@ -18,18 +41,10 @@ const MAX_SCHEDULE_AHEAD_MS = 24 * 60 * 60 * 1000 // don't schedule further out 
  * implying background delivery that doesn't exist.
  */
 export function NotificationToggle({ freeFoodEvents }: { freeFoodEvents: Recommendation[] }) {
-  const [enabled, setEnabled] = useState(false)
-  const [permission, setPermission] = useState<NotificationPermission | "unsupported">("default")
+  const settings = useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot)
+  const [permission, enabledValue] = settings.split(":")
+  const enabled = enabledValue === "true"
   const timerIds = useRef<number[]>([])
-
-  useEffect(() => {
-    if (typeof Notification === "undefined") {
-      setPermission("unsupported")
-      return
-    }
-    setPermission(Notification.permission)
-    setEnabled(Notification.permission === "granted" && localStorage.getItem(STORAGE_KEY) === "true")
-  }, [])
 
   useEffect(() => {
     timerIds.current.forEach((id) => window.clearTimeout(id))
@@ -65,17 +80,19 @@ export function NotificationToggle({ freeFoodEvents }: { freeFoodEvents: Recomme
 
     if (enabled) {
       localStorage.setItem(STORAGE_KEY, "false")
-      setEnabled(false)
+      window.dispatchEvent(new Event(CHANGE_EVENT))
       return
     }
 
     let perm = Notification.permission
     if (perm === "default") perm = await Notification.requestPermission()
-    setPermission(perm)
-    if (perm !== "granted") return
+    if (perm !== "granted") {
+      window.dispatchEvent(new Event(CHANGE_EVENT))
+      return
+    }
 
     localStorage.setItem(STORAGE_KEY, "true")
-    setEnabled(true)
+    window.dispatchEvent(new Event(CHANGE_EVENT))
   }
 
   if (permission === "unsupported") return null
@@ -83,7 +100,7 @@ export function NotificationToggle({ freeFoodEvents }: { freeFoodEvents: Recomme
   return (
     <div className="flex flex-wrap items-center gap-2">
       <Button type="button" size="sm" variant={enabled ? "default" : "outline"} onClick={handleToggle}>
-        {enabled ? "🔔 Reminders on" : "🔕 Remind me before free food"}
+        {enabled ? "Reminders on" : "Remind me before free food"}
       </Button>
       {permission === "denied" && (
         <p className="text-muted-foreground text-xs">

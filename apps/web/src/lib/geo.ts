@@ -5,6 +5,11 @@
 
 const OSRM_URL = "https://router.project-osrm.org/route/v1/foot"
 
+export function validCoordinates(latitude: unknown, longitude: unknown): boolean {
+  return typeof latitude === "number" && Number.isFinite(latitude) && Math.abs(latitude) <= 90
+    && typeof longitude === "number" && Number.isFinite(longitude) && Math.abs(longitude) <= 180
+}
+
 export function haversineMinutes(aLat: number, aLng: number, bLat: number, bLng: number): number {
   const R = 3958.8 // miles
   const toRad = (d: number) => (d * Math.PI) / 180

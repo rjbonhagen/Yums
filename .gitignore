@@ -5,7 +5,7 @@ node_modules/
 *.log
 .DS_Store
 
-# AI assistant / agent tooling files
+# Local development configuration
 .agents/
 .claude/
 .codex/

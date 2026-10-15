@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js"
 import type { Recommendation } from "@yums/shared"
+import { savedKey } from "./save-identity"
 
 // Persists to the `recommendations` table (see packages/database/schema.sql
 // for why that table — not a new one — is used for this). A save is a
@@ -15,6 +16,8 @@ export interface SavedItem {
   latitude?: number
   longitude?: number
   startTime?: string
+  endTime?: string
+  isSample?: boolean
 }
 
 interface SavedItemRow {
@@ -26,9 +29,10 @@ interface SavedItemRow {
   latitude: number | null
   longitude: number | null
   start_time: string | null
+  end_time: string | null
 }
 
-const SELECT_COLUMNS = "id, kind, title, subtitle, source_url, latitude, longitude, start_time"
+const SELECT_COLUMNS = "id, kind, title, subtitle, source_url, latitude, longitude, start_time, end_time"
 
 function fromRow(row: SavedItemRow): SavedItem {
   return {
@@ -40,6 +44,7 @@ function fromRow(row: SavedItemRow): SavedItem {
     latitude: row.latitude ?? undefined,
     longitude: row.longitude ?? undefined,
     startTime: row.start_time ?? undefined,
+    endTime: row.end_time ?? undefined,
   }
 }
 
@@ -60,19 +65,21 @@ export async function saveRecommendation(
 ): Promise<SavedItem> {
   const { data, error } = await supabase
     .from("recommendations")
-    .insert({
+    .upsert({
       user_id: userId,
+      save_key: savedKey(r),
       kind: r.kind,
       title: r.title,
       subtitle: r.subtitle ?? null,
       estimated_savings: r.estimatedSavings,
       distance_minutes: r.distanceMinutes ?? null,
       start_time: r.startTime ?? null,
+      end_time: r.endTime ?? null,
       source_url: r.sourceUrl ?? null,
       latitude: r.latitude ?? null,
       longitude: r.longitude ?? null,
       score: r.score,
-    })
+    }, { onConflict: "user_id,save_key" })
     .select(SELECT_COLUMNS)
     .single()
   if (error) throw error

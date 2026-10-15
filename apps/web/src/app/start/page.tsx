@@ -12,22 +12,19 @@ import {
   loadPreferencesFromSupabase,
   saveLocalPreferences,
   savePreferencesToSupabase,
+  normalizePreferences,
+  DEFAULT_PREFERENCES,
   type WeeklyPreferences,
 } from "@/lib/preferences"
 import { createClient, isSupabaseConfigured } from "@/lib/supabase/client"
 
 const OPTIMIZE_OPTIONS = [
-  { value: "cheapest", label: "Cheapest" },
-  { value: "healthy", label: "Healthy" },
-  { value: "high_protein", label: "High Protein" },
-  { value: "fast", label: "Fast" },
+  { value: "cheapest", label: "Free food first" },
+  { value: "fast", label: "Shorter walks" },
 ] as const
 
 const TRANSPORT_OPTIONS = [
   { value: "walking", label: "Walking" },
-  { value: "bike", label: "Bike" },
-  { value: "car", label: "Car" },
-  { value: "transit", label: "Transit" },
 ] as const
 
 export default function StartPage() {
@@ -39,8 +36,13 @@ export default function StartPage() {
   const [restored, setRestored] = useState(false)
   const [userId, setUserId] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
+  const [loading, setLoading] = useState(true)
+  const [syncError, setSyncError] = useState<string | null>(null)
 
   useEffect(() => {
+    let active = true
+    let revision = 0
+    let currentAccount: string | null | undefined
     function applyPrefs(saved: WeeklyPreferences) {
       setBudget(saved.budget)
       setOptimizeFor(saved.optimizeFor)
@@ -49,58 +51,89 @@ export default function StartPage() {
       setRestored(true)
     }
 
+    async function restore(user: { id: string } | null, version: number) {
+      if (!active || version !== revision) return
+      currentAccount = user?.id ?? null
+      setUserId(currentAccount)
+      setLoading(true)
+      setSyncError(null)
+      setRestored(false)
+      const browserPrefs = loadLocalPreferences()
+      applyPrefs(DEFAULT_PREFERENCES)
+      setRestored(false)
+      if (!user) {
+        if (browserPrefs) applyPrefs(browserPrefs)
+        setLoading(false)
+        return
+      }
+      try {
+        const saved = await loadPreferencesFromSupabase(createClient(), user.id)
+        if (active && version === revision && saved) applyPrefs(saved)
+      } catch {
+        if (active && version === revision) {
+          if (browserPrefs) applyPrefs(browserPrefs)
+          setSyncError("Couldn't load account preferences. Browser settings are shown; save again to sync them.")
+        }
+      } finally {
+        if (active && version === revision) setLoading(false)
+      }
+    }
+
     if (!isSupabaseConfigured()) {
-      const saved = loadLocalPreferences()
-      if (saved) applyPrefs(saved)
-      return
+      void restore(null, revision)
+      return () => { active = false }
     }
 
     // Signed-in users get their preferences from Supabase (synced across
     // devices) instead of this browser's localStorage — falls back to
     // localStorage if there's no session, same as an unconfigured deployment.
     const supabase = createClient()
-    supabase.auth.getUser().then(async ({ data: { user } }) => {
-      if (!user) {
-        const saved = loadLocalPreferences()
-        if (saved) applyPrefs(saved)
-        return
-      }
-      setUserId(user.id)
-      try {
-        const saved = await loadPreferencesFromSupabase(supabase, user.id)
-        if (saved) applyPrefs(saved)
-      } catch {
-        // No row yet for a brand-new user — nothing to restore, not an error.
-      }
+    supabase.auth.getUser().then(({ data: { user }, error }) => {
+      if (revision !== 0 || !active) return
+      if (error) throw error
+      return restore(user, revision)
+    }).catch(() => {
+      if (revision !== 0 || !active) return
+      void restore(null, revision)
+      setSyncError("Couldn't check your account. Retry before syncing preferences across devices.")
     })
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      if (!active || (event !== "SIGNED_IN" && event !== "SIGNED_OUT")) return
+      const account = session?.user.id ?? null
+      if (account === currentAccount) return
+      revision++
+      // Do not await database work inside the Auth event callback.
+      void restore(session?.user ?? null, revision)
+    })
+    return () => { active = false; revision++; subscription.unsubscribe() }
   }, [])
 
   async function buildMyWeek() {
-    const prefs: WeeklyPreferences = { budget, optimizeFor, transportation, maxTravelMinutes }
-
-    if (userId && isSupabaseConfigured()) {
-      setSaving(true)
-      try {
+    if (saving || loading) return
+    const prefs = normalizePreferences({ budget, optimizeFor, transportation, maxTravelMinutes })
+    saveLocalPreferences(prefs)
+    setSaving(true)
+    setSyncError(null)
+    try {
+      if (isSupabaseConfigured()) {
         const supabase = createClient()
-        await savePreferencesToSupabase(supabase, userId, prefs)
-      } catch {
-        // Real Supabase write failed (network, RLS, etc.) — still fall back
-        // to localStorage below so the user's input isn't lost.
-        saveLocalPreferences(prefs)
-      } finally {
-        setSaving(false)
+        const { data: { user }, error } = await supabase.auth.getUser()
+        if (error) throw error
+        if ((user?.id ?? null) !== userId) {
+          setSyncError("Your account changed. Reload this page before saving preferences.")
+          return
+        }
+        if (user) await savePreferencesToSupabase(supabase, user.id, prefs)
       }
-    } else {
-      saveLocalPreferences(prefs)
-    }
-
-    const params = new URLSearchParams({
-      budget: String(budget),
-      optimizeFor,
-      transportation,
-      maxTravelMinutes: String(maxTravelMinutes),
-    })
-    router.push(`/dashboard?${params.toString()}`)
+      const params = new URLSearchParams({
+        budget: String(prefs.budget), optimizeFor: prefs.optimizeFor,
+        transportation: prefs.transportation, maxTravelMinutes: String(prefs.maxTravelMinutes),
+      })
+      router.push(`/dashboard?${params.toString()}`)
+      router.refresh()
+    } catch {
+      setSyncError("Saved in this browser, but couldn't sync your account preferences. Try again before continuing.")
+    } finally { setSaving(false) }
   }
 
   return (
@@ -111,19 +144,25 @@ export default function StartPage() {
         <CardHeader>
           <CardTitle className="text-2xl">Yums</CardTitle>
           <p className="text-muted-foreground text-sm">
-            The cheapest way to live around campus.
+            Find free food and nearby eats around campus.
           </p>
           {restored && (
             <p className="text-muted-foreground text-xs">Restored your last saved preferences.</p>
           )}
+          {syncError && <p role="alert" className="text-destructive text-sm">{syncError}</p>}
         </CardHeader>
         <CardContent className="space-y-6">
+          <form className="space-y-6" onSubmit={(event) => { event.preventDefault(); void buildMyWeek() }}>
+          <fieldset className="space-y-6" disabled={loading || saving}>
           <div className="space-y-2">
             <Label htmlFor="budget">How much do you want to spend this week?</Label>
             <Input
               id="budget"
               type="number"
               min={0}
+              max={1000}
+              step="0.01"
+              required
               value={budget}
               onChange={(e) => setBudget(Number(e.target.value))}
               className="text-lg"
@@ -139,6 +178,7 @@ export default function StartPage() {
                   type="button"
                   variant={optimizeFor === opt.value ? "default" : "outline"}
                   onClick={() => setOptimizeFor(opt.value)}
+                  aria-pressed={optimizeFor === opt.value}
                 >
                   {opt.label}
                 </Button>
@@ -149,7 +189,7 @@ export default function StartPage() {
           <div className="space-y-2">
             <Label>University</Label>
             <Input value="UC Berkeley" disabled />
-            <p className="text-muted-foreground text-xs">More campuses coming soon.</p>
+            <p className="text-muted-foreground text-xs">This release covers UC Berkeley.</p>
           </div>
 
           <div className="space-y-2">
@@ -166,6 +206,7 @@ export default function StartPage() {
                 </Button>
               ))}
             </div>
+            <p className="text-muted-foreground text-xs">Walking estimates start at campus center. Nutrition and other travel modes aren&apos;t available.</p>
           </div>
 
           <div className="space-y-2">
@@ -174,14 +215,18 @@ export default function StartPage() {
               id="maxTravel"
               type="number"
               min={1}
+              max={120}
+              required
               value={maxTravelMinutes}
               onChange={(e) => setMaxTravelMinutes(Number(e.target.value))}
             />
           </div>
 
-          <Button className="w-full" size="lg" onClick={buildMyWeek} disabled={saving}>
-            {saving ? "Saving…" : "Build My Week"}
+          <Button type="submit" className="w-full" size="lg" disabled={loading || saving}>
+            {loading ? "Restoring preferences…" : saving ? "Saving…" : "Build My Week"}
           </Button>
+          </fieldset>
+          </form>
         </CardContent>
       </Card>
       </main>

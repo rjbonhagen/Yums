@@ -1,0 +1,80 @@
+name: Deploy EC2 pilot
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: ec2-pilot
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    if: github.ref == 'refs/heads/pilot-release'
+    runs-on: ubuntu-latest
+    environment: pilot
+    env:
+      AWS_REGION: us-west-1
+      REPOSITORY_URI: ${{ vars.ECR_REPOSITORY_URI }}
+      INSTANCE_ID: ${{ vars.EC2_INSTANCE_ID }}
+      APP_ORIGIN: ${{ vars.APP_ORIGIN }}
+      NEXT_PUBLIC_SUPABASE_URL: ${{ vars.NEXT_PUBLIC_SUPABASE_URL }}
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ vars.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
+      NEXT_PUBLIC_MAPBOX_TOKEN: ${{ vars.NEXT_PUBLIC_MAPBOX_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Verify deployment inputs
+        run: |
+          test -n "$REPOSITORY_URI"
+          test -n "$INSTANCE_ID"
+          node --input-type=module -e 'const value = process.env.APP_ORIGIN; const url = new URL(value); if (url.protocol !== "https:" || url.origin !== value || url.username || url.password || url.port) throw new Error("APP_ORIGIN must be an HTTPS origin without a path, credentials, or port")'
+          bash -n infra/release-ec2.sh
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: us-west-1
+      - uses: aws-actions/amazon-ecr-login@v2
+      - name: Build and check release
+        run: |
+          image="$REPOSITORY_URI:$GITHUB_SHA-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT"
+          docker build --platform linux/amd64 \
+            --build-arg NEXT_PUBLIC_SUPABASE_URL \
+            --build-arg NEXT_PUBLIC_SUPABASE_ANON_KEY \
+            --build-arg NEXT_PUBLIC_MAPBOX_TOKEN -t "$image" .
+          docker run -d --name yums-check -p 127.0.0.1:3000:3000 -e APP_ORIGIN=http://localhost:3000 "$image"
+          curl --fail --retry 10 --retry-all-errors --retry-delay 2 --max-time 3 http://localhost:3000/api/health
+          node scripts/smoke-host.mjs
+          docker rm -f yums-check
+          docker push "$image"
+          repository="${REPOSITORY_URI#*/}"
+          tag="${image##*:}"
+          digest=$(aws ecr describe-images --repository-name "$repository" --image-ids imageTag="$tag" --query 'imageDetails[0].imageDigest' --output text)
+          echo "IMAGE_URI=$REPOSITORY_URI@$digest" >> "$GITHUB_ENV"
+      - name: Deploy tested digest through Session Manager
+        run: |
+          node scripts/ec2-command.mjs "$RUNNER_TEMP/ec2-command.json"
+          command_id=$(aws ssm send-command --instance-ids "$INSTANCE_ID" --document-name AWS-RunShellScript \
+            --timeout-seconds 600 --parameters "file://$RUNNER_TEMP/ec2-command.json" \
+            --query 'Command.CommandId' --output text)
+          sleep 5
+          status=Pending
+          for attempt in $(seq 1 60); do
+            status=$(aws ssm get-command-invocation --command-id "$command_id" --instance-id "$INSTANCE_ID" --query Status --output text)
+            case "$status" in
+              Success) break ;;
+              Failed|Cancelled|TimedOut|Cancelling) exit 1 ;;
+            esac
+            sleep 10
+          done
+          test "$status" = Success
+      - name: Check public HTTPS deployment
+        run: node scripts/smoke-host.mjs "$APP_ORIGIN"
+      - name: Clean up test container
+        if: always()
+        run: docker rm -f yums-check 2>/dev/null || true

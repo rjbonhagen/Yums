@@ -16,6 +16,17 @@ describe("fetchNearbyPlaces", () => {
     global.fetch = originalFetch
   })
 
+  it("ignores a malformed mirror response when another mirror returns valid records", async () => {
+    vi.mocked(global.fetch)
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ error: "bad response" }) } as Response)
+      .mockResolvedValueOnce(overpassResponse([{ id: 1, lat: 37.87, lon: -122.26, tags: { name: "Real cafe", amenity: "cafe" } }]))
+    expect((await fetchNearbyPlaces([37.83, -122.3, 37.9, -122.22])).map((place) => place.name)).toEqual(["Real cafe"])
+  })
+  it("rejects malformed replies from both mirrors rather than reporting no places", async () => {
+    vi.mocked(global.fetch).mockResolvedValue({ ok: true, json: async () => ({ error: "bad response" }) } as Response)
+    await expect(fetchNearbyPlaces([37.83, -122.3, 37.9, -122.22])).rejects.toThrow("Invalid OpenStreetMap response")
+  })
+
   it("maps a named OSM element to a NearbyPlace with real coordinates", async () => {
     vi.mocked(global.fetch).mockResolvedValue(
       overpassResponse([{ id: 1, lat: 37.87, lon: -122.26, tags: { name: "Caffé Strada", amenity: "cafe" } }]),
@@ -26,6 +37,9 @@ describe("fetchNearbyPlaces", () => {
     expect(places).toEqual([
       { id: "1", name: "Caffé Strada", category: "cafe", latitude: 37.87, longitude: -122.26, address: undefined },
     ])
+    expect(vi.mocked(global.fetch).mock.calls.every(([, options]) =>
+      options?.cache === "no-store",
+    )).toBe(true)
   })
 
   it("filters out elements with no name tag rather than showing an unnamed place", async () => {
@@ -76,6 +90,22 @@ describe("fetchNearbyPlaces", () => {
     expect(places).toHaveLength(1)
     expect(places[0].name).toBe("Mirror Place")
   })
+
+  it.each(["overpass-api.de", "overpass.kumi.systems"])("returns a valid response without waiting for the slower %s endpoint", async (slowHost) => {
+    let slowSignal: AbortSignal | undefined
+    vi.mocked(global.fetch).mockImplementation(async (url, options) => {
+      if (String(url).includes(slowHost)) {
+        slowSignal = options?.signal ?? undefined
+        return new Promise<Response>((_, reject) => {
+          slowSignal?.addEventListener("abort", () => reject(new Error("cancelled slower request")), { once: true })
+        })
+      }
+      return overpassResponse([{ id: 1, lat: 37.87, lon: -122.26, tags: { name: "Available cafe", amenity: "cafe" } }])
+    })
+    const places = await fetchNearbyPlaces([37.83, -122.3, 37.9, -122.22])
+    expect(places[0].name).toBe("Available cafe")
+    expect(slowSignal?.aborted).toBe(true)
+  }, 1000)
 
   it("throws (never returns fabricated data) when both Overpass endpoints fail", async () => {
     vi.mocked(global.fetch).mockRejectedValue(new Error("both endpoints down"))

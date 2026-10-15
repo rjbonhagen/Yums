@@ -43,14 +43,11 @@ function stripHtml(html: string): string {
 export const callinkSource: CampusEventSource = {
   key: "callink-live",
   async fetchEvents(): Promise<CampusEvent[]> {
-    // Rounded to the current 2-minute bucket (matching the revalidate
-    // window below) rather than the exact current instant — an exact
-    // millisecond timestamp here would make every request's URL unique,
-    // which defeats Next's fetch cache entirely (it keys on URL). Losing
-    // events that start in the last couple minutes to this rounding is an
-    // acceptable trade for actually being cacheable.
+    // Include recently started events; the recommendation layer uses real
+    // end times to discard expired offers. Round the query time to reduce
+    // needless URL variations; recommendation caching is handled separately.
     const bucketMs = 2 * 60 * 1000
-    const startsAfter = new Date(Math.floor(Date.now() / bucketMs) * bucketMs).toISOString()
+    const startsAfter = new Date(Math.floor((Date.now() - 24 * 60 * 60 * 1000) / bucketMs) * bucketMs).toISOString()
     const params = new URLSearchParams({
       top: "100",
       startsAfter,
@@ -59,13 +56,8 @@ export const callinkSource: CampusEventSource = {
 
     const res = await fetch(`${SEARCH_URL}?${params.toString()}`, {
       headers: { Accept: "application/json" },
-      // Club events don't change minute-to-minute; a short revalidate
-      // window matches the pattern used for the other live sources.
-      // cache:'force-cache' makes the opt-in explicit (Next's fetch
-      // caching is opt-in per its docs) rather than relying on revalidate
-      // alone.
-      cache: "force-cache",
-      next: { revalidate: 120 },
+      // The outer recommendation cache must refresh from the network.
+      cache: "no-store",
       signal: AbortSignal.timeout(8000),
     })
 
@@ -74,18 +66,16 @@ export const callinkSource: CampusEventSource = {
     }
 
     const body = (await res.json()) as CalLinkSearchResponse
+    if (!body || !Array.isArray(body.value)) throw new Error("Invalid Cal Link event response")
 
-    return body.value.map((e) => {
+    return body.value.flatMap((e) => {
+      if (!e || !["string", "number"].includes(typeof e.id)
+        || !/^[a-zA-Z0-9_-]{1,128}$/.test(String(e.id))) return []
       const description = e.description ? stripHtml(e.description) : undefined
-      const hasFreeFoodBenefit = e.benefitNames?.some((b) => b.toLowerCase().includes("free food")) ?? false
+      const hasFreeFoodBenefit = e.benefitNames?.some((b) => b.trim().toLowerCase() === "free food") ?? false
 
-      // benefitNames is Cal Link's own organizer-set tag, not a guess — fold
-      // it into the description text so the existing keyword extractor
-      // (services/event-ingestion/extract.ts) picks it up as a real signal
-      // rather than adding a second, parallel confidence mechanism.
-      const annotatedDescription = hasFreeFoodBenefit
-        ? `${description ?? ""} Benefits: Free Food.`.trim()
-        : description
+      // Keep organizer evidence separate from description text so a
+      // withdrawn offer can override a stale benefit tag.
 
       // Coordinates are present on some events (organizer-entered) and
       // absent on others — never guess when missing, same rule
@@ -93,17 +83,18 @@ export const callinkSource: CampusEventSource = {
       const latitude = e.latitude ? Number(e.latitude) : undefined
       const longitude = e.longitude ? Number(e.longitude) : undefined
 
-      return {
+      return [{
         organization: e.organizationName ?? "UC Berkeley student organization",
         title: e.name,
-        description: annotatedDescription,
+        description,
         startTime: e.startsOn,
         endTime: e.endsOn,
         locationName: e.location?.trim() || undefined,
         latitude: latitude != null && !Number.isNaN(latitude) ? latitude : undefined,
         longitude: longitude != null && !Number.isNaN(longitude) ? longitude : undefined,
-        sourceUrl: `https://callink.berkeley.edu/event/${e.id}`,
-      }
+        sourceUrl: `https://callink.berkeley.edu/event/${encodeURIComponent(e.id)}`,
+        freeFoodConfirmed: hasFreeFoodBenefit,
+      }]
     })
   },
 }

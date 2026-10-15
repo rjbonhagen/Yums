@@ -50,16 +50,12 @@ export function FeedMap({ places }: { places: MappablePlace[] }) {
       map.remove()
       mapRef.current = null
     }
-    // places is a fresh array each render from server data, but re-creating
-    // the map on every render would be wasteful/flashy — this map is built
-    // once per page load, matching /feed's server-rendered-once data.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+  }, [places])
 
   if (!process.env.NEXT_PUBLIC_MAPBOX_TOKEN) {
     return (
       <p className="text-muted-foreground p-4 text-sm">
-        Map view isn&apos;t configured on this deployment (no Mapbox token) — see apps/web/.env.example.
+        Map view isn&apos;t available right now. Use the list to browse events and places.
       </p>
     )
   }

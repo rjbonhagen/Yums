@@ -3,6 +3,8 @@ import { Badge } from "@/components/ui/badge"
 import { Card, CardContent } from "@/components/ui/card"
 import { Nav } from "@/components/nav"
 import { buildRecommendations } from "@/lib/recommendations"
+import { isToday } from "@/lib/event-time"
+export const dynamic = "force-dynamic"
 
 const FEATURES = [
   {
@@ -11,11 +13,11 @@ const FEATURES = [
   },
   {
     title: "Nearby Eats",
-    body: "Real cafes and restaurants near campus from OpenStreetMap, ranked by distance. No live student-discount data exists yet, so this shows places, not fake deals.",
+    body: "Browse cafes and restaurants near campus from OpenStreetMap. Menu prices and discounts aren't verified.",
   },
   {
     title: "Real Distances",
-    body: "Walking time is computed from actual coordinates, not a guess — routed live where possible, geometric distance otherwise.",
+    body: "Approximate walking times use source coordinates and start at campus center. Events with no coordinates show distance unknown.",
   },
   {
     title: "Save Money vs. Save Time",
@@ -24,21 +26,23 @@ const FEATURES = [
 ]
 
 const STEPS = [
-  { n: "01", title: "Tell it your week", body: "Budget, transportation, how far you'll walk." },
+  { n: "01", title: "Tell it your week", body: "Set a budget target and how far you'll walk." },
   { n: "02", title: "It scans campus", body: "Live free food events and real nearby eateries, ranked by distance." },
   { n: "03", title: "You get a plan", body: "A ranked feed of what's actually happening today, near you, right now." },
 ]
 
 export default async function HomePage() {
   const { recommendations, meta } = await buildRecommendations({ maxTravelMinutes: 20 })
-  const preview = recommendations.slice(0, 3)
-  const freeFoodCount = recommendations.filter((r) => r.kind === "free_food").length
+  const todayRecommendations = recommendations.filter((r) => r.kind !== "free_food" || isToday(r.startTime, new Date(), r.endTime))
+  const preview = todayRecommendations.slice(0, 3)
+  const freeFoodCount = todayRecommendations.filter((r) => r.kind === "free_food").length
   const eatsCount = recommendations.filter((r) => r.kind === "nearby_eats").length
-  const closest = recommendations.find((r) => r.distanceMinutes != null)
+  const closest = [...todayRecommendations].filter((r) => r.distanceMinutes != null).sort((a, b) => a.distanceMinutes! - b.distanceMinutes!)[0]
+  const foodUnavailable = meta.freeFood.source === "unavailable" && meta.callink.source === "unavailable"
 
   const stats = [
-    { value: String(freeFoodCount), label: "free food events on campus today" },
-    { value: String(eatsCount), label: "nearby eats found live" },
+    { value: foodUnavailable ? "—" : String(freeFoodCount), label: "free food events on campus today" },
+    { value: meta.nearbyEats.source === "unavailable" ? "—" : String(eatsCount), label: "nearby places listed" },
     {
       value: closest?.distanceMinutes != null ? `${closest.distanceMinutes} min` : "—",
       label: "closest opportunity right now",
@@ -49,6 +53,10 @@ export default async function HomePage() {
     <div className="flex flex-1 flex-col">
       <Nav />
       <main className="flex-1">
+      {meta.freeFood.source === "demo" && <p role="status" className="bg-amber-50 px-4 py-3 text-center text-sm text-amber-900">Sample demo data · examples only, not real food offers.</p>}
+      {meta.freeFood.source === "unavailable" && <p role="status" className="bg-amber-50 px-4 py-3 text-center text-sm text-amber-900">Berkeley calendar is unavailable. Its events are omitted.</p>}
+      {meta.callink.source === "unavailable" && <p role="status" className="bg-amber-50 px-4 py-3 text-center text-sm text-amber-900">Cal Link is unavailable. Its club events are omitted.</p>}
+      {meta.nearbyEats.source === "unavailable" && <p role="status" className="bg-amber-50 px-4 py-3 text-center text-sm text-amber-900">Nearby places are unavailable from OpenStreetMap right now.</p>}
       {/* Hero */}
       <section className="border-b">
         <div className="mx-auto flex max-w-5xl flex-col items-center px-4 py-24 text-center">
@@ -56,11 +64,11 @@ export default async function HomePage() {
             Built for UC Berkeley
           </Badge>
           <h1 className="max-w-3xl text-5xl font-semibold tracking-tight text-balance sm:text-6xl">
-            The cheapest way to eat and live around campus
+            Find your next free bite around campus
           </h1>
           <p className="text-muted-foreground mt-6 max-w-xl text-lg text-balance">
-            Yums finds free food and nearby eats near you, and turns them into a plan built around your
-            schedule and your budget.
+            Discover campus events offering free food and nearby places to eat.
+            Choose shorter walks or free food first, and connect your calendar to check conflicts.
           </p>
           <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
             <Link
@@ -129,7 +137,7 @@ export default async function HomePage() {
 
       {/* Live preview */}
       <section className="mx-auto max-w-5xl px-4 py-24">
-        <div className="mb-8 flex items-end justify-between">
+        <div className="mb-8 flex flex-wrap items-end justify-between gap-3">
           <h2 className="text-3xl font-semibold tracking-tight">Happening near campus today</h2>
           <Link href="/feed" className="text-sm underline underline-offset-4">
             View full feed →
@@ -145,6 +153,7 @@ export default async function HomePage() {
                     {r.kind === "free_food" ? "FREE" : r.kind === "nearby_eats" ? "Nearby" : `$${r.estimatedSavings.toFixed(2)} off`}
                   </Badge>
                 </div>
+                {r.isSample && <p className="text-xs text-amber-700">Sample listing</p>}
                 {r.subtitle && <p className="text-muted-foreground text-sm">{r.subtitle}</p>}
                 <p className="text-muted-foreground mt-1 text-xs">
                   {r.distanceMinutes != null ? `${r.distanceMinutes} min away` : "distance unknown"}

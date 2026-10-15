@@ -1,6 +1,7 @@
 import Link from "next/link"
 import { Nav } from "@/components/nav"
 import { SavedList } from "@/components/saved-list"
+import { GuestSavedList } from "@/components/guest-saved-list"
 import { isSupabaseConfigured } from "@/lib/supabase/client"
 import { createClient } from "@/lib/supabase/server"
 import { loadSavedItems } from "@/lib/saved-items"
@@ -21,18 +22,21 @@ export default async function SavedPage() {
   if (!isSupabaseConfigured()) {
     return (
       <Shell>
-        <p className="text-muted-foreground text-sm">
-          Saving isn&apos;t configured on this deployment (no Supabase project connected) — see
-          apps/web/.env.example.
-        </p>
+        <GuestSavedList />
       </Shell>
     )
   }
 
-  const supabase = await createClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
+  const account = await (async () => {
+    const client = await createClient()
+    const { data: { user }, error } = await client.auth.getUser()
+    if (error) throw error
+    return { client, user }
+  })().catch(() => null)
+  if (!account) {
+    return <Shell><p role="status" className="text-muted-foreground text-sm">Couldn&apos;t check your account. Account saves are unavailable; refresh to retry.</p><GuestSavedList /></Shell>
+  }
+  const { client: supabase, user } = account
 
   if (!user) {
     return (
@@ -41,17 +45,18 @@ export default async function SavedPage() {
           <Link href="/login" className="underline underline-offset-4">
             Sign in
           </Link>{" "}
-          to save free food events and nearby eats from the{" "}
+          to sync saves across devices. Browse the{" "}
           <Link href="/feed" className="underline underline-offset-4">
             feed
           </Link>
           .
         </p>
+        <GuestSavedList />
       </Shell>
     )
   }
 
-  const items = await loadSavedItems(supabase, user.id)
+  const items = await loadSavedItems(supabase, user.id).catch(() => null)
 
   return (
     <Shell>
@@ -62,7 +67,9 @@ export default async function SavedPage() {
         </Link>
         .
       </p>
-      <SavedList userId={user.id} initialItems={items} />
+      {items ? <SavedList userId={user.id} initialItems={items} /> : <p role="status" className="text-muted-foreground text-sm">Couldn&apos;t load your account saves. Refresh to try again.</p>}
+      <h2 className="text-lg font-semibold">Browser-only saves</h2>
+      <GuestSavedList />
     </Shell>
   )
 }

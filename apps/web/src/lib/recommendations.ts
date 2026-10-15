@@ -1,10 +1,11 @@
-import { unstable_cache } from "next/cache"
-import { scoreOpportunity } from "@yums/shared"
+import { cacheLiveSource } from "./source-cache"
+import { scoreOpportunity, DEFAULT_WEIGHTS } from "@yums/shared"
 import type { Recommendation } from "@yums/shared"
 import { berkeleyLiveSource, callinkSource, ingestSource, type ExtractedFoodEvent } from "@yums/event-ingestion"
 import { fetchNearbyPlaces } from "./nearby-places"
-import { haversineMinutes } from "./geo"
-import { freeFoodEvents as fallbackFreeFoodEvents } from "./mock-data"
+import { haversineMinutes, validCoordinates } from "./geo"
+import { demoFoodEvents } from "./mock-data"
+import { eventEnd, isInCampusWeek } from "./event-time"
 import { fetchBusyIntervals, scheduleScoreFromBusyIntervals, type BusyInterval } from "./google-calendar"
 
 const PLACEHOLDER_SCHEDULE_SCORE = 0.7 // used until a calendar is connected (see RecommendationsParams.calendarAccessToken)
@@ -15,26 +16,14 @@ const CAMPUS_CENTER = { lat: 37.8719, lng: -122.2585 }
 // context and the Overpass nearby-places query.
 const BBOX: [number, number, number, number] = [37.83, -122.3, 37.9, -122.22]
 
-// /dashboard, /feed, and /api/recommendations all read searchParams and/or
-// cookies() (calendar personalization), which are Request-time APIs — once
-// a render touches one, Next.js stops honoring per-fetch cache: 'force-cache'
-// for that render entirely (verified empirically: identical fetches went
-// from ~65ms cached to 2-6s live the moment any Request-time API was read
-// in the same request). unstable_cache is Next's documented escape hatch
-// for exactly this — it persists a function's result across requests
-// independent of whether the calling route is dynamically rendered. These
-// three live sources don't depend on the request at all (same data for
-// every visitor), so this is a correct, not just fast, use of it.
-const getCachedBerkeleyEvents = unstable_cache(() => ingestSource(berkeleyLiveSource), ["berkeley-live-events"], {
-  revalidate: 120,
-})
-const getCachedCallinkEvents = unstable_cache(() => ingestSource(callinkSource), ["callink-events"], {
-  revalidate: 120,
-})
-const getCachedNearbyPlaces = unstable_cache(
+// Shared public sources have bounded cache windows. Each new window needs
+// a successful network response; a failed refresh cannot retain old results
+// indefinitely. Account preferences and Calendar tokens are never cached here.
+const getCachedBerkeleyEvents = cacheLiveSource(() => ingestSource(berkeleyLiveSource), "berkeley-live-events", 120)
+const getCachedCallinkEvents = cacheLiveSource(() => ingestSource(callinkSource), "callink-events", 120)
+const getCachedNearbyPlaces = cacheLiveSource(
   () => fetchNearbyPlaces(BBOX, ["cafe", "restaurant", "fast_food"]),
-  ["nearby-places", BBOX.join(",")],
-  { revalidate: 600 },
+  `nearby-places:${BBOX.join(",")}`, 600,
 )
 
 function proximityScore(minutesAway: number, maxTravelMinutes: number): number {
@@ -49,27 +38,29 @@ interface NormalizedFoodEvent {
   latitude?: number
   longitude?: number
   startTime: string
+  endTime?: string
   sourceUrl: string
   confidenceScore: number
   food?: string
 }
 
-function normalizeLiveEvent(e: ExtractedFoodEvent, i: number): NormalizedFoodEvent {
+function normalizeLiveEvent(e: ExtractedFoodEvent): NormalizedFoodEvent {
   return {
-    id: `live-${i}-${e.sourceUrl}`,
+    id: `live-${e.sourceUrl}-${Date.parse(e.startTime)}`,
     title: e.title,
     organization: e.organization,
     locationName: e.locationName,
     latitude: e.latitude,
     longitude: e.longitude,
     startTime: e.startTime,
+    endTime: e.endTime,
     sourceUrl: e.sourceUrl,
     confidenceScore: e.confidenceScore,
     food: e.food,
   }
 }
 
-function normalizeFallbackEvent(e: (typeof fallbackFreeFoodEvents)[number]): NormalizedFoodEvent {
+function normalizeFallbackEvent(e: ReturnType<typeof demoFoodEvents>[number]): NormalizedFoodEvent {
   return {
     id: e.id,
     title: e.title,
@@ -78,6 +69,7 @@ function normalizeFallbackEvent(e: (typeof fallbackFreeFoodEvents)[number]): Nor
     latitude: e.location.latitude,
     longitude: e.location.longitude,
     startTime: e.startTime,
+    endTime: e.endTime,
     sourceUrl: e.sourceUrl,
     confidenceScore: e.confidenceScore,
     food: e.food,
@@ -86,6 +78,7 @@ function normalizeFallbackEvent(e: (typeof fallbackFreeFoodEvents)[number]): Nor
 
 export interface RecommendationParams {
   maxTravelMinutes: number
+  optimizeFor?: "cheapest" | "fast"
   // Real Google Calendar access token (see /login's "Connect Google
   // Calendar" and apps/web/src/lib/google-calendar.ts). Absent for most
   // callers — scheduleScore then stays the documented flat placeholder.
@@ -93,9 +86,9 @@ export interface RecommendationParams {
 }
 
 export interface RecommendationsMeta {
-  freeFood: { source: "live" | "mock-fallback"; error?: string }
-  callink: { source: "live" | "unavailable"; error?: string }
-  nearbyEats: { source: "live" | "unavailable"; error?: string }
+  freeFood: { source: "live" | "unavailable" | "demo"; error?: string }
+  callink: { source: "live" | "unavailable" | "demo"; error?: string }
+  nearbyEats: { source: "live" | "unavailable" | "demo"; error?: string }
   schedule: { source: "live" | "placeholder" | "unavailable"; error?: string }
 }
 
@@ -106,6 +99,8 @@ export interface RecommendationsResult {
 
 export async function buildRecommendations(params: RecommendationParams): Promise<RecommendationsResult> {
   const { maxTravelMinutes, calendarAccessToken } = params
+  const weights = params.optimizeFor === "fast" ? { ...DEFAULT_WEIGHTS, savingsWeight: 0.1, proximityWeight: 0.5 } : DEFAULT_WEIGHTS
+  const demo = process.env.YUMS_DEMO_MODE === "true"
   const recs: Recommendation[] = []
   const meta: RecommendationsMeta = {
     freeFood: { source: "live" },
@@ -121,9 +116,12 @@ export async function buildRecommendations(params: RecommendationParams): Promis
   const now = new Date()
   const weekAhead = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000)
   const [foodResult, callinkResult, placesResult, calendarResult] = await Promise.allSettled([
-    getCachedBerkeleyEvents(),
-    getCachedCallinkEvents(),
-    getCachedNearbyPlaces(),
+    demo ? Promise.resolve([]) : getCachedBerkeleyEvents(),
+    demo ? Promise.resolve([]) : getCachedCallinkEvents(),
+    demo ? Promise.resolve([
+      { id: "sample-cafe", name: "Sample campus cafe", latitude: 37.8705, longitude: -122.259, address: "Sample listing · no verified prices" },
+      { id: "sample-restaurant", name: "Sample nearby restaurant", latitude: 37.869, longitude: -122.26, address: "Sample listing · no verified prices" },
+    ]) : getCachedNearbyPlaces(),
     calendarAccessToken
       ? fetchBusyIntervals(calendarAccessToken, now, weekAhead)
       : Promise.resolve<BusyInterval[]>([]),
@@ -139,16 +137,14 @@ export async function buildRecommendations(params: RecommendationParams): Promis
     }
   }
 
-  // Free food: live UC Berkeley events calendar, falling back to the
-  // hand-written mock only if the live fetch itself fails (network error,
-  // upstream down) — not as a default. See docs/data-sources.md.
+  // Source failures are disclosed and never replaced by synthetic offers.
   let foodEvents: NormalizedFoodEvent[]
   if (foodResult.status === "fulfilled") {
     foodEvents = foodResult.value.map(normalizeLiveEvent)
   } else {
     const err = foodResult.reason
-    meta.freeFood = { source: "mock-fallback", error: err instanceof Error ? err.message : "fetch failed" }
-    foodEvents = fallbackFreeFoodEvents.map(normalizeFallbackEvent)
+    meta.freeFood = { source: "unavailable", error: err instanceof Error ? err.message : "fetch failed" }
+    foodEvents = []
   }
 
   // Cal Link: real club/org events from callink.berkeley.edu, with real
@@ -163,21 +159,38 @@ export async function buildRecommendations(params: RecommendationParams): Promis
     meta.callink = { source: "unavailable", error: err instanceof Error ? err.message : "fetch failed" }
   }
 
+  if (demo) {
+    foodEvents = demoFoodEvents(now).map(normalizeFallbackEvent)
+    meta.freeFood = { source: "demo" }
+    meta.callink = { source: "demo" }
+    meta.nearbyEats = { source: "demo" }
+  }
+
+  // Source order can change between refreshes. Identity is the source URL
+  // plus occurrence time, so repeated pages collapse but recurring dates stay.
+  const uniqueFood = new Map<string, NormalizedFoodEvent>()
+  const quality = (event: NormalizedFoodEvent) => Number(!eventEnd(event.startTime, event.endTime).estimated)
+    + Number(validCoordinates(event.latitude, event.longitude)) + Number(Boolean(event.locationName))
   for (const event of foodEvents) {
-    const hasCoords = event.latitude != null && event.longitude != null
+    const previous = uniqueFood.get(event.id)
+    if (!previous || quality(event) > quality(previous)) uniqueFood.set(event.id, event)
+  }
+  for (const event of uniqueFood.values()) {
+    if (!isInCampusWeek(event.startTime, event.endTime, now)) continue
+    const hasCoords = validCoordinates(event.latitude, event.longitude)
     const minutesAway = hasCoords
       ? haversineMinutes(CAMPUS_CENTER.lat, CAMPUS_CENTER.lng, event.latitude!, event.longitude!)
       : undefined
-    const estimatedSavings = 8 // typical meal value; no live per-event price source exists
+    const estimatedSavings = 0 // No verified meal replacement value or actual spending data.
 
     // Real overlap check against the connected calendar's busy blocks when
     // available; otherwise the documented flat placeholder (see
     // RecommendationParams.calendarAccessToken and lib/google-calendar.ts).
     const eventStart = new Date(event.startTime)
-    const eventEnd = new Date(eventStart.getTime() + 60 * 60 * 1000) // events here have no endTime field; assume 1hr
+    const end = eventEnd(event.startTime, event.endTime)
     const scheduleScore =
       calendarAccessToken && meta.schedule.source === "live"
-        ? scheduleScoreFromBusyIntervals(busyIntervals, eventStart, eventEnd)
+        ? scheduleScoreFromBusyIntervals(busyIntervals, eventStart, end.date)
         : PLACEHOLDER_SCHEDULE_SCORE
 
     const score = scoreOpportunity({
@@ -186,19 +199,22 @@ export async function buildRecommendations(params: RecommendationParams): Promis
       scheduleScore,
       preferenceScore: 0.6,
       confidenceScore: event.confidenceScore,
-    })
+    }, weights)
 
     recs.push({
       id: event.id,
       kind: "free_food",
-      title: event.food ? `Free ${event.food}` : event.title,
+      isSample: demo,
+      title: event.title,
       subtitle: event.locationName ? `${event.organization} · ${event.locationName}` : event.organization,
       estimatedSavings,
       distanceMinutes: minutesAway,
       distanceEstimated: hasCoords ? true : undefined,
-      latitude: event.latitude,
-      longitude: event.longitude,
+      latitude: hasCoords ? event.latitude : undefined,
+      longitude: hasCoords ? event.longitude : undefined,
       startTime: event.startTime,
+      endTime: end.date.toISOString(),
+      durationEstimated: end.estimated,
       sourceUrl: event.sourceUrl,
       // event.title here is the original (pre-"Free {food}"-transform)
       // title — see the Recommendation.seriesKey comment in
@@ -212,7 +228,10 @@ export async function buildRecommendations(params: RecommendationParams): Promis
   // for student-discount data, so this never claims a savings figure —
   // see the RecommendationKind comment in packages/shared/types.ts.
   if (placesResult.status === "fulfilled") {
+    const seenPlaces = new Set<string>()
     for (const place of placesResult.value) {
+      if (!validCoordinates(place.latitude, place.longitude) || seenPlaces.has(place.id)) continue
+      seenPlaces.add(place.id)
       const minutesAway = haversineMinutes(CAMPUS_CENTER.lat, CAMPUS_CENTER.lng, place.latitude, place.longitude)
       const score = scoreOpportunity({
         savingsScore: 0,
@@ -220,11 +239,12 @@ export async function buildRecommendations(params: RecommendationParams): Promis
         scheduleScore: 0.5,
         preferenceScore: 0.5,
         confidenceScore: 0.9, // OSM listing exists; not evidence of a current deal
-      })
+      }, weights)
 
       recs.push({
         id: `place-${place.id}`,
         kind: "nearby_eats",
+        isSample: demo,
         title: place.name,
         subtitle: place.address,
         estimatedSavings: 0,
@@ -232,6 +252,7 @@ export async function buildRecommendations(params: RecommendationParams): Promis
         distanceEstimated: true,
         latitude: place.latitude,
         longitude: place.longitude,
+        sourceUrl: demo ? undefined : `https://www.openstreetmap.org/node/${place.id}`,
         score,
       })
     }

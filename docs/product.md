@@ -1,94 +1,25 @@
-# Product
+# Product scope
 
-AI savings agent for college students — answers "what's the cheapest and
-easiest way for me to find free food and eat cheap around campus this
-week?" Scope is deliberately narrow: free food events and real nearby
-eateries/restaurants. No grocery shopping, no meal-plan/dining-dollars
-tracking — cut from V1 to keep the app focused on eateries and
-restaurants specifically.
+Yums is preparing for a small invited UC Berkeley pilot: discover explicit
+free-food offers and nearby restaurants, save listings across devices, and
+submit community tips for review. The local portfolio demo is complete; the
+pilot still requires remote account/security checks and authorized hosting.
+See [roadmap](roadmap.md) and [release evidence](pilot-release.md).
 
-Full spec lives in the original handoff doc; this file tracks what's
-actually built vs. planned. See `docs/architecture.md` for how it's built
-and `docs/data-sources.md` for exactly what's live vs. reference-only, and
-why for each.
+Built:
+- Budget target, preferred walking time, and free-food/shorter-walks ranking.
+- Guest settings persist via localStorage plus a validated preference cookie;
+  signed-in settings can synchronize through Supabase.
+- Today and seven-day feeds use Berkeley's timezone and source event durations.
+- Search, type filters, optional map, exact-title recurring-event grouping.
+- Browser-local saved snapshots and optional per-account cloud saves.
+- Optional Calendar conflict ranking and grounded chat. Community reports
+  require operator approval before shared display; remote setup is pending.
+- Open-tab browser reminders for real events; no sample-event reminders.
+- Explicit sample mode for reproducible demos; no mock offers during outages.
 
-## MVP scope (V1, UC Berkeley only)
-
-- [x] Campus/budget/preferences onboarding form (`/start`), persisted to
-      `localStorage` for anyone signed out, or to Supabase
-      (`savePreferencesToSupabase`) for anyone signed in — see
-      `docs/architecture.md`
-- [x] Free food event discovery — **live**, from events.berkeley.edu's
-      public calendar feed, with a documented mock fallback if that fetch
-      fails. Powers `/`, `/dashboard`, `/feed`, and the chatbot.
-- [x] Nearby eats — **live**, real cafes/restaurants near campus from
-      OpenStreetMap. No live source exists anywhere for student-discount
-      data, so this intentionally shows real places with no fabricated
-      savings claim, replacing what used to be fake "student deals."
-- [x] Weekly recommendations feed (`/feed`), ranked by the scoring formula
-- [x] Dashboard with today's free food + weekly budget projection (`/dashboard`)
-- [x] Floating chatbot assistant. Real LLM path (OpenAI, grounded in the
-      same live `buildRecommendations()` data, instructed never to
-      invent facts) once `OPENAI_API_KEY` is set; deterministic
-      keyword-matched answers otherwise or on any LLM failure — see
-      `docs/architecture.md`'s "AI responsibilities" section.
-- [x] Real distance/walking-time math from actual coordinates (haversine
-      geometry + optional OSRM routing), replacing an earlier placeholder
-      formula
-- [x] Map view — List/Map toggle on `/feed` (`components/recommendations-view.tsx`,
-      `components/feed-map.tsx`) plotting real coordinates already computed
-      for free food and nearby eats. No fabricated locations — items
-      without real coordinates are simply omitted from the map, disclosed
-      via a count of how many. Requires `NEXT_PUBLIC_MAPBOX_TOKEN`; shows
-      an honest "not configured" message in the Map tab without it, same
-      as every other optional integration in this app.
-- [x] Schedule awareness — real Google Calendar FreeBusy check once a user
-      connects via `/login`; flat placeholder otherwise (see
-      `docs/architecture.md`'s "Schedule awareness" section). Verified
-      end-to-end this session: `calendar_connections` holds a real
-      access/refresh token pair and `/feed` correctly shows the "live"
-      ranking notice.
-- [x] Auth — magic-link sign-in (`/login`, `/auth/callback`); `/start`
-      switches to real Supabase-backed preference persistence for anyone
-      signed in, `localStorage` otherwise. Verified end-to-end against the
-      live Supabase project: a confirmed `auth.users` row exists with the
-      `handle_new_auth_user` trigger correctly mirroring it into
-      `public.users` and `public.user_preferences`.
-- [x] Filter/search on `/feed` — free-food-only / nearby-eats-only
-      toggle plus keyword search over title/subtitle, client-side over
-      the already-fetched recommendations.
-- [x] Save/favorite items — ☆/★ toggle on every `/feed` card for a
-      signed-in user, a `/saved` page to view and remove them. See
-      `docs/roadmap.md` item 11 for the persistence design.
-- [x] Recurring-event grouping — exact-match-only (never fuzzy/guessed)
-      grouping of a club's repeated weekly meeting into one card
-      instead of N separate ones. See `docs/roadmap.md` item 9.
-- [x] Client-side free-food reminders — a real browser notification
-      ~20 min before an event's start, while `/feed` stays open. Not
-      push notifications (no background delivery) — see
-      `docs/roadmap.md` item 10 for why that's an honest, not a missing,
-      scope limit.
-- [x] Crowdsourced event reporting (`/report`) — a signed-in student can
-      submit free food that isn't on either live feed; shown on `/feed`
-      as an explicitly "Unverified — user-submitted" section, never
-      blended into the scored/ranked recommendations. See
-      `docs/roadmap.md` item 12.
-- [ ] Agentic checkout (out of MVP scope per the original spec)
-- [ ] Real student-discount data for nearby businesses — confirmed no live
-      source exists (ASUC's site has no discount-card page at any URL
-      checked, including its full page listing and REST search); still
-      shown honestly as "nearby eats" with no savings claim, per
-      `docs/data-sources.md`.
-
-## What "live" means here
-
-Every "live" item above hits a real, public, keyless API at request time —
-verified working via `curl` in this session, not just assumed. One thing
-worth knowing:
-
-**OpenStreetMap/Overpass reachability was flaky from the dev machine
-this was built on** — Node's `fetch` intermittently couldn't reach it
-while `curl` on the same machine could, every time. Confirmed not a
-code bug (see `docs/data-sources.md`). The app degrades honestly when
-this happens (shows the real error, never fabricates a "deal") rather
-than hiding it.
+Not built: menu-price comparisons, actual spending/savings tracking, nutrition
+matching, travel modes beyond walking, background push, multi-campus support,
+merchant deals, checkout, and model-based event extraction. Do not advertise
+those as functioning features. Optional account features require configuration
+and the database schema/migration in the README.

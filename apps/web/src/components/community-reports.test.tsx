@@ -22,6 +22,7 @@ const REPORT: ReportedEvent = {
   locationName: "Sproul Plaza",
   startTime: "2026-08-29T18:00:00Z",
   createdAt: "2026-08-29T10:00:00Z",
+  moderationStatus: "approved",
 }
 
 beforeEach(() => {
@@ -29,6 +30,10 @@ beforeEach(() => {
 })
 
 describe("CommunityReports", () => {
+  it("explains that pending submissions are private until reviewed", () => {
+    render(<CommunityReports userId="author-1" reports={[{ ...REPORT, moderationStatus: "pending" }]} />)
+    expect(screen.getByText("Awaiting review · visible only to you")).toBeInTheDocument()
+  })
   it("labels the section as unverified/user-submitted", () => {
     render(<CommunityReports userId={null} reports={[REPORT]} />)
     expect(screen.getByText(/unverified/i)).toBeInTheDocument()
@@ -64,5 +69,6 @@ describe("CommunityReports", () => {
     await user.click(screen.getByRole("button", { name: "Remove" }))
 
     await waitFor(() => expect(screen.getByText("Free samosas outside Sproul")).toBeInTheDocument())
+    expect(screen.getByRole("alert")).toHaveTextContent("Couldn't remove this report")
   })
 })

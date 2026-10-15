@@ -83,11 +83,11 @@ export type RecommendationKind = "free_food" | "nearby_eats" | "grocery" | "dini
 export interface Recommendation {
   id: string
   kind: RecommendationKind
+  isSample?: boolean
   title: string
   subtitle?: string
-  /** Only meaningful for kinds with a real savings figure (free_food). No
-   * live source exists for restaurant discount data, so nearby_eats never
-   * carries a fabricated number here — see docs/data-sources.md. */
+  /** Reserved for verified savings values; current discovery sources have
+   * no meal replacement or spending data, so recommendations use zero. */
   estimatedSavings: number
   distanceMinutes?: number
   /** true when distanceMinutes is a haversine estimate rather than a
@@ -101,6 +101,8 @@ export interface Recommendation {
   longitude?: number
   startTime?: string
   sourceUrl?: string
+  endTime?: string
+  durationEstimated?: boolean
   /** free_food only: `${organization}::${original event title}` — the
    * *original* title from the source, before any "Free {food}" display
    * transformation, since that transformed title isn't a safe grouping

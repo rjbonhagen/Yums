@@ -12,16 +12,26 @@ import { createClient, isSupabaseConfigured } from "@/lib/supabase/client"
 export function AuthStatus() {
   const router = useRouter()
   const [email, setEmail] = useState<string | null | undefined>(undefined)
+  const [signingOut, setSigningOut] = useState(false)
+  const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
     if (!isSupabaseConfigured()) return
     const supabase = createClient()
-    supabase.auth.getUser().then(({ data: { user } }) => setEmail(user?.email ?? null))
+    let active = true
+    let sessionChanged = false
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      if (active && !sessionChanged) setEmail(user?.email ?? null)
+    }).catch(() => { if (active && !sessionChanged) setEmail(null) })
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => setEmail(session?.user.email ?? null))
-    return () => subscription.unsubscribe()
-  }, [])
+    } = supabase.auth.onAuthStateChange((event, session) => {
+      sessionChanged = true
+      setEmail(session?.user.email ?? null)
+      if (event === "SIGNED_IN" || event === "SIGNED_OUT") router.refresh()
+    })
+    return () => { active = false; subscription.unsubscribe() }
+  }, [router])
 
   if (!isSupabaseConfigured()) {
     return (
@@ -49,15 +59,24 @@ export function AuthStatus() {
       <button
         type="button"
         className="text-muted-foreground hover:text-foreground"
+        disabled={signingOut}
         onClick={async () => {
-          const supabase = createClient()
-          await supabase.auth.signOut()
-          router.push("/")
-          router.refresh()
+          setSigningOut(true)
+          setError(null)
+          try {
+            const { error: authError } = await createClient().auth.signOut()
+            if (authError) throw authError
+            setEmail(null)
+            router.push("/")
+            router.refresh()
+          } catch {
+            setError("Couldn't sign out. Try again.")
+          } finally { setSigningOut(false) }
         }}
       >
-        Sign out
+        {signingOut ? "Signing out…" : "Sign out"}
       </button>
+      {error && <span role="alert" className="text-destructive text-xs">{error}</span>}
     </div>
   )
 }

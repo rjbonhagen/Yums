@@ -7,6 +7,8 @@ const { answerDeterministically, answerWithLLM, isOpenAIConfigured } = vi.hoiste
 }))
 
 vi.mock("@/lib/chatbot", () => ({ answerDeterministically, answerWithLLM, isOpenAIConfigured }))
+const { reserveProviderReply } = vi.hoisted(() => ({ reserveProviderReply: vi.fn() }))
+vi.mock("@/lib/chat-allowance", () => ({ reserveProviderReply }))
 
 const { POST } = await import("./route")
 
@@ -16,9 +18,34 @@ function req(body: unknown) {
 
 beforeEach(() => {
   vi.clearAllMocks()
+  reserveProviderReply.mockResolvedValue(true)
 })
 
 describe("POST /api/chat", () => {
+  it("does not spend provider credits without an authenticated database allowance", async () => {
+    isOpenAIConfigured.mockReturnValue(true)
+    reserveProviderReply.mockResolvedValue(false)
+    answerDeterministically.mockResolvedValue("free reply")
+    const result = await POST(req({ message: "What's free?" }))
+    expect(await result.json()).toEqual({ reply: "free reply", source: "deterministic" })
+    expect(answerWithLLM).not.toHaveBeenCalled()
+  })
+  it("rejects oversized bodies before invoking either reply path", async () => {
+    const response = await POST(req({ message: "x".repeat(40000) }))
+    expect(response.status).toBe(413)
+    expect(answerWithLLM).not.toHaveBeenCalled()
+    expect(answerDeterministically).not.toHaveBeenCalled()
+  })
+  it("rejects overlong messages and malformed JSON", async () => {
+    expect((await POST(req({ message: "x".repeat(2001) }))).status).toBe(400)
+    expect((await POST(new Request("http://localhost/api/chat", { method: "POST", body: "invalid" }))).status).toBe(400)
+  })
+  it("bounds conversation history passed to the configured provider", async () => {
+    isOpenAIConfigured.mockReturnValue(true)
+    answerWithLLM.mockResolvedValue("ok")
+    await POST(req({ message: "hi", history: Array.from({ length: 15 }, () => ({ role: "user", content: "prior" })) }))
+    expect(answerWithLLM.mock.calls[0][1]).toHaveLength(10)
+  })
   it("400s on an empty message", async () => {
     isOpenAIConfigured.mockReturnValue(false)
     const res = await POST(req({ message: "  " }))

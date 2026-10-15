@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useMemo, useState } from "react"
+import { useEffect, useMemo, useRef, useState } from "react"
 import type { Recommendation } from "@yums/shared"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -11,6 +11,9 @@ import { FeedMap } from "@/components/feed-map"
 import { formatEventDateTime } from "@/lib/format"
 import { createClient, isSupabaseConfigured } from "@/lib/supabase/client"
 import { loadSavedItems, saveRecommendation, unsaveItem } from "@/lib/saved-items"
+import { savedKey } from "@/lib/save-identity"
+import { collapseDuplicateListings } from "@/lib/event-listings"
+import { saveGuestItem, removeGuestItem, useGuestSavedItems } from "@/lib/guest-saved-items"
 
 function kindLabel(kind: string, estimatedSavings: number): string {
   if (kind === "free_food") return "FREE"
@@ -22,10 +25,6 @@ function kindLabel(kind: string, estimatedSavings: number): string {
 // live source, which can return different results next time) — this key
 // is what actually identifies "the same place/event" for save/unsave
 // matching, both here and in lib/saved-items.ts's SavedItem shape.
-function savedKey(r: { kind: string; title: string; sourceUrl?: string }): string {
-  return `${r.kind}::${r.title}::${r.sourceUrl ?? ""}`
-}
-
 function RecommendationCard({
   r,
   signedIn,
@@ -42,9 +41,11 @@ function RecommendationCard({
       <CardContent className="flex items-start justify-between gap-4 py-4">
         <div>
           <p className="font-medium">{r.title}</p>
+          {r.isSample && <p className="text-xs text-amber-700">Sample listing · not a real offer</p>}
           {r.subtitle && <p className="text-muted-foreground text-sm">{r.subtitle}</p>}
           <p className="text-muted-foreground text-xs">
             {formatEventDateTime(r.startTime)}
+            {r.durationEstimated ? " · duration estimated at 1 hour" : ""}
             {r.startTime && r.distanceMinutes != null ? " · " : ""}
             {r.distanceMinutes != null
               ? `${r.distanceEstimated ? "~" : ""}${r.distanceMinutes} min away`
@@ -69,7 +70,7 @@ function RecommendationCard({
               onClick={() => onToggleSave(r)}
               aria-pressed={saved}
             >
-              {saved ? "★ Saved" : "☆ Save"}
+              {saved ? "Saved" : "Save"}
             </Button>
           )}
         </div>
@@ -105,7 +106,7 @@ function RecurringGroupCard({
           <div>
             <p className="font-medium">{first.title}</p>
             {first.subtitle && <p className="text-muted-foreground text-sm">{first.subtitle}</p>}
-            <p className="text-muted-foreground text-xs">Recurring · {items.length} upcoming</p>
+            <p className="text-muted-foreground text-xs">Matching event titles · {items.length} upcoming</p>
           </div>
           <Badge variant={first.kind === "free_food" ? "default" : "secondary"}>
             {kindLabel(first.kind, first.estimatedSavings)}
@@ -116,6 +117,7 @@ function RecurringGroupCard({
             <li key={r.id} className="flex items-center justify-between gap-3">
               <span className="text-muted-foreground text-xs">
                 {formatEventDateTime(r.startTime)}
+                {r.durationEstimated ? " · duration estimated at 1 hour" : ""}
                 {r.distanceMinutes != null ? ` · ${r.distanceEstimated ? "~" : ""}${r.distanceMinutes} min away` : ""}
               </span>
               <div className="flex items-center gap-2">
@@ -134,7 +136,7 @@ function RecurringGroupCard({
                     aria-pressed={savedByKey.has(savedKey(r))}
                     aria-label={savedByKey.has(savedKey(r)) ? "Unsave" : "Save"}
                   >
-                    {savedByKey.has(savedKey(r)) ? "★" : "☆"}
+                    {savedByKey.has(savedKey(r)) ? "Saved" : "Save"}
                   </Button>
                 )}
               </div>
@@ -187,28 +189,106 @@ export function RecommendationsView({ recommendations }: { recommendations: Reco
   const [kindFilter, setKindFilter] = useState<KindFilter>("all")
   const [search, setSearch] = useState("")
   const [userId, setUserId] = useState<string | null>(null)
-  const [savedByKey, setSavedByKey] = useState<Map<string, string>>(new Map())
+  const [cloudSavedByKey, setSavedByKey] = useState<Map<string, string>>(new Map())
+  const guestItems = useGuestSavedItems()
+  const savedByKey = useMemo(() => new Map([...guestItems.filter((item) => !userId || item.isSample).map((item) => [savedKey(item), item.id] as const), ...cloudSavedByKey]), [guestItems, userId, cloudSavedByKey])
+  const [saveError, setSaveError] = useState<string | null>(null)
+  const savingKeys = useRef(new Set<string>())
+  const account = useRef<{ id: string | null | undefined; revision: number; active: boolean; loading: boolean }>({ id: undefined, revision: 0, active: true, loading: true })
 
   useEffect(() => {
-    if (!isSupabaseConfigured()) return
+    const trackedAccount = account.current
+    account.current.active = true
+    const initialRevision = account.current.revision
+    if (!isSupabaseConfigured()) {
+      account.current.id = null
+      account.current.loading = false
+      return () => { trackedAccount.active = false; trackedAccount.revision++ }
+    }
     const supabase = createClient()
-    supabase.auth.getUser().then(({ data: { user } }) => {
-      setUserId(user?.id ?? null)
+    function restore(user: { id: string } | null) {
+      account.current.id = user?.id ?? null
+      account.current.loading = Boolean(user)
+      const revision = ++account.current.revision
+      setUserId(account.current.id)
+      setSavedByKey(new Map())
+      setSaveError(null)
       if (!user) return
       loadSavedItems(supabase, user.id)
-        .then((items) => setSavedByKey(new Map(items.map((it) => [savedKey(it), it.id]))))
-        .catch(() => {
-          // Saved state just stays empty — save/unsave still works for new
-          // items, it just can't show which of *these* were already saved.
+        .then((items) => {
+          if (account.current.active && revision === account.current.revision) {
+            setSavedByKey(new Map(items.map((it) => [savedKey(it), it.id])))
+          }
         })
+        .catch(() => {
+          if (account.current.active && revision === account.current.revision) {
+            setSaveError("Couldn't load account saves. You can still save new items.")
+          }
+        })
+        .finally(() => {
+          if (account.current.active && revision === account.current.revision) account.current.loading = false
+        })
+    }
+    supabase.auth.getUser().then(({ data: { user }, error }) => {
+      if (!account.current.active || account.current.revision !== initialRevision) return
+      if (error) throw error
+      restore(user)
+    }).catch(() => {
+      if (account.current.active && account.current.revision === initialRevision) {
+        setSaveError("Couldn't check your account. Refresh before saving.")
+      }
     })
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      if (!account.current.active || (event !== "SIGNED_IN" && event !== "SIGNED_OUT")) return
+      if ((session?.user.id ?? null) === account.current.id) return
+      restore(session?.user ?? null)
+    })
+    return () => { trackedAccount.active = false; trackedAccount.revision++; subscription.unsubscribe() }
   }, [])
 
   async function handleToggleSave(r: Recommendation) {
-    if (!userId) return
+    const key = `${account.current.revision}:${savedKey(r)}`
+    if (savingKeys.current.has(key)) return
+    savingKeys.current.add(key)
+    try { await toggleSave(r) } finally { savingKeys.current.delete(key) }
+  }
+
+  async function toggleSave(r: Recommendation) {
+    setSaveError(null)
+    if (account.current.id === undefined && !r.isSample) {
+      setSaveError("Your account isn't ready. Refresh before saving.")
+      return
+    }
+    if (account.current.loading && !r.isSample) {
+      setSaveError("Account saves are loading. Try again in a moment.")
+      return
+    }
+    if (!userId || r.isSample) {
+      try {
+        const existing = savedByKey.get(savedKey(r))
+        if (existing) removeGuestItem(existing)
+        else saveGuestItem(r)
+      } catch { setSaveError("Couldn't save in this browser. Check that site storage is allowed.") }
+      return
+    }
     const supabase = createClient()
+    const revision = account.current.revision
+    const current = () => account.current.active && revision === account.current.revision
+    try {
+      const { data: { user }, error } = await supabase.auth.getUser()
+      if (!current()) return
+      if (error) throw error
+      if (user?.id !== userId) {
+        setSaveError("Your account changed. Refresh before saving.")
+        return
+      }
+    } catch {
+      if (current()) setSaveError("Couldn't check your account. Try again.")
+      return
+    }
     const key = savedKey(r)
     const existingId = savedByKey.get(key)
+    if (existingId?.startsWith("pending:")) return
 
     if (existingId) {
       setSavedByKey((prev) => {
@@ -219,6 +299,8 @@ export function RecommendationsView({ recommendations }: { recommendations: Reco
       try {
         await unsaveItem(supabase, userId, existingId)
       } catch {
+        if (!current()) return
+        setSaveError("Couldn't remove the saved item. Try again.")
         setSavedByKey((prev) => new Map(prev).set(key, existingId)) // revert — don't lie about saved state
       }
       return
@@ -228,8 +310,11 @@ export function RecommendationsView({ recommendations }: { recommendations: Reco
     setSavedByKey((prev) => new Map(prev).set(key, optimisticId))
     try {
       const saved = await saveRecommendation(supabase, userId, r)
+      if (!current()) return
       setSavedByKey((prev) => new Map(prev).set(key, saved.id))
     } catch {
+      if (!current()) return
+      setSaveError("Couldn't save this item. Try again.")
       setSavedByKey((prev) => {
         const next = new Map(prev)
         next.delete(key)
@@ -240,17 +325,19 @@ export function RecommendationsView({ recommendations }: { recommendations: Reco
 
   const filtered = useMemo(() => {
     const query = search.trim().toLowerCase()
-    return recommendations.filter((r) => {
+    return collapseDuplicateListings(recommendations, savedByKey).filter((r) => {
       if (kindFilter !== "all" && r.kind !== kindFilter) return false
       if (!query) return true
       return r.title.toLowerCase().includes(query) || (r.subtitle?.toLowerCase().includes(query) ?? false)
     })
-  }, [recommendations, kindFilter, search])
+  }, [recommendations, savedByKey, kindFilter, search])
 
-  const mappable = filtered.filter((r) => r.latitude != null && r.longitude != null)
+  const mappable = useMemo(() => filtered.filter((r) => r.latitude != null && r.longitude != null), [filtered])
 
   return (
     <div className="space-y-3">
+      {!userId && <p className="text-muted-foreground text-xs">Saves stay in this browser. Sign in to save across devices.</p>}
+      {saveError && <p role="alert" className="text-destructive text-sm">{saveError}</p>}
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex gap-1">
           {KIND_FILTERS.map((f) => (
@@ -260,12 +347,14 @@ export function RecommendationsView({ recommendations }: { recommendations: Reco
               size="sm"
               variant={kindFilter === f.value ? "default" : "outline"}
               onClick={() => setKindFilter(f.value)}
+              aria-pressed={kindFilter === f.value}
             >
               {f.label}
             </Button>
           ))}
         </div>
         <Input
+          aria-label="Search food events and places"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           placeholder="Search by name or location…"
@@ -291,7 +380,7 @@ export function RecommendationsView({ recommendations }: { recommendations: Reco
               <RecurringGroupCard
                 key={entry.seriesKey}
                 items={entry.items}
-                signedIn={userId != null}
+                signedIn={true}
                 savedByKey={savedByKey}
                 onToggleSave={handleToggleSave}
               />
@@ -299,7 +388,7 @@ export function RecommendationsView({ recommendations }: { recommendations: Reco
               <RecommendationCard
                 key={entry.item.id}
                 r={entry.item}
-                signedIn={userId != null}
+                signedIn={true}
                 saved={savedByKey.has(savedKey(entry.item))}
                 onToggleSave={handleToggleSave}
               />

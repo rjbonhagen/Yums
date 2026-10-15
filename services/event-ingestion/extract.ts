@@ -1,5 +1,4 @@
 import type { CampusEvent } from "./types"
-import { mentionsFood } from "./types"
 
 export interface ExtractedFoodEvent extends CampusEvent {
   food?: string
@@ -12,22 +11,29 @@ export interface ExtractedFoodEvent extends CampusEvent {
  * beat. Confidence is a heuristic, not a model output.
  */
 export function extractDeterministic(event: CampusEvent): ExtractedFoodEvent {
-  const hasFood = mentionsFood(event)
   const text = `${event.title} ${event.description ?? ""}`.toLowerCase()
-
-  let confidence = 0
-  if (hasFood) {
-    confidence = 0.5
-    if (text.includes("free food") || text.includes("free pizza")) confidence = 0.9
-    else if (["pizza", "boba", "catering", "snacks", "refreshments"].some((k) => text.includes(k)))
-      confidence = 0.75
-  }
+  const contradicted = /\b(?:no|not|without|never)\s+(?:(?:a|any|longer)\s+)?(?:free|complimentary)\b|\b(?:isn't|aren't|won't be)\s+free\b|\b(?:cancelled|canceled|sold out|no longer available)\b/.test(text)
+  const confirmed = !contradicted && (event.freeFoodConfirmed === true || hasExplicitFreeFoodOffer(text))
 
   return {
     ...event,
-    food: hasFood ? guessFoodPhrase(text) : undefined,
-    confidenceScore: confidence,
+    food: confirmed ? guessFoodPhrase(text) : undefined,
+    confidenceScore: confirmed ? 0.9 : 0,
   }
+}
+
+// Food mentions, free admission, and dietary phrases are not evidence of
+// a free meal. Prefer missing an ambiguous offer to inventing one.
+function hasExplicitFreeFoodOffer(text: string): boolean {
+  const food = "(?:food|pizza|boba|coffee|snacks|refreshments|breakfast|lunch|dinner|sandwiches|tacos|meals)"
+  const offer = new RegExp(`\\b(?:free|complimentary|no-cost)\\s+${food}\\b|\\b${food}\\s+(?:is\\s+|are\\s+|will be\\s+)?(?:free|complimentary|provided at no charge)\\b`, "i")
+  return text.split(/[.!?\n]/).some((sentence) => {
+    if (/\b(?:no|not|without|never)\s+(?:any\s+)?(?:free|complimentary)\b|\b(?:isn't|aren't|won't be)\s+free\b/.test(sentence)) return false
+    if (/\b(?:discuss|discussion|debate|research|policy|survey|study|studying)\b/.test(sentence)) return false
+    if (/\b(?:gluten|dairy|nut|sugar|caffeine|allergen)[ -]free\b/.test(sentence)) return false
+    if (/\$\s*\d|\b(?:paid|purchase|buy|costs?|fee|ticket required)\b/.test(sentence)) return false
+    return offer.test(sentence)
+  })
 }
 
 function guessFoodPhrase(text: string): string | undefined {

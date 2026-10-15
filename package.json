@@ -8,10 +8,17 @@
   ],
   "scripts": {
     "dev": "npm run dev --workspace apps/web",
-    "build": "npm run build --workspace apps/web",
-    "test": "vitest run"
+    "build": "npm run build --workspace apps/web && node scripts/package-standalone.mjs",
+    "test": "vitest run",
+    "lint": "npm run lint --workspace apps/web",
+    "start": "node --env-file-if-exists=apps/web/.env.local apps/web/.next/standalone/apps/web/server.js",
+    "check:pilot": "node --env-file-if-exists=apps/web/.env.local scripts/check-pilot.mjs",
+    "test:pilot-config": "node --test scripts/pilot-config.test.mjs scripts/supabase-readiness.test.mjs",
+    "check:supabase": "node --env-file-if-exists=apps/web/.env.local scripts/check-supabase.mjs",
+    "check:host": "node scripts/smoke-host.mjs"
   },
   "devDependencies": {
+    "@electric-sql/pglite": "^0.5.8",
     "@testing-library/jest-dom": "^7.0.1",
     "@testing-library/react": "^16.3.3",
     "@testing-library/user-event": "^14.6.6",

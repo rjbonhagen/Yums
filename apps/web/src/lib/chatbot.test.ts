@@ -4,7 +4,7 @@ import type { Recommendation } from "@yums/shared"
 vi.mock("./recommendations", () => ({ buildRecommendations: vi.fn() }))
 
 const { buildRecommendations } = await import("./recommendations")
-const { answerWithLLM, isOpenAIConfigured } = await import("./chatbot")
+const { answerWithLLM, isOpenAIConfigured, answerDeterministically } = await import("./chatbot")
 
 const FREE_EVENT: Recommendation = {
   id: "1",
@@ -45,6 +45,21 @@ describe("isOpenAIConfigured", () => {
 
     vi.stubEnv("OPENAI_API_KEY", "sk-test")
     expect(isOpenAIConfigured()).toBe(true)
+  })
+})
+
+describe("source outages in deterministic chat", () => {
+  it("discloses total source failure instead of claiming that no offers exist", async () => {
+    vi.mocked(buildRecommendations).mockResolvedValue({ recommendations: [], meta: {
+      ...EMPTY_META, freeFood: { source: "unavailable" }, callink: { source: "unavailable" },
+    } })
+    expect(await answerDeterministically("What is free this week?")).toContain("can't confirm")
+  })
+  it("explains partial coverage when one food source is down", async () => {
+    vi.mocked(buildRecommendations).mockResolvedValue({ recommendations: [], meta: {
+      ...EMPTY_META, callink: { source: "unavailable" },
+    } })
+    expect(await answerDeterministically("Free food?")).toContain("Cal Link is unavailable")
   })
 })
 

@@ -32,6 +32,9 @@ language plpgsql
 security definer set search_path = public
 as $$
 begin
+  -- The invited pilot uses email accounts. Other Auth identities can exist
+  -- in the project without a usable pilot profile.
+  if new.email is null or btrim(new.email) = '' then return new; end if;
   insert into public.users (id, email)
   values (new.id, new.email)
   on conflict (id) do nothing;
@@ -42,6 +45,13 @@ $$;
 create trigger on_auth_user_created
   after insert on auth.users
   for each row execute function public.handle_new_auth_user();
+
+-- Auth accounts can predate installation of the app schema. Keep existing
+-- profiles intact and create only missing email-account profiles.
+insert into public.users (id, email)
+select id, email from auth.users
+where email is not null and btrim(email) <> ''
+on conflict (id) do nothing;
 
 create table user_preferences (
   user_id uuid primary key references users (id) on delete cascade,
@@ -133,6 +143,7 @@ create table calendar_connections (
 create table recommendations (
   id uuid primary key default uuid_generate_v4(),
   user_id uuid references users (id) on delete cascade,
+  save_key text not null,
   -- Must match packages/shared/types.ts's RecommendationKind union exactly.
   kind text not null check (kind in ('free_food', 'nearby_eats')),
   ref_id uuid, -- points at events.id / deals.id depending on kind
@@ -141,11 +152,13 @@ create table recommendations (
   estimated_savings numeric(10, 2) not null default 0,
   distance_minutes int,
   start_time timestamptz,
+  end_time timestamptz,
   source_url text,
   latitude double precision,
   longitude double precision,
   score numeric(6, 4) not null default 0,
-  created_at timestamptz not null default now()
+  created_at timestamptz not null default now(),
+  unique (user_id, save_key)
 );
 
 -- Crowdsourced free-food reports (see apps/web/src/lib/reported-events.ts)
@@ -165,6 +178,17 @@ create table user_reported_events (
   longitude double precision,
   start_time timestamptz not null,
   source_url text,
+  moderation_status text not null default 'pending'
+    check (moderation_status in ('pending', 'approved', 'rejected')),
+  constraint reports_content_limits check (
+    char_length(btrim(title)) between 1 and 160
+    and (description is null or char_length(description) <= 2000)
+    and (location_name is null or char_length(location_name) <= 160)
+    and (source_url is null or (
+      char_length(source_url) <= 2048 and source_url ~* '^https?://[^[:space:]]+$'
+      and source_url !~* '^https?://[^/]*@'
+    ))
+  ),
   created_at timestamptz not null default now()
 );
 
@@ -187,11 +211,12 @@ create policy "users manage own recommendations" on recommendations
 create policy "users manage own calendar connection" on calendar_connections
   for all using (auth.uid() = user_id);
 create policy "anyone can view reported events" on user_reported_events
-  for select using (true);
+  for select using (moderation_status = 'approved' or auth.uid() = user_id);
 create policy "signed-in users can submit reports" on user_reported_events
-  for insert with check (auth.uid() = user_id);
+  for insert with check (auth.uid() = user_id and moderation_status = 'pending');
 create policy "users manage own reports" on user_reported_events
-  for update using (auth.uid() = user_id);
+  for update using (auth.uid() = user_id and moderation_status = 'pending')
+  with check (auth.uid() = user_id and moderation_status = 'pending');
 create policy "users delete own reports" on user_reported_events
   for delete using (auth.uid() = user_id);
 

@@ -1,15 +1,13 @@
 import { university } from "./mock-data"
 import { buildRecommendations } from "./recommendations"
+import { formatEventDateTime } from "./format"
 
 function formatTime(iso: string): string {
-  return new Date(iso).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })
+  return formatEventDateTime(iso)
 }
 
 /**
- * Grounded in buildRecommendations() — the same live data (or documented
- * fallback) the rest of the app uses — instead of letting an LLM guess at
- * deterministic facts. Swap for callOpenAI() below once a real
- * OPENAI_API_KEY exists and open-ended questions need handling.
+ * Answers common questions from the same recommendation data used by the feed.
  */
 export async function answerDeterministically(message: string): Promise<string> {
   const text = message.toLowerCase()
@@ -18,17 +16,21 @@ export async function answerDeterministically(message: string): Promise<string> 
     const { recommendations, meta } = await buildRecommendations({ maxTravelMinutes: 30 })
     const freeFood = recommendations.filter((r) => r.kind === "free_food")
     if (freeFood.length === 0) {
-      return `No free food found on ${university.name}'s calendar right now.`
+      const unavailable = [meta.freeFood.source === "unavailable" ? "Berkeley calendar" : null,
+        meta.callink.source === "unavailable" ? "Cal Link" : null].filter(Boolean)
+      if (unavailable.length === 2) return "Couldn't reach the campus event sources, so I can't confirm current free-food offers. Try again shortly."
+      return `No qualifying free-food offers found in the available ${university.name} source results.${unavailable.length ? ` ${unavailable[0]} is unavailable; its offers may be missing.` : " Source coverage is limited; check the campus calendars too."}`
     }
     const lines = freeFood
       .slice(0, 5)
       .map((r) => `- ${r.title}${r.subtitle ? ` at ${r.subtitle}` : ""}${r.startTime ? `, ${formatTime(r.startTime)}` : ""}`)
     const notes = [
-      meta.freeFood.source === "mock-fallback" ? "live calendar was unreachable, showing fallback" : null,
+      meta.freeFood.source === "unavailable" ? "Berkeley calendar unavailable, its events omitted" : null,
+      meta.freeFood.source === "demo" ? "sample demo data, not real offers" : null,
       meta.callink.source === "unavailable" ? "Cal Link was unreachable, club events omitted" : null,
     ].filter((n): n is string => n != null)
     const note = notes.length > 0 ? ` (${notes.join("; ")})` : ""
-    return `Here's what's free near ${university.name} today${note}:\n${lines.join("\n")}`
+    return `Here's what's free near ${university.name} this week${note} (times in Berkeley):\n${lines.join("\n")}`
   }
 
   if (/deal|discount|coupon|bogo|nearby eat|restaurant|cafe/.test(text)) {
@@ -41,14 +43,14 @@ export async function answerDeterministically(message: string): Promise<string> 
       return "No nearby eats found."
     }
     const lines = eats.slice(0, 5).map((e) => `- ${e.title}${e.distanceMinutes != null ? ` (${e.distanceMinutes} min away)` : ""}`)
-    return `Real cafes/restaurants near campus (no live discount data exists, so no savings claims here):\n${lines.join("\n")}`
+    return `${meta.nearbyEats.source === "demo" ? "Sample restaurants for the demo, not real listings" : "Real cafes/restaurants near campus"} (prices and discounts are not verified):\n${lines.join("\n")}`
   }
 
   if (/budget|spend|afford|save|savings/.test(text)) {
     const { recommendations } = await buildRecommendations({ maxTravelMinutes: 20 })
     const top = recommendations[0]
-    if (!top) return "Set your budget on the Build My Week form and I'll build a full weekly plan."
-    return `Set your budget on the Build My Week form and I'll build a full weekly plan. Right now the best opportunity I can see is: ${top.title}${top.subtitle ? ` (${top.subtitle})` : ""}${top.distanceMinutes != null ? `, ${top.distanceMinutes} min away` : ""}.`
+    if (!top) return "Set your budget target on Build My Week. No food opportunities were found right now; actual spending and savings aren't tracked."
+    return `Set your budget target on Build My Week. Actual spending and savings aren't tracked. A current opportunity is: ${top.title}${top.subtitle ? ` (${top.subtitle})` : ""}${top.distanceMinutes != null ? `, approximately ${top.distanceMinutes} minutes from campus center` : ""}.`
   }
 
   return "I can tell you about free food happening today or nearby eats — ask me about either of those."
@@ -67,26 +69,20 @@ export interface ChatMessage {
 }
 
 /**
- * Real LLM path for open-ended natural-language questions (e.g. "feed me
- * for a week for $50" from the original spec), once OPENAI_API_KEY is
- * configured — see /api/chat/route.ts for the fallback-on-failure wiring.
- * Grounded in the same live buildRecommendations() data
- * answerDeterministically() uses: the system prompt hands the model
- * today's real free food/nearby eats and explicitly instructs it to
- * answer only from that, never invent events, businesses, or discounts —
- * same no-fabrication standard as the rest of this app, just enforced via
- * the prompt instead of a keyword match.
+ * Answers open-ended questions using current recommendations as context.
+ * The route falls back to deterministic answers if the provider fails.
  */
 export async function answerWithLLM(message: string, history: ChatMessage[] = []): Promise<string> {
   const apiKey = process.env.OPENAI_API_KEY
   if (!apiKey) throw new Error("OPENAI_API_KEY is not configured")
 
-  const { recommendations } = await buildRecommendations({ maxTravelMinutes: 20 })
+  const { recommendations, meta } = await buildRecommendations({ maxTravelMinutes: 20 })
   const freeFood = recommendations.filter((r) => r.kind === "free_food").slice(0, 8)
   const nearbyEats = recommendations.filter((r) => r.kind === "nearby_eats").slice(0, 8)
 
   const context = [
-    `Free food events today at ${university.name} (this is the complete real list — do not invent more):`,
+    meta.freeFood.source === "demo" ? "ALL LISTINGS BELOW ARE SAMPLE DEMO DATA. Identify them as examples, never as actual offers." : "Source results may be incomplete; an empty list does not prove no offers exist.",
+    `Free food events this week at ${university.name} (a limited source list; times in Berkeley; do not invent more):`,
     ...(freeFood.length > 0
       ? freeFood.map(
           (r) => `- ${r.title}${r.subtitle ? ` at ${r.subtitle}` : ""}${r.startTime ? `, ${formatTime(r.startTime)}` : ""}`,

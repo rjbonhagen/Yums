@@ -61,3 +61,16 @@ export const freeFoodEvents: FreeFoodEvent[] = [
     confidenceScore: 0.6,
   },
 ]
+
+/** Explicit, opt-in fixtures for a reproducible demo; never an outage fallback. */
+export function demoFoodEvents(now = new Date()): FreeFoodEvent[] {
+  return freeFoodEvents.map((event, index) => ({
+    ...event,
+    id: `sample-${event.id}`,
+    title: `Sample: ${event.title}`,
+    organization: "Sample campus event",
+    sourceUrl: "",
+    startTime: new Date(now.getTime() + (index + 1) * 90 * 60 * 1000).toISOString(),
+    endTime: new Date(now.getTime() + ((index + 1) * 90 + 60) * 60 * 1000).toISOString(),
+  }))
+}
