@@ -63,9 +63,13 @@ deployment role can publish to that repository and run the standard shell
 document only on the pilot instance. ECR authorization and command-status APIs
 require wildcard resources; image and deployment mutations remain scoped.
 
-GitHub OIDC eliminates stored AWS access keys. Create a protected GitHub
-environment named `pilot`, require reviewer approval, and restrict it to
-`pilot-release` before deploying. The workflow is manual; pushing code does not
+GitHub OIDC eliminates stored AWS access keys. The role trusts the immutable
+`sub_claim_prefix` returned by GitHub's repository OIDC settings API, followed
+by `:environment:pilot`. Keep this prefix aligned with the repository identity.
+The `pilot` environment restricts deployment to `pilot-release`. The current
+GitHub plan does not support required reviewers; deployment is an explicit
+manual workflow dispatch. Enable reviewer approval if the plan supports it.
+Pushing code does not
 launch or update infrastructure. Review changes to the workflow and release
 script as privileged server code because deployment runs through Session Manager.
 
