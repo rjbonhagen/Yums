@@ -28,9 +28,14 @@ Promotional credits cover
 eligible charges only while credits and account eligibility remain available.
 The $30 budget is an alert threshold, not a spending cap.
 
+October 14 local verification: `cfn-lint` 1.57.2 passed for `us-west-1` with
+no diagnostics. `guardpycfn` 0.1.0 passed all three rules in `infra/pilot.guard`.
+Four in-memory negative controls were rejected: optional IMDS tokens,
+unencrypted EBS, public SSH, and mutable image tags. These checks cover the
+defined rules; they are not a comprehensive security assessment.
+
 Release-command tests pass locally. CloudFormation's basic `ValidateTemplate`
-check accepts the template. Local schema and Guard validation remain pending,
-and Docker is unavailable on this machine. A Linux container build and smoke
+check accepts the template. Docker is unavailable on this machine. A Linux container build and smoke
 check, account-aware deployment review, and actual HTTPS/account acceptance
 checks remain release gates. No infrastructure has been created.
 
@@ -56,6 +61,10 @@ launch or update infrastructure. Review changes to the workflow and release
 script as privileged server code because deployment runs through Session Manager.
 
 ## Domain and initial launch
+
+The selected hostname is `yumsberkeley.com`. A public registration lookup on
+October 14 found no registration record; registrar availability and the exact
+registration/renewal price still need confirmation. No domain has been purchased.
 
 Choose and register a domain, or obtain a subdomain from a domain owner. Domain
 registration is a separate purchase and is not included in the server estimate.
