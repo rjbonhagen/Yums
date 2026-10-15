@@ -2,6 +2,7 @@ import { act, render, screen, waitFor } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
 import { beforeEach, expect, it, vi } from "vitest"
 import { RecommendationsView } from "./recommendations-view"
+import { AuthSessionMissingError } from "@supabase/supabase-js"
 
 const mocks = vi.hoisted(() => ({ getUser: vi.fn(), load: vi.fn(), save: vi.fn(), remove: vi.fn(), unsubscribe: vi.fn() }))
 let notify: (event: string, session: { user: { id: string } } | null) => void
@@ -35,6 +36,16 @@ async function ready() {
   await waitFor(() => expect(mocks.load).toHaveBeenCalled())
   await act(async () => {})
 }
+
+it("allows browser saves for a signed-out session without an account error", async () => {
+  mocks.getUser.mockResolvedValue({ data: { user: null }, error: new AuthSessionMissingError() })
+  render(<RecommendationsView recommendations={[listing]} />)
+  await act(async () => {})
+  expect(screen.queryByRole("alert")).not.toBeInTheDocument()
+  await userEvent.click(screen.getByRole("button", { name: "Save" }))
+  expect(screen.queryByRole("alert")).not.toBeInTheDocument()
+  expect(mocks.save).not.toHaveBeenCalled()
+})
 
 it("saves with a fresh account check and restores the button on failure", async () => {
   mocks.save.mockRejectedValueOnce(new Error("offline"))

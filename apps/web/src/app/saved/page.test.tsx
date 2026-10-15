@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest"
 import { render, screen } from "@testing-library/react"
+import { AuthSessionMissingError } from "@supabase/supabase-js"
 const { createClient, getUser, loadSavedItems } = vi.hoisted(() => ({ createClient: vi.fn(), getUser: vi.fn(), loadSavedItems: vi.fn() }))
 vi.mock("@/lib/supabase/client", () => ({ isSupabaseConfigured: () => true }))
 vi.mock("@/lib/supabase/server", () => ({ createClient }))
@@ -13,6 +14,14 @@ beforeEach(() => {
   createClient.mockResolvedValue({ auth: { getUser } })
 })
 describe("Saved page account failures", () => {
+  it("shows browser saves and a sign-in prompt for a missing session", async () => {
+    getUser.mockResolvedValue({ data: { user: null }, error: new AuthSessionMissingError() })
+    render(await SavedPage())
+    expect(screen.queryByRole("status")).not.toBeInTheDocument()
+    expect(screen.getByRole("link", { name: "Sign in" })).toHaveAttribute("href", "/login")
+    expect(screen.getByText("Browser saves")).toBeInTheDocument()
+    expect(loadSavedItems).not.toHaveBeenCalled()
+  })
   it("keeps browser saves usable when authentication is offline", async () => {
     getUser.mockRejectedValue(new Error("offline"))
     render(await SavedPage())

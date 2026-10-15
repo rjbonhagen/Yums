@@ -27,11 +27,12 @@ with UC Berkeley.
 ## Project status
 
 Yums is preparing for an invitation-only Berkeley pilot. Live discovery and
-account persistence are implemented. The registered production domain is
-`getyums.food`; public deployment and hosted acceptance testing are pending.
+account persistence are implemented. The pilot is deployed at
+[getyums.food](https://getyums.food). New accounts require an invitation.
 
 The AWS template has passed local schema checks, Guard rules, and account-aware
-pre-deployment validation. The server has not been launched. See the
+pre-deployment validation. Public health, packaged assets, and callback-origin
+checks pass. Hosted signed-in acceptance checks remain in progress. See the
 [EC2 deployment guide](docs/ec2-pilot.md) for costs, configuration, release
 checks, and recovery procedures.
 

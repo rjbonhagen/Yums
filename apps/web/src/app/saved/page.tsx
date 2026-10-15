@@ -1,4 +1,5 @@
 import Link from "next/link"
+import { isAuthSessionMissingError } from "@supabase/supabase-js"
 import { Nav } from "@/components/nav"
 import { SavedList } from "@/components/saved-list"
 import { GuestSavedList } from "@/components/guest-saved-list"
@@ -30,7 +31,7 @@ export default async function SavedPage() {
   const account = await (async () => {
     const client = await createClient()
     const { data: { user }, error } = await client.auth.getUser()
-    if (error) throw error
+    if (error && !isAuthSessionMissingError(error)) throw error
     return { client, user }
   })().catch(() => null)
   if (!account) {
