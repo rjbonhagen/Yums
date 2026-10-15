@@ -62,9 +62,9 @@ script as privileged server code because deployment runs through Session Manager
 
 ## Domain and initial launch
 
-The selected hostname is `yumsberkeley.com`. A public registration lookup on
-October 14 found no registration record; registrar availability and the exact
-registration/renewal price still need confirmation. No domain has been purchased.
+The selected hostname is `getyums.food`. The operator confirmed registration
+through Porkbun on October 14, 2026. Use `https://getyums.food` as the production
+origin. DNS configuration remains pending until the server's static IP exists.
 
 Choose and register a domain, or obtain a subdomain from a domain owner. Domain
 registration is a separate purchase and is not included in the server estimate.
