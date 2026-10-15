@@ -48,7 +48,7 @@ jobs:
             --build-arg NEXT_PUBLIC_SUPABASE_ANON_KEY \
             --build-arg NEXT_PUBLIC_MAPBOX_TOKEN -t "$image" .
           docker run -d --name yums-check -p 127.0.0.1:3000:3000 -e APP_ORIGIN=http://localhost:3000 "$image"
-          curl --fail --retry 10 --retry-connrefused --retry-delay 2 --max-time 3 http://localhost:3000/api/health
+          curl --fail --retry 10 --retry-all-errors --retry-delay 2 --max-time 3 http://localhost:3000/api/health
           node scripts/smoke-host.mjs
           docker rm -f yums-check
           docker push "$image"
