@@ -1,116 +1,125 @@
 # Yums
 
-A UC Berkeley food-discovery demo: find campus events offering free food,
-browse nearby restaurants, and rank recommendations for free food or shorter
-walks. Prices, nutrition, attendance, and actual savings are not tracked.
+Discover free food on campus and nearby places to eat. Yums brings campus event
+feeds, personal availability, and saved recommendations into one place, starting
+with UC Berkeley.
 
-An invited Berkeley pilot is being prepared with live feeds, account persistence,
-reviewed community submissions, and per-account paid-chat limits. See
-[pilot setup](docs/pilot-setup.md) and [release status](docs/pilot-release.md).
-Remote account configuration and deployment have not yet been verified.
+![Yums desktop feed](docs/screenshots/feed-desktop.jpg)
 
-![Desktop feed](docs/screenshots/feed-desktop.jpg)
+[Mobile preview](docs/screenshots/feed-mobile.jpg) ·
+[Architecture](docs/architecture.md) · [Data sources](docs/data-sources.md) ·
+[Roadmap](docs/roadmap.md)
 
-More screenshots: [mobile feed](docs/screenshots/feed-mobile.jpg),
-[homepage](docs/screenshots/home-desktop.jpg), [live feed](docs/screenshots/feed-live.jpg).
+## Features
+
+- **Live discovery:** Berkeley and Cal Link events, filtered for explicit
+  free-food offers and linked to the original listings.
+- **Personal recommendations:** ranking by free-food preference, walking time,
+  and Google Calendar availability when connected.
+- **Saved items:** browser-local saves for guests and account-backed saves for
+  signed-in users.
+- **Community reports:** food opportunities reviewed by an operator before
+  appearing publicly.
+- **List and map views:** search, filter, and browse events and nearby restaurants.
+- **Account access:** Google sign-in, synchronized preferences, and private user
+  data protected by database row-level security.
+
+## Project status
+
+Yums is preparing for an invitation-only Berkeley pilot. Live discovery and
+account persistence are implemented. The registered production domain is
+`getyums.food`; public deployment and hosted acceptance testing are pending.
+
+The AWS template has passed local schema checks, Guard rules, and account-aware
+pre-deployment validation. The server has not been launched. See the
+[EC2 deployment guide](docs/ec2-pilot.md) for costs, configuration, release
+checks, and recovery procedures.
 
 ## Run locally
 
-Requires Node.js 22 and npm 10. From the repository root:
+Requires **Node.js 22** and **npm 10**. Run commands from the repository root.
 
 ```sh
 npm ci
 npm run dev
 ```
 
-Open http://localhost:3000. No credentials are needed for public feeds,
-preferences, browser-local saves, or the deterministic chat helper. Public
-sources can return no matching events or be unavailable; failures are disclosed
-and never replaced by sample offers.
+Open [localhost:3000](http://localhost:3000). Public discovery and guest saves
+work without integration credentials. External sources may be unavailable;
+the interface reports failures rather than substituting sample offers.
 
-For a reproducible offline demo, copy `apps/web/.env.example` to
-`apps/web/.env.local` and set `YUMS_DEMO_MODE=true`, then restart the server.
-Sample events and restaurant listings are visibly labeled. Sample saves stay
-in the browser even if an account is connected. Set the flag to `false` to
-restore live sources. Sample mode does not call the external discovery feeds.
+To enable integrations, copy `apps/web/.env.example` to `apps/web/.env.local`
+and fill in the settings you need:
 
-For a production build, set the same demo flag before both build and start:
+| Integration | Configuration | Purpose |
+| --- | --- | --- |
+| Supabase | Public project URL and publishable/anon key | Sign-in, preferences, saves, and reports |
+| Google Calendar | Provider consent and server-side OAuth refresh credentials | Availability-aware ranking |
+| Mapbox | Public token | Map rendering |
+| Chat provider | Optional server-side API key | Source-grounded replies with a deterministic fallback |
+
+Keep server credentials in local or protected runtime configuration. Never
+commit environment files or pass server credentials as Docker build arguments.
+See [pilot setup](docs/pilot-setup.md) for database and authentication setup.
+
+For an offline walkthrough, set `YUMS_DEMO_MODE=true` in the local environment
+file and restart. Sample listings are labeled and stay separate from live data.
+Return the flag to `false` for live discovery. Production mode changes require
+a rebuild.
+
+## Build and verify
 
 ```sh
+npm test
+npm run test:pilot-config
+npm run lint
 npm run build
 npm run start
 ```
 
-The homepage is cached; changing modes requires a rebuild for production.
-
-## Demo walkthrough
-
-1. Open Build My Week, set a $42 budget target and an eight-minute preferred walk.
-2. Choose Shorter walks, submit, and inspect the dashboard.
-3. Open Feed; reload to show the preferences survived direct navigation.
-4. Filter Free food or Nearby eats, search a venue, and try an unmatched query.
-5. Save an item, visit Saved, reload, and remove it.
-6. Open Map to show the graceful unavailable state without a token.
-7. Ask Yums “What's free this week?” Sample results remain explicitly labeled.
-
-See [the rehearsal record](docs/demo-verification.md) for checks and limits.
-
-## Verification
+With the production server running, use a second terminal to check health,
+login HTML, packaged assets, and the callback origin:
 
 ```sh
-npm test
-npm run lint
-npm run build
-npm audit --omit=dev
+npm run check:host
 ```
 
-The included GitHub Actions workflow will run install, lint, tests, build, and
-the production dependency audit after pushing; it has not run remotely yet.
-The local production audit is clean. Development tooling still has
-nine high-severity transitive `braces` findings; npm suggests incompatible
-downgrades. Do not run `npm audit fix --force` without reviewing its changes.
+`npm run check:pilot` and `npm run check:supabase` check configuration and public
+connection readiness. These complement signed-in acceptance tests; they do not
+establish account isolation or end-to-end integration behavior.
 
-## Optional integrations
+## Architecture
 
-- Supabase: account sign-in, synchronized preferences and saves, community reports.
-- Google Calendar: optional conflict-aware ranking after consent.
-- Mapbox: plotted source coordinates when a public token is provided.
-- OpenAI: grounded chat replies with a deterministic fallback.
+| Layer | Implementation |
+| --- | --- |
+| Web application | Next.js 16, React 19, TypeScript, Tailwind CSS |
+| Discovery | Campus-source adapters, OpenStreetMap, cached source results |
+| Ranking | Shared scoring logic, walking estimates, optional Calendar availability |
+| Accounts and persistence | Supabase Auth and PostgreSQL with row-level security |
+| Deployment | Docker, AWS EC2, ECR, Caddy HTTPS, CloudWatch, GitHub Actions |
 
-All variables are listed in [the environment example](apps/web/.env.example).
-For a new Supabase project, run `packages/database/schema.sql` through the SQL
-editor. For an existing database, apply
-`packages/database/migrations/20261007_saved_identity.sql` before using updated
-cloud saves. It preserves the newest duplicate snapshot and adds per-user
-uniqueness. No remote database changes were made during this work.
+Source adapters normalize listings and extract food evidence. Shared scoring
+produces recommendations for the feed, dashboard, and chat. Public source
+caches are separate from per-user Calendar data.
 
-For the invited pilot, also apply the report moderation and chat allowance
-migrations described in [pilot setup](docs/pilot-setup.md). New databases need
-the initial schema plus the chat allowance migration. Existing reports enter
-pending review; only approved reports are shared. Paid provider replies require
-a verified account and a database allowance; failures use deterministic replies.
+```text
+apps/web/                  Pages, UI components, and API routes
+services/event-ingestion/  Campus-source adapters and food evidence extraction
+packages/shared/           Shared types and recommendation scoring
+packages/database/         Schema, migrations, and database audits
+infra/                     AWS template, Guard rules, and release script
+scripts/                   Configuration, packaging, and host checks
+docs/                      Architecture, source coverage, and pilot operations
+```
 
-Configure Supabase site URL and auth redirect URL for your localhost address
-(`/auth/callback`). Google sign-in requires the Google provider in Supabase;
-Calendar linking also requires the FreeBusy scope and the app's Google OAuth
-client credentials for token refresh. Never commit `.env.local` or secret keys.
+## Scope and limitations
 
-## Architecture and limitations
+Current coverage focuses on UC Berkeley. Walking times are estimates from
+campus center. Source listings may change, and an explicit food offer does not
+establish attendance eligibility or remaining availability. Check the original
+event details before attending.
 
-Next.js pages → cached campus-source adapters / OpenStreetMap → deterministic
-food-evidence extraction → date window and scoring → feed, dashboard, and chat.
-Preferences use a validated browser cookie and optional account persistence;
-local saves use localStorage, while account saves use Supabase row-level security.
-
-- Berkeley only; walking estimates start at campus center, not device location.
-- Today and weekly views use Pacific Time; missing durations assume one hour.
-- Food detection is conservative. An explicit offer can still be canceled or
-  limited to eligible attendees; always inspect the original event details.
-- Restaurant listings have no verified menu prices, discounts, or nutrition.
-- Browser reminders require an open feed tab; there is no background push.
-- Optional credential-backed integrations were not live-verified in this checkout.
-- Remote migrations, invited-account checks, email delivery, host traffic limits,
-  and provider spend limits must be verified before accepting pilot users.
-
-See [architecture](docs/architecture.md), [sources](docs/data-sources.md),
-[product scope](docs/product.md), and [roadmap](docs/roadmap.md).
+Restaurant listings do not include verified prices, discounts, or nutrition.
+Budget settings are preferences; Yums does not track spending or actual savings.
+Browser reminders require an open feed tab. The planned single-server pilot
+does not provide high availability.
