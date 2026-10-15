@@ -36,8 +36,17 @@ defined rules; they are not a comprehensive security assessment.
 
 Release-command tests pass locally. CloudFormation's basic `ValidateTemplate`
 check accepts the template. Docker is unavailable on this machine. A Linux container build and smoke
-check, account-aware deployment review, and actual HTTPS/account acceptance
-checks remain release gates. No infrastructure has been created.
+check and actual HTTPS/account acceptance checks remain release gates.
+
+The `yums-pilot` change set `pre-deploy-20261014` completed account-aware
+pre-deployment validation in `us-west-1`; `DescribeEvents` returned no validation
+errors. It plans 16 resources, using the existing default VPC and public subnet
+in `us-west-1a`. Execution remains pending until the Linux checks pass.
+No server has been launched. The stack exists in `REVIEW_IN_PROGRESS` while
+the change set awaits execution. CloudTrail has no persistent trail configured;
+management event history provides limited retention rather than durable audit
+logging. Alert delivery will use the operator-selected address and requires
+confirmation of the SNS email subscription after launch.
 
 ## Access and exposure
 
