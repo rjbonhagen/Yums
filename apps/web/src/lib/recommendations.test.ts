@@ -82,6 +82,14 @@ beforeEach(() => {
 afterEach(() => { vi.useRealTimers(); vi.unstubAllEnvs() })
 
 describe("buildRecommendations", () => {
+  it("skips restaurant lookups in the food-only feed and sorts by time", async () => {
+    mockIngestSource(async (source) => source.key === "berkeley-live" ? [liveBerkeleyEvent] : [liveCallinkEvent])
+    const result = await buildRecommendations({ maxTravelMinutes: 20, freeFoodOnly: true })
+    expect(fetchNearbyPlaces).not.toHaveBeenCalled()
+    expect(fetchBusyIntervals).not.toHaveBeenCalled()
+    expect(result.recommendations.map((event) => event.title)).toEqual([liveBerkeleyEvent.title, liveCallinkEvent.title])
+    expect(result.recommendations.every((event) => event.kind === "free_food")).toBe(true)
+  })
   it("deduplicates source occurrences, retains recurring dates, and keeps IDs stable across reorder", async () => {
     const nextOccurrence = { ...liveBerkeleyEvent, startTime: "2026-09-02T20:00:00Z" }
     mockIngestSource(async (source) => source.key === "berkeley-live" ? [liveBerkeleyEvent, liveBerkeleyEvent, nextOccurrence] : [])

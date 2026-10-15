@@ -11,8 +11,8 @@ function Shell({ children }: { children: React.ReactNode }) {
   return (
     <div className="flex flex-1 flex-col">
       <Nav />
-      <main className="mx-auto w-full max-w-3xl flex-1 space-y-3 px-4 py-8">
-        <h1 className="text-2xl font-semibold">Saved</h1>
+      <main className="mx-auto w-full max-w-4xl flex-1 space-y-5 px-5 py-10">
+        <h1 className="text-3xl font-semibold tracking-tight">Saved food</h1>
         {children}
       </main>
     </div>
@@ -68,7 +68,7 @@ export default async function SavedPage() {
         </Link>
         .
       </p>
-      {items ? <SavedList userId={user.id} initialItems={items} /> : <p role="status" className="text-muted-foreground text-sm">Couldn&apos;t load your account saves. Refresh to try again.</p>}
+      {items ? <SavedList userId={user.id} initialItems={items.filter((item) => item.kind === "free_food")} /> : <p role="status" className="text-muted-foreground text-sm">Couldn&apos;t load your account saves. Refresh to try again.</p>}
       <h2 className="text-lg font-semibold">Browser-only saves</h2>
       <GuestSavedList />
     </Shell>

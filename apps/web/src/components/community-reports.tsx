@@ -47,9 +47,10 @@ export function CommunityReports({ userId, reports }: { userId: string | null; r
           </Badge>
         </div>
         <Link href="/report" className="text-primary text-sm underline underline-offset-4">
-          + Report free food
+          Share food
         </Link>
       </div>
+      <p className="text-sm text-muted-foreground">Student tips for the next seven days. Check the source before heading out.</p>
       {error && <p role="alert" className="text-destructive text-sm">{error}</p>}
       {items.length === 0 ? (
         <p className="text-muted-foreground text-sm">No community reports right now.</p>

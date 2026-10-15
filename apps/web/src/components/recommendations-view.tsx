@@ -3,192 +3,40 @@
 import { useEffect, useMemo, useRef, useState } from "react"
 import { isAuthSessionMissingError } from "@supabase/supabase-js"
 import type { Recommendation } from "@yums/shared"
-import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { FeedMap } from "@/components/feed-map"
 import { formatEventDateTime } from "@/lib/format"
+import { addCalendarDays, campusDate, isInCampusWeek, isToday } from "@/lib/event-time"
 import { createClient, isSupabaseConfigured } from "@/lib/supabase/client"
 import { loadSavedItems, saveRecommendation, unsaveItem } from "@/lib/saved-items"
 import { savedKey } from "@/lib/save-identity"
 import { collapseDuplicateListings } from "@/lib/event-listings"
 import { saveGuestItem, removeGuestItem, useGuestSavedItems } from "@/lib/guest-saved-items"
 
-function kindLabel(kind: string, estimatedSavings: number): string {
-  if (kind === "free_food") return "FREE"
-  if (kind === "nearby_eats") return "Nearby"
-  return `$${estimatedSavings.toFixed(2)} off`
-}
-
-// Recommendation ids aren't stable save-to-save (they're derived from the
-// live source, which can return different results next time) — this key
-// is what actually identifies "the same place/event" for save/unsave
-// matching, both here and in lib/saved-items.ts's SavedItem shape.
-function RecommendationCard({
-  r,
-  signedIn,
-  saved,
-  onToggleSave,
-}: {
-  r: Recommendation
-  signedIn: boolean
-  saved: boolean
-  onToggleSave: (r: Recommendation) => void
-}) {
-  return (
-    <Card>
-      <CardContent className="flex items-start justify-between gap-4 py-4">
-        <div>
-          <p className="font-medium">{r.title}</p>
-          {r.isSample && <p className="text-xs text-amber-700">Sample listing · not a real offer</p>}
-          {r.subtitle && <p className="text-muted-foreground text-sm">{r.subtitle}</p>}
-          <p className="text-muted-foreground text-xs">
-            {formatEventDateTime(r.startTime)}
-            {r.durationEstimated ? " · duration estimated at 1 hour" : ""}
-            {r.startTime && r.distanceMinutes != null ? " · " : ""}
-            {r.distanceMinutes != null
-              ? `${r.distanceEstimated ? "~" : ""}${r.distanceMinutes} min away`
-              : r.startTime
-                ? ""
-                : "distance unknown"}
-          </p>
-          {r.sourceUrl && (
-            <a href={r.sourceUrl} target="_blank" rel="noreferrer" className="text-xs underline underline-offset-4">
-              Source
-            </a>
-          )}
-        </div>
-        <div className="flex flex-col items-end gap-2">
-          <Badge variant={r.kind === "free_food" ? "default" : "secondary"}>{kindLabel(r.kind, r.estimatedSavings)}</Badge>
-          {signedIn && (
-            <Button
-              type="button"
-              size="sm"
-              variant="ghost"
-              className="h-auto p-0 text-xs"
-              onClick={() => onToggleSave(r)}
-              aria-pressed={saved}
-            >
-              {saved ? "Saved" : "Save"}
-            </Button>
-          )}
-        </div>
-      </CardContent>
-    </Card>
-  )
-}
-
-/** Groups multiple upcoming instances of the exact same recurring meeting
- * (same Recommendation.seriesKey — organization + original title, an
- * exact match, never a fuzzy/guessed one — see that field's comment in
- * packages/shared/types.ts) into one card instead of N separate ones.
- * Preserves per-instance Save controls and Source links; Map view is
- * unaffected (still plots every instance individually). Only groups when
- * 2+ items actually share a key — a lone free_food item just renders as
- * a normal RecommendationCard. */
-function RecurringGroupCard({
-  items,
-  signedIn,
-  savedByKey,
-  onToggleSave,
-}: {
-  items: Recommendation[]
-  signedIn: boolean
-  savedByKey: Map<string, string>
-  onToggleSave: (r: Recommendation) => void
-}) {
-  const [first] = items
-  return (
-    <Card>
-      <CardContent className="space-y-2 py-4">
-        <div className="flex items-start justify-between gap-4">
-          <div>
-            <p className="font-medium">{first.title}</p>
-            {first.subtitle && <p className="text-muted-foreground text-sm">{first.subtitle}</p>}
-            <p className="text-muted-foreground text-xs">Matching event titles · {items.length} upcoming</p>
-          </div>
-          <Badge variant={first.kind === "free_food" ? "default" : "secondary"}>
-            {kindLabel(first.kind, first.estimatedSavings)}
-          </Badge>
-        </div>
-        <ul className="space-y-1.5 border-t pt-2">
-          {items.map((r) => (
-            <li key={r.id} className="flex items-center justify-between gap-3">
-              <span className="text-muted-foreground text-xs">
-                {formatEventDateTime(r.startTime)}
-                {r.durationEstimated ? " · duration estimated at 1 hour" : ""}
-                {r.distanceMinutes != null ? ` · ${r.distanceEstimated ? "~" : ""}${r.distanceMinutes} min away` : ""}
-              </span>
-              <div className="flex items-center gap-2">
-                {r.sourceUrl && (
-                  <a href={r.sourceUrl} target="_blank" rel="noreferrer" className="text-xs underline underline-offset-4">
-                    Source
-                  </a>
-                )}
-                {signedIn && (
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant="ghost"
-                    className="h-auto p-0 text-xs"
-                    onClick={() => onToggleSave(r)}
-                    aria-pressed={savedByKey.has(savedKey(r))}
-                    aria-label={savedByKey.has(savedKey(r)) ? "Unsave" : "Save"}
-                  >
-                    {savedByKey.has(savedKey(r)) ? "Saved" : "Save"}
-                  </Button>
-                )}
-              </div>
-            </li>
-          ))}
-        </ul>
-      </CardContent>
-    </Card>
-  )
-}
-
-type ListEntry = { kind: "single"; item: Recommendation } | { kind: "group"; seriesKey: string; items: Recommendation[] }
-
-function groupBySeries(items: Recommendation[]): ListEntry[] {
-  const placed = new Set<string>()
-  const entries: ListEntry[] = []
-  for (const item of items) {
-    if (item.kind === "free_food" && item.seriesKey) {
-      if (placed.has(item.seriesKey)) continue // already emitted as part of an earlier group in this pass
-      const group = items.filter((i) => i.kind === "free_food" && i.seriesKey === item.seriesKey)
-      if (group.length > 1) {
-        placed.add(item.seriesKey)
-        entries.push({ kind: "group", seriesKey: item.seriesKey, items: group })
-        continue
-      }
-    }
-    entries.push({ kind: "single", item })
-  }
-  return entries
-}
-
-type KindFilter = "all" | "free_food" | "nearby_eats"
-
-const KIND_FILTERS: { value: KindFilter; label: string }[] = [
-  { value: "all", label: "All" },
-  { value: "free_food", label: "Free food" },
-  { value: "nearby_eats", label: "Nearby eats" },
+type DateFilter = "week" | "today" | "tomorrow"
+const DATE_FILTERS: { value: DateFilter; label: string }[] = [
+  { value: "week", label: "This week" },
+  { value: "today", label: "Today" },
+  { value: "tomorrow", label: "Tomorrow" },
 ]
 
-/** List/map toggle for /feed's recommendations, with a free-food/nearby-eats
- * filter and keyword search over title/subtitle — both computed client-side
- * over the same recommendations the server already fetched, no extra
- * requests. Map tab only ever plots items with real coordinates (see
- * FeedMap) and shows an honest "not configured" message instead of a broken
- * map when no Mapbox token is set — same pattern as the rest of the app's
- * optional integrations. Signed-in users can save/unsave items (see
- * lib/saved-items.ts, /saved); the save controls simply don't render when
- * signed out, same pattern as /login's Google Calendar card. */
-export function RecommendationsView({ recommendations }: { recommendations: Recommendation[] }) {
-  const [kindFilter, setKindFilter] = useState<KindFilter>("all")
+function sourceName(url?: string): string {
+  try {
+    const host = new URL(url ?? "").hostname
+    if (host === "callink.berkeley.edu") return "Cal Link"
+    if (host === "events.berkeley.edu") return "Berkeley calendar"
+    return host || "Original announcement"
+  } catch { return "Original announcement" }
+}
+
+export function RecommendationsView({ recommendations, now: initialNow }: { recommendations: Recommendation[]; now?: string }) {
+  const [dateFilter, setDateFilter] = useState<DateFilter>("week")
   const [search, setSearch] = useState("")
+  const [now, setNow] = useState(() => initialNow ? new Date(initialNow) : new Date())
+  useEffect(() => {
+    const timer = setInterval(() => setNow(new Date()), 60000)
+    return () => clearInterval(timer)
+  }, [])
   const [userId, setUserId] = useState<string | null>(null)
   const [cloudSavedByKey, setSavedByKey] = useState<Map<string, string>>(new Map())
   const guestItems = useGuestSavedItems()
@@ -326,86 +174,71 @@ export function RecommendationsView({ recommendations }: { recommendations: Reco
 
   const filtered = useMemo(() => {
     const query = search.trim().toLowerCase()
-    return collapseDuplicateListings(recommendations, savedByKey).filter((r) => {
-      if (kindFilter !== "all" && r.kind !== kindFilter) return false
-      if (!query) return true
-      return r.title.toLowerCase().includes(query) || (r.subtitle?.toLowerCase().includes(query) ?? false)
-    })
-  }, [recommendations, savedByKey, kindFilter, search])
-
-  const mappable = useMemo(() => filtered.filter((r) => r.latitude != null && r.longitude != null), [filtered])
+    return collapseDuplicateListings(recommendations, savedByKey)
+      .filter((event) => {
+        if (event.kind !== "free_food") return false
+        if (event.startTime && !isInCampusWeek(event.startTime, event.endTime, now)) return false
+        if (dateFilter === "today" && !isToday(event.startTime, now, event.endTime)) return false
+        if (dateFilter === "tomorrow" && (!event.startTime || campusDate(new Date(event.startTime)) !== addCalendarDays(campusDate(now), 1))) return false
+        return !query || `${event.title} ${event.subtitle ?? ""}`.toLowerCase().includes(query)
+      })
+      .sort((a, b) => (a.startTime ? Date.parse(a.startTime) : Infinity) - (b.startTime ? Date.parse(b.startTime) : Infinity))
+  }, [recommendations, savedByKey, dateFilter, search, now])
 
   return (
-    <div className="space-y-3">
-      {!userId && <p className="text-muted-foreground text-xs">Saves stay in this browser. Sign in to save across devices.</p>}
-      {saveError && <p role="alert" className="text-destructive text-sm">{saveError}</p>}
-      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex gap-1">
-          {KIND_FILTERS.map((f) => (
-            <Button
-              key={f.value}
-              type="button"
-              size="sm"
-              variant={kindFilter === f.value ? "default" : "outline"}
-              onClick={() => setKindFilter(f.value)}
-              aria-pressed={kindFilter === f.value}
-            >
-              {f.label}
+    <section aria-label="Free food events" className="space-y-5">
+      <h2 className="text-lg font-semibold">Campus calendars</h2>
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div aria-label="Filter by date" className="flex gap-1 rounded-xl bg-muted p-1">
+          {DATE_FILTERS.map((filter) => (
+            <Button key={filter.value} type="button" size="sm"
+              variant={dateFilter === filter.value ? "default" : "ghost"}
+              className="min-h-10 flex-1 rounded-lg px-4 shadow-none"
+              aria-pressed={dateFilter === filter.value} onClick={() => setDateFilter(filter.value)}>
+              {filter.label}
             </Button>
           ))}
         </div>
-        <Input
-          aria-label="Search food events and places"
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          placeholder="Search by name or location…"
-          className="sm:max-w-56"
-        />
+        <Input aria-label="Search free food" value={search} onChange={(event) => setSearch(event.target.value)}
+          placeholder="Search by name or location" className="h-11 rounded-xl bg-background sm:max-w-64" />
       </div>
-
-      <Tabs defaultValue="list">
-        <TabsList>
-          <TabsTrigger value="list">List</TabsTrigger>
-          <TabsTrigger value="map">Map</TabsTrigger>
-        </TabsList>
-        <TabsContent value="list" className="space-y-3 pt-3">
-          {filtered.length === 0 && (
-            <p className="text-muted-foreground text-sm">
-              {recommendations.length === 0
-                ? "Nothing found right now — check back later."
-                : "Nothing matches your filter/search."}
-            </p>
-          )}
-          {groupBySeries(filtered).map((entry) =>
-            entry.kind === "group" ? (
-              <RecurringGroupCard
-                key={entry.seriesKey}
-                items={entry.items}
-                signedIn={true}
-                savedByKey={savedByKey}
-                onToggleSave={handleToggleSave}
-              />
-            ) : (
-              <RecommendationCard
-                key={entry.item.id}
-                r={entry.item}
-                signedIn={true}
-                saved={savedByKey.has(savedKey(entry.item))}
-                onToggleSave={handleToggleSave}
-              />
-            ),
-          )}
-        </TabsContent>
-        <TabsContent value="map" className="pt-3">
-          <FeedMap places={mappable} />
-          {mappable.length < filtered.length && (
-            <p className="text-muted-foreground pt-2 text-xs">
-              {filtered.length - mappable.length} item{filtered.length - mappable.length === 1 ? "" : "s"} without a
-              known location {filtered.length - mappable.length === 1 ? "isn't" : "aren't"} shown on the map.
-            </p>
-          )}
-        </TabsContent>
-      </Tabs>
-    </div>
+      <div className="flex flex-wrap items-center justify-between gap-2 text-sm text-muted-foreground">
+        <p aria-live="polite">{filtered.length} {filtered.length === 1 ? "campus event" : "campus events"}</p>
+        <p>{userId ? "Saves sync to your account." : "No account needed. Saves stay in this browser."}</p>
+      </div>
+      {saveError && <p role="alert" className="text-destructive text-sm">{saveError}</p>}
+      {filtered.length === 0 ? (
+        <div className="rounded-2xl border border-dashed bg-muted/30 px-6 py-12 text-center">
+          <h3 className="text-lg font-semibold">{search ? "No matching food events" : "No campus events found"}</h3>
+          <p className="mt-2 text-sm text-muted-foreground">
+            {search ? "Try a different name or location." : dateFilter === "week" ? "Check back later or share an opportunity you know about." : "Try This week to see other upcoming events."}
+          </p>
+        </div>
+      ) : (
+        <div className="overflow-hidden rounded-2xl border bg-card">
+          {filtered.map((event) => (
+            <article key={event.id} className="flex items-start justify-between gap-4 border-b p-5 last:border-b-0 sm:p-6">
+              <div className="min-w-0 space-y-2">
+                <p className="text-sm font-semibold text-primary">
+                  {event.startTime ? `${isToday(event.startTime, now) ? "Today, " : ""}${formatEventDateTime(event.startTime, now)}` : "See announcement for time"}
+                </p>
+                <h3 className="text-lg font-semibold leading-snug">{event.title}</h3>
+                {event.subtitle && <p className="text-sm text-muted-foreground">{event.subtitle}</p>}
+                {event.isSample && <p className="text-sm text-amber-800">Sample event, not a real offer</p>}
+                {event.sourceUrl && <a href={event.sourceUrl} target="_blank" rel="noreferrer"
+                  className="inline-block py-1 text-sm text-primary underline underline-offset-4">
+                  View announcement <span className="text-muted-foreground">({sourceName(event.sourceUrl)})</span>
+                </a>}
+              </div>
+              <Button type="button" size="sm" variant={savedByKey.has(savedKey(event)) ? "secondary" : "outline"}
+                className="mt-0.5 min-h-10 shrink-0 rounded-lg px-4 shadow-none"
+                aria-pressed={savedByKey.has(savedKey(event))} onClick={() => handleToggleSave(event)}>
+                {savedByKey.has(savedKey(event)) ? "Saved" : "Save"}
+              </Button>
+            </article>
+          ))}
+        </div>
+      )}
+    </section>
   )
 }

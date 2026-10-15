@@ -106,7 +106,7 @@ export default function ReportPage() {
       <main className="flex flex-1 items-center justify-center px-4 py-12">
         <Card className="w-full max-w-md">
           <CardHeader>
-            <CardTitle className="text-2xl">Report free food</CardTitle>
+            <CardTitle className="text-2xl">Share free food</CardTitle>
             <p className="text-muted-foreground text-sm">
               Found free food that isn&apos;t on the feed? Share it — shown on{" "}
               <Link href="/feed" className="underline underline-offset-4">

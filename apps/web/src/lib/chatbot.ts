@@ -47,10 +47,7 @@ export async function answerDeterministically(message: string): Promise<string> 
   }
 
   if (/budget|spend|afford|save|savings/.test(text)) {
-    const { recommendations } = await buildRecommendations({ maxTravelMinutes: 20 })
-    const top = recommendations[0]
-    if (!top) return "Set your budget target on Build My Week. No food opportunities were found right now; actual spending and savings aren't tracked."
-    return `Set your budget target on Build My Week. Actual spending and savings aren't tracked. A current opportunity is: ${top.title}${top.subtitle ? ` (${top.subtitle})` : ""}${top.distanceMinutes != null ? `, approximately ${top.distanceMinutes} minutes from campus center` : ""}.`
+    return "Yums focuses on free food. Browse the feed for upcoming events and save the ones you want to visit. Actual spending and savings aren't tracked."
   }
 
   return "I can tell you about free food happening today or nearby eats — ask me about either of those."

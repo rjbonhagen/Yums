@@ -18,9 +18,8 @@ export async function GET(request: Request) {
       if (calendarRequested && !initiatingUser) return NextResponse.redirect(`${origin}/login?error=calendar-failed`)
       const { data, error } = await supabase.auth.exchangeCodeForSession(code)
       if (!error) {
-        // Google sign-in requests Calendar availability. Magic links have no
-        // provider token. Verify ownership and granted access before storage.
-        if (calendarRequested || data.session?.provider_token) {
+        // Honor existing Calendar reconnect links separately from ordinary sign-in.
+        if (calendarRequested) {
           const token = data.session?.provider_token
           const user = data.session?.user
           if (calendarRequested && user?.id !== initiatingUser?.id) {

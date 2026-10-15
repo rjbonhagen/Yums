@@ -36,12 +36,12 @@ describe("auth callback consent boundary", () => {
     expect(response.status).toBe(503)
     expect(exchangeCodeForSession).not.toHaveBeenCalled()
   })
-  it("connects Calendar during Google sign-in without requiring a previous session", async () => {
+  it("signs in with Google without connecting Calendar", async () => {
     const response = await GET(new Request("http://localhost/auth/callback?code=test"))
     expect(response.headers.get("location")).toBe("http://localhost/")
     expect(getUser).not.toHaveBeenCalled()
-    expect(verifyCalendarAccount).toHaveBeenCalledWith("test-provider-token", "person@berkeley.edu")
-    expect(upsert).toHaveBeenCalledWith(expect.objectContaining({ user_id: "verified-user" }))
+    expect(verifyCalendarAccount).not.toHaveBeenCalled()
+    expect(upsert).not.toHaveBeenCalled()
   })
   it("does not request Calendar access during magic-link sign-in", async () => {
     exchangeCodeForSession.mockResolvedValue({ data: { session: { user: { id: "verified-user", email: "person@berkeley.edu" } } }, error: null })
@@ -52,7 +52,7 @@ describe("auth callback consent boundary", () => {
   })
   it("preserves sign-in but explains when Google Calendar access was denied", async () => {
     fetchBusyIntervals.mockRejectedValue(new Error("scope not granted"))
-    const response = await GET(new Request("http://localhost/auth/callback?code=test"))
+    const response = await GET(new Request("http://localhost/auth/callback?code=test&calendar=connect"))
     expect(response.headers.get("location")).toContain("calendar-failed")
     expect(upsert).not.toHaveBeenCalled()
     expect(signOut).not.toHaveBeenCalled()

@@ -78,6 +78,7 @@ function normalizeFallbackEvent(e: ReturnType<typeof demoFoodEvents>[number]): N
 
 export interface RecommendationParams {
   maxTravelMinutes: number
+  freeFoodOnly?: boolean
   optimizeFor?: "cheapest" | "fast"
   // Real Google Calendar access token (see /login's "Connect Google
   // Calendar" and apps/web/src/lib/google-calendar.ts). Absent for most
@@ -118,7 +119,7 @@ export async function buildRecommendations(params: RecommendationParams): Promis
   const [foodResult, callinkResult, placesResult, calendarResult] = await Promise.allSettled([
     demo ? Promise.resolve([]) : getCachedBerkeleyEvents(),
     demo ? Promise.resolve([]) : getCachedCallinkEvents(),
-    demo ? Promise.resolve([
+    params.freeFoodOnly ? Promise.resolve([]) : demo ? Promise.resolve([
       { id: "sample-cafe", name: "Sample campus cafe", latitude: 37.8705, longitude: -122.259, address: "Sample listing · no verified prices" },
       { id: "sample-restaurant", name: "Sample nearby restaurant", latitude: 37.869, longitude: -122.26, address: "Sample listing · no verified prices" },
     ]) : getCachedNearbyPlaces(),
@@ -261,5 +262,7 @@ export async function buildRecommendations(params: RecommendationParams): Promis
     meta.nearbyEats = { source: "unavailable", error: err instanceof Error ? err.message : "fetch failed" }
   }
 
-  return { recommendations: recs.sort((a, b) => b.score - a.score), meta }
+  return { recommendations: recs.sort(params.freeFoodOnly
+    ? (a, b) => Date.parse(a.startTime!) - Date.parse(b.startTime!)
+    : (a, b) => b.score - a.score), meta }
 }
