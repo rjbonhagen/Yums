@@ -7,10 +7,7 @@ function formatTime(iso: string): string {
 }
 
 /**
- * Grounded in buildRecommendations() — the same live data (or documented
- * fallback) the rest of the app uses — instead of letting an LLM guess at
- * deterministic facts. Swap for callOpenAI() below once a real
- * OPENAI_API_KEY exists and open-ended questions need handling.
+ * Answers common questions from the same recommendation data used by the feed.
  */
 export async function answerDeterministically(message: string): Promise<string> {
   const text = message.toLowerCase()
@@ -72,15 +69,8 @@ export interface ChatMessage {
 }
 
 /**
- * Real LLM path for open-ended natural-language questions (e.g. "feed me
- * for a week for $50" from the original spec), once OPENAI_API_KEY is
- * configured — see /api/chat/route.ts for the fallback-on-failure wiring.
- * Grounded in the same live buildRecommendations() data
- * answerDeterministically() uses: the system prompt hands the model
- * today's real free food/nearby eats and explicitly instructs it to
- * answer only from that, never invent events, businesses, or discounts —
- * same no-fabrication standard as the rest of this app, just enforced via
- * the prompt instead of a keyword match.
+ * Answers open-ended questions using current recommendations as context.
+ * The route falls back to deterministic answers if the provider fails.
  */
 export async function answerWithLLM(message: string, history: ChatMessage[] = []): Promise<string> {
   const apiKey = process.env.OPENAI_API_KEY
