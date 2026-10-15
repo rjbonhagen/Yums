@@ -1,5 +1,7 @@
 "use client"
 
+import { isAuthSessionMissingError } from "@supabase/supabase-js"
+
 import { useRouter } from "next/navigation"
 import { useEffect, useState } from "react"
 import { Button } from "@/components/ui/button"
@@ -90,7 +92,7 @@ export default function StartPage() {
     const supabase = createClient()
     supabase.auth.getUser().then(({ data: { user }, error }) => {
       if (revision !== 0 || !active) return
-      if (error) throw error
+      if (error && !isAuthSessionMissingError(error)) throw error
       return restore(user, revision)
     }).catch(() => {
       if (revision !== 0 || !active) return
@@ -118,7 +120,7 @@ export default function StartPage() {
       if (isSupabaseConfigured()) {
         const supabase = createClient()
         const { data: { user }, error } = await supabase.auth.getUser()
-        if (error) throw error
+        if (error && !isAuthSessionMissingError(error)) throw error
         if ((user?.id ?? null) !== userId) {
           setSyncError("Your account changed. Reload this page before saving preferences.")
           return

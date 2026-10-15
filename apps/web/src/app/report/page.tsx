@@ -1,5 +1,7 @@
 "use client"
 
+import { isAuthSessionMissingError } from "@supabase/supabase-js"
+
 import { useEffect, useRef, useState } from "react"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
@@ -41,7 +43,7 @@ export default function ReportPage() {
     const client = createClient()
     client.auth.getUser().then(({ data: { user }, error: authError }) => {
       if (!active || changed) return
-      if (authError) throw authError
+      if (authError && !isAuthSessionMissingError(authError)) throw authError
       currentAccount = user?.id ?? null
       setSignedInUserId(currentAccount)
     }).catch(() => {

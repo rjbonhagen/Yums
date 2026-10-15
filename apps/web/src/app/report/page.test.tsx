@@ -2,6 +2,7 @@ import { act, fireEvent, render, screen, waitFor } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
 import { beforeEach, describe, expect, it, vi } from "vitest"
 import ReportPage from "./page"
+import { AuthSessionMissingError } from "@supabase/supabase-js"
 
 const mocks = vi.hoisted(() => ({ configured: vi.fn(), createClient: vi.fn(), submit: vi.fn(), router: { push: vi.fn(), refresh: vi.fn() } }))
 vi.mock("@/lib/supabase/client", () => ({ isSupabaseConfigured: mocks.configured, createClient: mocks.createClient }))
@@ -31,6 +32,13 @@ async function fillReport() {
 }
 
 describe("report submission account and error handling", () => {
+  it("asks a signed-out visitor to sign in without reporting an account failure", async () => {
+    getUser.mockResolvedValue({ data: { user: null }, error: new AuthSessionMissingError() })
+    render(<ReportPage />)
+    await screen.findByRole("link", { name: "Sign in" })
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument()
+    expect(screen.queryByLabelText("What's free?")).not.toBeInTheDocument()
+  })
   it("requires sign-in when account configuration is absent", () => {
     mocks.configured.mockReturnValue(false)
     render(<ReportPage />)

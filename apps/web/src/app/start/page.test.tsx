@@ -2,6 +2,7 @@ import { act, render, screen, waitFor } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
 import { beforeEach, describe, expect, it, vi } from "vitest"
 import StartPage from "./page"
+import { AuthSessionMissingError } from "@supabase/supabase-js"
 
 const mocks = vi.hoisted(() => ({
   configured: vi.fn(), createClient: vi.fn(), loadLocal: vi.fn(), saveLocal: vi.fn(),
@@ -44,6 +45,16 @@ async function restored() {
 }
 
 describe("pilot onboarding account persistence", () => {
+  it("restores and submits guest preferences when no auth session exists", async () => {
+    getUser.mockResolvedValue({ data: { user: null }, error: new AuthSessionMissingError() })
+    render(<StartPage />)
+    await restored()
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument()
+    await userEvent.setup().click(screen.getByRole("button", { name: "Build My Week" }))
+    await waitFor(() => expect(mocks.router.push).toHaveBeenCalledWith(expect.stringContaining("/dashboard?")))
+    expect(mocks.saveCloud).not.toHaveBeenCalled()
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument()
+  })
   it("restores guest settings and submits without account configuration", async () => {
     mocks.configured.mockReturnValue(false)
     render(<StartPage />)

@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect, useMemo, useRef, useState } from "react"
+import { isAuthSessionMissingError } from "@supabase/supabase-js"
 import type { Recommendation } from "@yums/shared"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -231,7 +232,7 @@ export function RecommendationsView({ recommendations }: { recommendations: Reco
     }
     supabase.auth.getUser().then(({ data: { user }, error }) => {
       if (!account.current.active || account.current.revision !== initialRevision) return
-      if (error) throw error
+      if (error && !isAuthSessionMissingError(error)) throw error
       restore(user)
     }).catch(() => {
       if (account.current.active && account.current.revision === initialRevision) {
