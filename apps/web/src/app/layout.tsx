@@ -1,6 +1,5 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
-import { ChatWidget } from "@/components/chat-widget";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -15,7 +14,7 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   title: "Yums",
-  description: "Discover campus events offering free food and nearby places to eat at UC Berkeley.",
+  description: "Free food at UC Berkeley, collected from campus calendars and community tips. See when, where, and the original source.",
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
@@ -26,7 +25,6 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
     >
       <body className="min-h-full flex flex-col" suppressHydrationWarning>
         {children}
-        <ChatWidget />
       </body>
     </html>
   );

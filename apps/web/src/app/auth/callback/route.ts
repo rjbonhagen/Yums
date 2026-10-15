@@ -46,7 +46,7 @@ export async function GET(request: Request) {
             return NextResponse.redirect(`${origin}/login?error=calendar-failed`)
           }
         }
-        return NextResponse.redirect(`${origin}/start`)
+        return NextResponse.redirect(`${origin}/`)
       }
     }
   } catch {
