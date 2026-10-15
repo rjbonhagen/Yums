@@ -35,18 +35,22 @@ unencrypted EBS, public SSH, and mutable image tags. These checks cover the
 defined rules; they are not a comprehensive security assessment.
 
 Release-command tests pass locally. CloudFormation's basic `ValidateTemplate`
-check accepts the template. Docker is unavailable on this machine. A Linux container build and smoke
-check and actual HTTPS/account acceptance checks remain release gates.
+check accepts the template. GitHub's Linux builds and container smoke checks
+passed. The first release is deployed with HTTPS at `https://getyums.food`.
+Public health, login HTML, static assets, and callback-origin checks pass.
+Hosted signed-in account acceptance checks remain a release gate for invitations.
 
 The `yums-pilot` change set `pre-deploy-20261014` completed account-aware
 pre-deployment validation in `us-west-1`; `DescribeEvents` returned no validation
-errors. It plans 16 resources, using the existing default VPC and public subnet
-in `us-west-1a`. Execution remains pending until the Linux checks pass.
-No server has been launched. The stack exists in `REVIEW_IN_PROGRESS` while
-the change set awaits execution. CloudTrail has no persistent trail configured;
+errors. It provisioned 16 resources, using the existing default VPC and public
+subnet in `us-west-1a`. The server passed bootstrap and EC2 health checks.
+The deployment identity was subsequently updated in place to match GitHub's
+immutable repository subject format. CloudTrail has no persistent trail configured;
 management event history provides limited retention rather than durable audit
 logging. Alert delivery will use the operator-selected address and requires
-confirmation of the SNS email subscription after launch.
+confirmation of the SNS email subscription after launch. Public DNS resolves to
+the stack's static IP. Production and localhost callback URLs are configured
+in Supabase, with `https://getyums.food` as the Site URL.
 
 ## Access and exposure
 
