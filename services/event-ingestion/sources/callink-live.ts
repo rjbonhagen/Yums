@@ -1,17 +1,15 @@
 import type { CampusEvent, CampusEventSource } from "../types"
 
-// UC Berkeley's official student-org platform (Cal Link, a CampusGroups
-// instance) exposes a real, public, unauthenticated JSON API for club
-// events — confirmed by hand: GET /api/discovery/event/search returns
-// real titles, HTML descriptions, start/end times, location names, and
-// (when the organizer provided them) coordinates. Unlike
-// events.berkeley.edu (see berkeley-live.ts), this feed also returns a
-// `benefitNames` tag array that organizers can set themselves, including
-// a literal "Free Food" tag on many events — a real, attributable signal
-// distinct from guessing off keywords, so we fold it into the description
-// text handed to extractDeterministic rather than inventing a separate
-// confidence path.
+// Cal Link's event discovery feed may require CalNet sign-in. Read only
+// public JSON responses; sign-in redirects are disclosed to the caller.
 const SEARCH_URL = "https://callink.berkeley.edu/api/discovery/event/search"
+
+export class CalLinkSignInRequiredError extends Error {
+  constructor() {
+    super("Cal Link requires Berkeley CalNet sign-in.")
+    this.name = "CalLinkSignInRequiredError"
+  }
+}
 
 interface CalLinkEvent {
   id: string
@@ -58,14 +56,23 @@ export const callinkSource: CampusEventSource = {
       headers: { Accept: "application/json" },
       // The outer recommendation cache must refresh from the network.
       cache: "no-store",
+      redirect: "manual",
       signal: AbortSignal.timeout(8000),
     })
 
+    const location = res.headers.get("location")
+    if (res.status === 401 || (res.status >= 300 && res.status < 400 && location
+      && new URL(location, SEARCH_URL).origin === "https://callink.berkeley.edu"
+      && new URL(location, SEARCH_URL).pathname.toLowerCase() === "/account/login")) {
+      throw new CalLinkSignInRequiredError()
+    }
     if (!res.ok) {
       throw new Error(`callink.berkeley.edu returned ${res.status}`)
     }
-
-    const body = (await res.json()) as CalLinkSearchResponse
+    if (!res.headers.get("content-type")?.toLowerCase().includes("application/json")) {
+      throw new Error("Invalid Cal Link event response")
+    }
+    const body = await res.json().catch(() => { throw new Error("Invalid Cal Link event response") }) as CalLinkSearchResponse
     if (!body || !Array.isArray(body.value)) throw new Error("Invalid Cal Link event response")
 
     return body.value.flatMap((e) => {

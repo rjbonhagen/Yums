@@ -28,9 +28,10 @@ export default async function FeedPage() {
     buildRecommendations({ maxTravelMinutes: 20, freeFoodOnly: true }),
     loadCommunityReports(),
   ])
+  const calLinkNeedsSignIn = meta.callink.source === "unavailable" && meta.callink.reason === "sign-in-required"
   const missingSources = [
     meta.freeFood.source === "unavailable" ? "Berkeley calendar" : null,
-    meta.callink.source === "unavailable" ? "Cal Link" : null,
+    meta.callink.source === "unavailable" && !calLinkNeedsSignIn ? "Cal Link" : null,
   ].filter(Boolean)
 
   return (
@@ -39,8 +40,12 @@ export default async function FeedPage() {
       <main id="main-content" className="flex-1">
         <RecommendationsView key={userId ?? "guest"} recommendations={recommendations} now={new Date().toISOString()} notices={<>
         {meta.freeFood.source === "demo" && <p role="status" className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">Sample events for preview only. These are not real food offers.</p>}
+        {calLinkNeedsSignIn && <p role="status" className="rounded-xl border bg-secondary/50 p-4 text-sm">
+          Cal Link requires Berkeley CalNet sign-in, so its events can’t be imported here. {" "}
+          <a href="https://callink.berkeley.edu/events" target="_blank" rel="noreferrer" className="font-medium text-primary underline underline-offset-4">Browse Cal Link</a>
+        </p>}
         {missingSources.length > 0 && <p role="status" className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
-          {missingSources.join(" and ")} {missingSources.length === 1 ? "is" : "are"} unavailable right now. {missingSources.length === 2 ? "We can’t check campus events. Try again later." : "Events from other sources still appear."}
+          {missingSources.join(" and ")} {missingSources.length === 1 ? "is" : "are"} unavailable right now. {meta.freeFood.source === "unavailable" && meta.callink.source === "unavailable" ? "Campus events can’t be checked right now." : "Events from other sources still appear."}
         </p>}
         </>}>
         <section className="border-t pt-8" aria-label="Community tips">

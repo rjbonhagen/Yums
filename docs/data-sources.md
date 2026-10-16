@@ -18,7 +18,14 @@ API format: [LiveWhale documentation](https://support.livewhale.com/live/blurbs/
 
 ## Cal Link
 
-`callink-live.ts` reads the public event-search endpoint. It uses descriptions,
+On October 16, 2026, both the event page and discovery endpoint redirected
+anonymous requests to CalNet sign-in. Yums cannot currently import this feed.
+The adapter detects the login redirect without following it, and the feed
+shows an access message with a direct link to Cal Link. Restoring automatic
+imports requires an approved public feed or another authorized integration;
+personal CalNet sessions are not shared with Yums.
+
+When publicly accessible, `callink-live.ts` reads the event-search endpoint using descriptions,
 organizer names, times, and organizer-entered locations/coordinates. An exact
 Free Food benefit is explicit organizer evidence. The source requests the
 first 100 events starting within the last day or later, retaining recently

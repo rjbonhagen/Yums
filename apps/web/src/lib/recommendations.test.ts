@@ -15,7 +15,8 @@ vi.mock("next/cache", () => ({
 const berkeleySourceMarker = { key: "berkeley-live" }
 const callinkSourceMarker = { key: "callink-live" }
 
-vi.mock("@yums/event-ingestion", () => ({
+vi.mock("@yums/event-ingestion", async (original) => ({
+  ...await original<typeof import("@yums/event-ingestion")>(),
   berkeleyLiveSource: berkeleySourceMarker,
   callinkSource: callinkSourceMarker,
   ingestSource: vi.fn(),
@@ -28,7 +29,7 @@ vi.mock("./google-calendar", async (original) => ({
   ...await original<typeof import("./google-calendar")>(), fetchBusyIntervals: vi.fn(),
 }))
 
-const { ingestSource } = await import("@yums/event-ingestion")
+const { ingestSource, CalLinkSignInRequiredError } = await import("@yums/event-ingestion")
 const { fetchNearbyPlaces } = await import("./nearby-places")
 const { fetchBusyIntervals } = await import("./google-calendar")
 const { buildRecommendations } = await import("./recommendations")
@@ -163,6 +164,17 @@ describe("buildRecommendations", () => {
     expect(meta.freeFood).toEqual({ source: "live" })
     expect(recommendations.some((r) => r.sourceUrl === liveBerkeleyEvent.sourceUrl)).toBe(true)
     expect(recommendations.some((r) => r.sourceUrl === liveCallinkEvent.sourceUrl)).toBe(false)
+  })
+
+  it("distinguishes CalNet sign-in from a temporary Cal Link outage", async () => {
+    mockIngestSource(async (source) => {
+      if (source.key === "callink-live") throw new CalLinkSignInRequiredError()
+      return [liveBerkeleyEvent]
+    })
+    const { recommendations, meta } = await buildRecommendations({ maxTravelMinutes: 20, freeFoodOnly: true })
+    expect(meta.callink).toEqual({ source: "unavailable", reason: "sign-in-required", error: "Cal Link requires Berkeley CalNet sign-in." })
+    expect(meta.freeFood.source).toBe("live")
+    expect(recommendations.map((event) => event.sourceUrl)).toEqual([liveBerkeleyEvent.sourceUrl])
   })
 
   it("never invents a savings figure for nearby_eats and discloses when Overpass is unavailable", async () => {

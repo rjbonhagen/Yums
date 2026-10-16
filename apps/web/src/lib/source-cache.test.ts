@@ -12,7 +12,8 @@ vi.mock("next/cache", () => ({
     return value
   },
 }))
-vi.mock("@yums/event-ingestion", () => ({
+vi.mock("@yums/event-ingestion", async (original) => ({
+  ...await original<typeof import("@yums/event-ingestion")>(),
   berkeleyLiveSource: { key: "berkeley-live" }, callinkSource: { key: "callink-live" }, ingestSource: mocks.ingest,
 }))
 vi.mock("./nearby-places", () => ({ fetchNearbyPlaces: mocks.places }))

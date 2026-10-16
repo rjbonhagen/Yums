@@ -1,7 +1,7 @@
 import { cacheLiveSource } from "./source-cache"
 import { scoreOpportunity, DEFAULT_WEIGHTS } from "@yums/shared"
 import type { Recommendation } from "@yums/shared"
-import { berkeleyLiveSource, callinkSource, ingestSource, type ExtractedFoodEvent } from "@yums/event-ingestion"
+import { berkeleyLiveSource, callinkSource, CalLinkSignInRequiredError, ingestSource, type ExtractedFoodEvent } from "@yums/event-ingestion"
 import { fetchNearbyPlaces } from "./nearby-places"
 import { haversineMinutes, validCoordinates } from "./geo"
 import { demoFoodEvents } from "./mock-data"
@@ -88,7 +88,7 @@ export interface RecommendationParams {
 
 export interface RecommendationsMeta {
   freeFood: { source: "live" | "unavailable" | "demo"; error?: string }
-  callink: { source: "live" | "unavailable" | "demo"; error?: string }
+  callink: { source: "live" | "unavailable" | "demo"; error?: string; reason?: "sign-in-required" }
   nearbyEats: { source: "live" | "unavailable" | "demo"; error?: string }
   schedule: { source: "live" | "placeholder" | "unavailable"; error?: string }
 }
@@ -157,7 +157,10 @@ export async function buildRecommendations(params: RecommendationParams): Promis
     foodEvents = foodEvents.concat(callinkResult.value.map(normalizeLiveEvent))
   } else {
     const err = callinkResult.reason
-    meta.callink = { source: "unavailable", error: err instanceof Error ? err.message : "fetch failed" }
+    meta.callink = {
+      source: "unavailable", error: err instanceof Error ? err.message : "fetch failed",
+      ...(err instanceof CalLinkSignInRequiredError ? { reason: "sign-in-required" as const } : {}),
+    }
   }
 
   if (demo) {

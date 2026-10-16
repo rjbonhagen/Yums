@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest"
 import { berkeleyLiveSource } from "./berkeley-live"
-import { callinkSource } from "./callink-live"
+import { callinkSource, CalLinkSignInRequiredError } from "./callink-live"
 
 afterEach(() => { vi.unstubAllGlobals(); vi.useRealTimers() })
 
@@ -13,14 +13,14 @@ describe("live source coverage", () => {
     expect((await berkeleyLiveSource.fetchEvents()).map((event) => event.sourceUrl)).toEqual(["https://events.berkeley.edu/live/events/1"])
   })
   it("rejects a malformed Cal Link response rather than reporting a successful empty feed", async () => {
-    vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ ok: true, json: async () => ({ error: "bad response" }) }))
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(Response.json({ error: "bad response" })))
     await expect(callinkSource.fetchEvents()).rejects.toThrow("Invalid Cal Link event response")
   })
   it("does not create event links from absent or invalid Cal Link IDs", async () => {
     const event = { name: "Free pizza", startsOn: "2026-10-07T20:00:00Z" }
-    vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ ok: true, json: async () => ({ value: [
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(Response.json({ value: [
       { ...event, id: 123 }, { ...event }, { ...event, id: "../other" },
-    ] }) }))
+    ] })))
     expect((await callinkSource.fetchEvents()).map((event) => event.sourceUrl)).toEqual(["https://callink.berkeley.edu/event/123"])
   })
   it("uses Pacific dates and documented path parameters for the weekly feed", async () => {
@@ -50,15 +50,39 @@ describe("live source coverage", () => {
   it("includes recently started Cal Link events and preserves their end times", async () => {
     vi.useFakeTimers()
     vi.setSystemTime(new Date("2026-10-07T20:01:30Z"))
-    const fetcher = vi.fn().mockResolvedValue({ ok: true, json: async () => ({ value: [{
+    const fetcher = vi.fn().mockResolvedValue(Response.json({ value: [{
       id: "ongoing", name: "Free pizza social", startsOn: "2026-10-07T19:00:00Z",
       endsOn: "2026-10-07T21:00:00Z", benefitNames: ["Free Food"],
-    }] }) })
+    }] }))
     vi.stubGlobal("fetch", fetcher)
     const [event] = await callinkSource.fetchEvents()
     const lowerBound = new URL(fetcher.mock.calls[0][0]).searchParams.get("startsAfter")!
     expect(new Date(lowerBound).getTime()).toBeLessThan(new Date(event.startTime).getTime())
     expect(event.endTime).toBe("2026-10-07T21:00:00Z")
     expect(event.freeFoodConfirmed).toBe(true)
+  })
+  it("identifies Cal Link sign-in redirects without following them", async () => {
+    const fetcher = vi.fn().mockResolvedValue(new Response(null, { status: 302,
+      headers: { Location: "/account/login?returnUrl=%2Fapi%2Fdiscovery%2Fevent%2Fsearch" },
+    }))
+    vi.stubGlobal("fetch", fetcher)
+    await expect(callinkSource.fetchEvents()).rejects.toBeInstanceOf(CalLinkSignInRequiredError)
+    expect(fetcher).toHaveBeenCalledOnce()
+    expect(fetcher.mock.calls[0][1]).toMatchObject({ redirect: "manual" })
+  })
+  it("does not mislabel an unrelated redirect as a CalNet sign-in requirement", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(null, { status: 302,
+      headers: { Location: "https://example.com/account/login" },
+    })))
+    await expect(callinkSource.fetchEvents()).rejects.toThrow("callink.berkeley.edu returned 302")
+  })
+  it("identifies an authentication rejection and rejects HTML or broken JSON cleanly", async () => {
+    vi.stubGlobal("fetch", vi.fn()
+      .mockResolvedValueOnce(new Response(null, { status: 401 }))
+      .mockResolvedValueOnce(new Response("<html>Sign in</html>", { headers: { "Content-Type": "text/html" } }))
+      .mockResolvedValueOnce(new Response("broken", { headers: { "Content-Type": "application/json" } })))
+    await expect(callinkSource.fetchEvents()).rejects.toBeInstanceOf(CalLinkSignInRequiredError)
+    await expect(callinkSource.fetchEvents()).rejects.toThrow("Invalid Cal Link event response")
+    await expect(callinkSource.fetchEvents()).rejects.toThrow("Invalid Cal Link event response")
   })
 })

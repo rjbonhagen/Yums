@@ -36,4 +36,21 @@ describe("public food feed", () => {
     expect(screen.queryByText(/internal connection detail/)).not.toBeInTheDocument()
     expect(screen.queryByText(/budget|Calendar connection|OpenStreetMap/i)).not.toBeInTheDocument()
   })
+  it("explains CalNet access and links to Cal Link without claiming a temporary outage", async () => {
+    build.mockResolvedValue({ recommendations: [], meta: {
+      freeFood: { source: "live" }, callink: { source: "unavailable", reason: "sign-in-required" },
+    } })
+    render(await FeedPage())
+    expect(screen.getByRole("status")).toHaveTextContent("Cal Link requires Berkeley CalNet sign-in")
+    expect(screen.getByRole("link", { name: "Browse Cal Link" })).toHaveAttribute("href", "https://callink.berkeley.edu/events")
+    expect(screen.queryByText(/Cal Link is unavailable right now/)).not.toBeInTheDocument()
+  })
+  it("does not claim other campus sources are available when both imports are unavailable", async () => {
+    build.mockResolvedValue({ recommendations: [], meta: {
+      freeFood: { source: "unavailable" }, callink: { source: "unavailable", reason: "sign-in-required" },
+    } })
+    render(await FeedPage())
+    expect(screen.queryByText(/Events from other sources still appear/)).not.toBeInTheDocument()
+    expect(screen.getByText(/Campus events can’t be checked right now/)).toBeInTheDocument()
+  })
 })

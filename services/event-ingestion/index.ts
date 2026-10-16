@@ -9,7 +9,7 @@ export * from "./types"
 export * from "./extract"
 export { berkeleyMockSource } from "./sources/berkeley-mock"
 export { berkeleyLiveSource } from "./sources/berkeley-live"
-export { callinkSource } from "./sources/callink-live"
+export { callinkSource, CalLinkSignInRequiredError } from "./sources/callink-live"
 
 // Default ingestion is live-only. Sample adapters remain an explicit export
 // for test/demo callers and cannot enter an ordinary live ingestion result.

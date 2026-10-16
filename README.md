@@ -6,8 +6,8 @@ announcement before heading out.
 
 ## Features
 
-- **One food feed:** Berkeley calendar and Cal Link events with explicit food
-  offers, shown in time order.
+- **One food feed:** available campus sources with explicit food offers, shown
+  in time order. Cal Link imports currently require an approved access path.
 - **Simple filters:** this week, today, tomorrow, and search by name or location.
 - **Saved food:** save in the browser without an account, or sign in to sync new
   saves across devices.
@@ -88,5 +88,7 @@ See [product scope](docs/product.md), [data sources](docs/data-sources.md), and
 
 Coverage is limited to available sources around UC Berkeley. A food announcement
 does not establish eligibility or remaining supplies; check the original post.
+Cal Link currently requires CalNet sign-in, so Yums links to it directly rather
+than importing its events. See [data sources](docs/data-sources.md) for access details.
 Community reports are user submitted and are labeled accordingly. The pilot
 runs on one server and does not provide high availability.
