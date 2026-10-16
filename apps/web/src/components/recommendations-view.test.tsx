@@ -63,6 +63,21 @@ describe("free food feed", () => {
     expect(screen.getAllByRole("article")).toHaveLength(2)
     expect(screen.getAllByRole("button", { name: "Save" })).toHaveLength(2)
   })
+  it("combines campus source, date, and search filters", async () => {
+    const user = userEvent.setup()
+    render(<RecommendationsView now={now} recommendations={[
+      today, tomorrow,
+      rec("calendar", "2026-10-15T21:00:00Z", { title: "Pizza social", sourceUrl: "https://events.berkeley.edu/event/1" }),
+    ]} />)
+    await user.selectOptions(screen.getByRole("combobox", { name: "Filter by campus source" }), "Berkeley calendar")
+    expect(screen.queryByText("Pizza lunch")).not.toBeInTheDocument()
+    expect(screen.getByText("Pizza social")).toBeInTheDocument()
+    await user.click(screen.getByRole("button", { name: "Today" }))
+    expect(screen.getByText("No matching food events")).toBeInTheDocument()
+    await user.click(screen.getByRole("button", { name: "Tomorrow" }))
+    await user.type(screen.getByRole("textbox", { name: "Search free food" }), "Soda Hall")
+    expect(screen.getByText("Pizza social")).toBeInTheDocument()
+  })
   it("explains an empty source result without adding sample offers", () => {
     render(<RecommendationsView now={now} recommendations={[]} />)
     expect(screen.getByText("No campus events found")).toBeInTheDocument()

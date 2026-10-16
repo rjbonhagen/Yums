@@ -1,12 +1,13 @@
 import { beforeEach, describe, expect, it, vi } from "vitest"
 import { render, screen } from "@testing-library/react"
+import type { ReactNode } from "react"
 const { getUser, build } = vi.hoisted(() => ({ getUser: vi.fn(), build: vi.fn() }))
 vi.mock("@/lib/supabase/client", () => ({ isSupabaseConfigured: () => true }))
 vi.mock("@/lib/supabase/server", () => ({ createClient: async () => ({ auth: { getUser } }) }))
 vi.mock("@/lib/reported-events", () => ({ loadUpcomingReportedEvents: async () => [] }))
 vi.mock("@/lib/recommendations", () => ({ buildRecommendations: build }))
 vi.mock("@/components/nav", () => ({ Nav: () => null }))
-vi.mock("@/components/recommendations-view", () => ({ RecommendationsView: () => <p>Public recommendations</p> }))
+vi.mock("@/components/recommendations-view", () => ({ RecommendationsView: ({ notices, children }: { notices?: ReactNode; children?: ReactNode }) => <><p>Public recommendations</p>{notices}{children}</> }))
 vi.mock("@/components/community-reports", () => ({ CommunityReports: () => <p>Report list</p> }))
 import FeedPage from "./page"
 beforeEach(() => {

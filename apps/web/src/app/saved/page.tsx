@@ -10,7 +10,7 @@ import { loadSavedItems } from "@/lib/saved-items"
 function Shell({ children }: { children: React.ReactNode }) {
   return (
     <div className="flex flex-1 flex-col">
-      <Nav />
+      <Nav active="saved" />
       <main className="mx-auto w-full max-w-4xl flex-1 space-y-5 px-5 py-10">
         <h1 className="text-3xl font-semibold tracking-tight">Saved food</h1>
         {children}

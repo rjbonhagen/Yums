@@ -36,7 +36,7 @@ describe("CommunityReports", () => {
   })
   it("labels the section as unverified/user-submitted", () => {
     render(<CommunityReports userId={null} reports={[REPORT]} />)
-    expect(screen.getByText(/unverified/i)).toBeInTheDocument()
+    expect(screen.getByText("Unverified — user-submitted")).toBeInTheDocument()
   })
 
   it("shows a message when there are no reports", () => {

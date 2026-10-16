@@ -5,7 +5,7 @@ export function Nav({ tone = "light", active }: { tone?: "light" | "teal"; activ
   const teal = tone === "teal"
   const navLink = "border-b-2 border-transparent py-2 transition-colors hover:border-current aria-[current=page]:border-current"
   return (
-    <header className={teal ? "bg-primary text-white" : "border-b bg-background text-primary"}>
+    <header className={teal ? "bg-primary text-white [&_a]:focus-visible:outline-accent [&_button]:focus-visible:outline-accent" : "border-b bg-background text-primary"}>
       <nav aria-label="Main navigation" className="mx-auto flex w-full max-w-[1184px] flex-wrap items-center justify-between gap-x-6 gap-y-2 px-5 py-5 sm:px-8">
         <div className="flex items-center gap-3">
           <Link href="/" aria-label="Yums home" className="text-[38px] font-bold leading-none tracking-[-3px] sm:text-[42px]">
