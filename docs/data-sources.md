@@ -25,6 +25,10 @@ shows an access message with a direct link to Cal Link. Restoring automatic
 imports requires an approved public feed or another authorized integration;
 personal CalNet sessions are not shared with Yums.
 
+A separate [personal calendar preview](local-callink-import.md) can read an
+official iCal/Outlook export after the user signs in on Berkeley's site. It keeps
+reviewed events in the local browser tab and does not populate the shared feed.
+
 When publicly accessible, `callink-live.ts` reads the event-search endpoint using descriptions,
 organizer names, times, and organizer-entered locations/coordinates. An exact
 Free Food benefit is explicit organizer evidence. The source requests the

@@ -52,6 +52,10 @@ For an offline preview, set `YUMS_DEMO_MODE=true` locally and restart. Sample
 events stay labeled. Restore `false` for live data; production mode changes
 require a rebuild.
 
+For a personal Cal Link preview after signing in on Berkeley's site, see
+[local calendar imports](docs/local-callink-import.md). This optional tool keeps
+reviewed exports in one browser tab and does not publish them to the pilot.
+
 ## Verify
 
 ```sh

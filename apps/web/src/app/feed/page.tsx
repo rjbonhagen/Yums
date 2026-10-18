@@ -6,6 +6,7 @@ import { buildRecommendations } from "@/lib/recommendations"
 import { isSupabaseConfigured } from "@/lib/supabase/client"
 import { createClient } from "@/lib/supabase/server"
 import { loadUpcomingReportedEvents, type ReportedEvent } from "@/lib/reported-events"
+import { localImportsEnabled } from "@/lib/local-imports"
 
 export const dynamic = "force-dynamic"
 
@@ -43,6 +44,7 @@ export default async function FeedPage() {
         {calLinkNeedsSignIn && <p role="status" className="rounded-xl border bg-secondary/50 p-4 text-sm">
           Cal Link requires Berkeley CalNet sign-in, so its events can’t be imported here. {" "}
           <a href="https://callink.berkeley.edu/events" target="_blank" rel="noreferrer" className="font-medium text-primary underline underline-offset-4">Browse Cal Link</a>
+          {localImportsEnabled() && <Link href="/import" prefetch={false} className="ml-3 font-medium text-primary underline underline-offset-4">Review a local export</Link>}
         </p>}
         {missingSources.length > 0 && <p role="status" className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
           {missingSources.join(" and ")} {missingSources.length === 1 ? "is" : "are"} unavailable right now. {meta.freeFood.source === "unavailable" && meta.callink.source === "unavailable" ? "Campus events can’t be checked right now." : "Events from other sources still appear."}

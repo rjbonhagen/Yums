@@ -24,6 +24,7 @@ export default defineConfig({
     alias: {
       "@": path.resolve(root, "apps/web/src"),
       "@yums/shared": path.resolve(root, "packages/shared/index.ts"),
+      "@yums/event-ingestion/callink-calendar": path.resolve(root, "services/event-ingestion/callink-calendar.ts"),
       "@yums/event-ingestion": path.resolve(root, "services/event-ingestion/index.ts"),
     },
   },
