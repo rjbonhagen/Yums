@@ -25,6 +25,7 @@ function sourceName(url?: string): string {
     const host = new URL(url ?? "").hostname
     if (host === "callink.berkeley.edu") return "Cal Link"
     if (host === "events.berkeley.edu") return "Berkeley calendar"
+    if (host === "grad.berkeley.edu") return "Graduate Division"
     return host || "Original announcement"
   } catch { return "Original announcement" }
 }
@@ -180,10 +181,9 @@ export function RecommendationsView({ recommendations, now: initialNow, notices,
 
   const filtered = useMemo(() => {
     const query = search.trim().toLowerCase()
-    return collapseDuplicateListings(recommendations, savedByKey)
+    return collapseDuplicateListings(recommendations.filter((event) => source === "all" || sourceName(event.sourceUrl) === source), savedByKey)
       .filter((event) => {
         if (event.kind !== "free_food") return false
-        if (source !== "all" && sourceName(event.sourceUrl) !== source) return false
         if (event.startTime && !isInCampusWeek(event.startTime, event.endTime, now)) return false
         if (dateFilter === "today" && !isToday(event.startTime, now, event.endTime)) return false
         if (dateFilter === "tomorrow" && (!event.startTime || campusDate(new Date(event.startTime)) !== addCalendarDays(campusDate(now), 1))) return false
@@ -218,7 +218,7 @@ export function RecommendationsView({ recommendations, now: initialNow, notices,
       {notices}
       <section aria-label="Free food events" className="space-y-5">
         <div className="flex items-center justify-between gap-5">
-          <div><h2 className="text-2xl font-semibold tracking-tight sm:text-[27px]">Your next free bite</h2><p className="mt-1 text-sm text-muted-foreground">From campus calendars and club announcements.</p></div>
+          <div><h2 className="text-2xl font-semibold tracking-tight sm:text-[27px]">Your next free bite</h2><p className="mt-1 text-sm text-muted-foreground">From public campus calendars. Only explicit free-food offers.</p></div>
           <p className="hidden text-right text-xs leading-relaxed text-muted-foreground sm:block">Campus announcements.<br />Original sources, always linked.</p>
         </div>
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">

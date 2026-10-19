@@ -13,12 +13,12 @@ vi.mock("next/cache", () => ({
 }))
 
 const berkeleySourceMarker = { key: "berkeley-live" }
-const callinkSourceMarker = { key: "callink-live" }
+const graduateSourceMarker = { key: "graduate-live" }
 
 vi.mock("@yums/event-ingestion", async (original) => ({
   ...await original<typeof import("@yums/event-ingestion")>(),
   berkeleyLiveSource: berkeleySourceMarker,
-  callinkSource: callinkSourceMarker,
+  graduateLiveSource: graduateSourceMarker,
   ingestSource: vi.fn(),
 }))
 
@@ -29,7 +29,7 @@ vi.mock("./google-calendar", async (original) => ({
   ...await original<typeof import("./google-calendar")>(), fetchBusyIntervals: vi.fn(),
 }))
 
-const { ingestSource, CalLinkSignInRequiredError } = await import("@yums/event-ingestion")
+const { ingestSource } = await import("@yums/event-ingestion")
 const { fetchNearbyPlaces } = await import("./nearby-places")
 const { fetchBusyIntervals } = await import("./google-calendar")
 const { buildRecommendations } = await import("./recommendations")
@@ -46,14 +46,14 @@ const liveBerkeleyEvent = {
   food: "pizza",
 }
 
-const liveCallinkEvent = {
+const liveGraduateEvent = {
   organization: "Orthodox Christian Fellowship",
   title: "Free dinner",
   locationName: "OCF House",
   latitude: 37.87,
   longitude: -122.26,
   startTime: "2026-09-02T01:00:00Z",
-  sourceUrl: "https://callink.berkeley.edu/event/1",
+  sourceUrl: "https://grad.berkeley.edu/event/1",
   confidenceScore: 0.9,
   food: "dinner",
 }
@@ -84,11 +84,11 @@ afterEach(() => { vi.useRealTimers(); vi.unstubAllEnvs() })
 
 describe("buildRecommendations", () => {
   it("skips restaurant lookups in the food-only feed and sorts by time", async () => {
-    mockIngestSource(async (source) => source.key === "berkeley-live" ? [liveBerkeleyEvent] : [liveCallinkEvent])
+    mockIngestSource(async (source) => source.key === "berkeley-live" ? [liveBerkeleyEvent] : [liveGraduateEvent])
     const result = await buildRecommendations({ maxTravelMinutes: 20, freeFoodOnly: true })
     expect(fetchNearbyPlaces).not.toHaveBeenCalled()
     expect(fetchBusyIntervals).not.toHaveBeenCalled()
-    expect(result.recommendations.map((event) => event.title)).toEqual([liveBerkeleyEvent.title, liveCallinkEvent.title])
+    expect(result.recommendations.map((event) => event.title)).toEqual([liveBerkeleyEvent.title, liveGraduateEvent.title])
     expect(result.recommendations.every((event) => event.kind === "free_food")).toBe(true)
   })
   it("deduplicates source occurrences, retains recurring dates, and keeps IDs stable across reorder", async () => {
@@ -106,18 +106,18 @@ describe("buildRecommendations", () => {
     mockIngestSource(async (source) => source.key === "berkeley-live" ? [
       { ...liveBerkeleyEvent, latitude: Infinity, longitude: NaN },
       { ...liveBerkeleyEvent, endTime: "2026-09-01T22:00:00Z" },
-      { ...liveCallinkEvent, latitude: 999, longitude: 999 },
+      { ...liveGraduateEvent, latitude: 999, longitude: 999 },
     ] : [])
     vi.mocked(fetchNearbyPlaces).mockResolvedValue([{ ...nearbyPlace, latitude: NaN }])
     const { recommendations } = await buildRecommendations({ maxTravelMinutes: 20 })
     expect(recommendations).toHaveLength(2)
     expect(recommendations.find((r) => r.title === liveBerkeleyEvent.title)).toMatchObject({ endTime: "2026-09-01T22:00:00.000Z", durationEstimated: false })
-    expect(recommendations.find((r) => r.title === liveCallinkEvent.title)).toMatchObject({ latitude: undefined, longitude: undefined, distanceMinutes: undefined })
+    expect(recommendations.find((r) => r.title === liveGraduateEvent.title)).toMatchObject({ latitude: undefined, longitude: undefined, distanceMinutes: undefined })
     expect(recommendations.every((r) => Number.isFinite(r.score))).toBe(true)
   })
   it("reports every source as live when all three succeed", async () => {
     mockIngestSource(async (source) =>
-      source.key === "berkeley-live" ? [liveBerkeleyEvent] : [liveCallinkEvent],
+      source.key === "berkeley-live" ? [liveBerkeleyEvent] : [liveGraduateEvent],
     )
     vi.mocked(fetchNearbyPlaces).mockResolvedValue([nearbyPlace])
 
@@ -125,56 +125,51 @@ describe("buildRecommendations", () => {
 
     expect(meta).toEqual({
       freeFood: { source: "live" },
-      callink: { source: "live" },
+      graduate: { source: "live" },
       nearbyEats: { source: "live" },
       schedule: { source: "placeholder" },
     })
     expect(recommendations.some((r) => r.sourceUrl === liveBerkeleyEvent.sourceUrl)).toBe(true)
-    expect(recommendations.some((r) => r.sourceUrl === liveCallinkEvent.sourceUrl)).toBe(true)
+    expect(recommendations.some((r) => r.sourceUrl === liveGraduateEvent.sourceUrl)).toBe(true)
     expect(recommendations.some((r) => r.title === "Caffé Strada")).toBe(true)
   })
 
   it("omits Berkeley events during an outage without injecting sample offers", async () => {
     mockIngestSource(async (source) => {
       if (source.key === "berkeley-live") throw new Error("events.berkeley.edu returned 503")
-      return [liveCallinkEvent]
+      return [liveGraduateEvent]
     })
     vi.mocked(fetchNearbyPlaces).mockResolvedValue([])
 
     const { recommendations, meta } = await buildRecommendations({ maxTravelMinutes: 20 })
 
     expect(meta.freeFood).toEqual({ source: "unavailable", error: "events.berkeley.edu returned 503" })
-    // Cal Link's independent success is unaffected by Berkeley's failure.
-    expect(meta.callink).toEqual({ source: "live" })
+    // Graduate Division's independent success is unaffected by Berkeley's failure.
+    expect(meta.graduate).toEqual({ source: "live" })
     // Some free_food recs came from the (non-empty) mock fixture, not silently zero.
     expect(recommendations.filter((r) => r.kind === "free_food")).toHaveLength(1)
     expect(recommendations.some((r) => r.isSample)).toBe(false)
   })
 
-  it("omits Cal Link events (never fabricates a replacement) when Cal Link fails, without touching Berkeley's result", async () => {
+  it("omits Graduate Division events (never fabricates a replacement) when Graduate Division fails, without touching Berkeley's result", async () => {
     mockIngestSource(async (source) => {
-      if (source.key === "callink-live") throw new Error("callink.berkeley.edu returned 500")
+      if (source.key === "graduate-live") throw new Error("grad.berkeley.edu returned 500")
       return [liveBerkeleyEvent]
     })
     vi.mocked(fetchNearbyPlaces).mockResolvedValue([])
 
     const { recommendations, meta } = await buildRecommendations({ maxTravelMinutes: 20 })
 
-    expect(meta.callink).toEqual({ source: "unavailable", error: "callink.berkeley.edu returned 500" })
+    expect(meta.graduate).toEqual({ source: "unavailable", error: "grad.berkeley.edu returned 500" })
     expect(meta.freeFood).toEqual({ source: "live" })
     expect(recommendations.some((r) => r.sourceUrl === liveBerkeleyEvent.sourceUrl)).toBe(true)
-    expect(recommendations.some((r) => r.sourceUrl === liveCallinkEvent.sourceUrl)).toBe(false)
+    expect(recommendations.some((r) => r.sourceUrl === liveGraduateEvent.sourceUrl)).toBe(false)
   })
 
-  it("distinguishes CalNet sign-in from a temporary Cal Link outage", async () => {
-    mockIngestSource(async (source) => {
-      if (source.key === "callink-live") throw new CalLinkSignInRequiredError()
-      return [liveBerkeleyEvent]
-    })
-    const { recommendations, meta } = await buildRecommendations({ maxTravelMinutes: 20, freeFoodOnly: true })
-    expect(meta.callink).toEqual({ source: "unavailable", reason: "sign-in-required", error: "Cal Link requires Berkeley CalNet sign-in." })
-    expect(meta.freeFood.source).toBe("live")
-    expect(recommendations.map((event) => event.sourceUrl)).toEqual([liveBerkeleyEvent.sourceUrl])
+  it("checks only the two public calendars without requesting a CalNet session", async () => {
+    mockIngestSource(async () => [])
+    await buildRecommendations({ maxTravelMinutes: 20, freeFoodOnly: true })
+    expect(vi.mocked(ingestSource).mock.calls.map(([source]) => source.key)).toEqual(["berkeley-live", "graduate-live"])
   })
 
   it("never invents a savings figure for nearby_eats and discloses when Overpass is unavailable", async () => {
@@ -192,7 +187,7 @@ describe("buildRecommendations", () => {
 
   it("sets seriesKey from the ORIGINAL event title, not the transformed display title", async () => {
     mockIngestSource(async (source) =>
-      source.key === "berkeley-live" ? [liveBerkeleyEvent] : [liveCallinkEvent],
+      source.key === "berkeley-live" ? [liveBerkeleyEvent] : [liveGraduateEvent],
     )
     vi.mocked(fetchNearbyPlaces).mockResolvedValue([nearbyPlace])
 
@@ -207,7 +202,7 @@ describe("buildRecommendations", () => {
     expect(pizzaRec.title).toBe("Free pizza social")
     expect(pizzaRec.seriesKey).toBe("ACM at UC Berkeley::Free pizza social")
 
-    const dinnerRec = recommendations.find((r) => r.sourceUrl === liveCallinkEvent.sourceUrl)!
+    const dinnerRec = recommendations.find((r) => r.sourceUrl === liveGraduateEvent.sourceUrl)!
     expect(dinnerRec.seriesKey).toBe("Orthodox Christian Fellowship::Free dinner")
 
     // nearby_eats has no concept of a recurring series.
@@ -237,7 +232,7 @@ describe("buildRecommendations", () => {
   })
 
   it("excludes expired and out-of-week source events and retains real end times", async () => {
-    mockIngestSource(async (source) => source.key === "callink-live" ? [] : [
+    mockIngestSource(async (source) => source.key === "graduate-live" ? [] : [
       { ...liveBerkeleyEvent, endTime: "2026-09-01T22:00:00Z" },
       { ...liveBerkeleyEvent, sourceUrl: "expired", startTime: "2026-09-01T16:00:00Z", endTime: "2026-09-01T17:00:00Z" },
       { ...liveBerkeleyEvent, sourceUrl: "far-future", startTime: "2026-09-20T20:00:00Z" },
@@ -250,7 +245,7 @@ describe("buildRecommendations", () => {
   })
 
   it("changes ordering when the user prioritizes shorter walks", async () => {
-    mockIngestSource(async (source) => source.key === "callink-live" ? [] : [{ ...liveBerkeleyEvent, latitude: 37.9 }])
+    mockIngestSource(async (source) => source.key === "graduate-live" ? [] : [{ ...liveBerkeleyEvent, latitude: 37.9 }])
     vi.mocked(fetchNearbyPlaces).mockResolvedValue([{ ...nearbyPlace, latitude: 37.8719, longitude: -122.2585 }])
     const cheap = await buildRecommendations({ maxTravelMinutes: 10, optimizeFor: "cheapest" })
     const fast = await buildRecommendations({ maxTravelMinutes: 10, optimizeFor: "fast" })
@@ -268,7 +263,7 @@ describe("buildRecommendations", () => {
     expect(fetchNearbyPlaces).not.toHaveBeenCalled()
   })
   it("uses a source's full duration when checking Calendar conflicts", async () => {
-    mockIngestSource(async (source) => source.key === "callink-live" ? [] : [{ ...liveBerkeleyEvent, endTime: "2026-09-01T22:00:00Z" }])
+    mockIngestSource(async (source) => source.key === "graduate-live" ? [] : [{ ...liveBerkeleyEvent, endTime: "2026-09-01T22:00:00Z" }])
     vi.mocked(fetchNearbyPlaces).mockResolvedValue([])
     vi.mocked(fetchBusyIntervals).mockResolvedValue([{ start: "2026-09-01T21:30:00Z", end: "2026-09-01T22:30:00Z" }])
     const conflict = await buildRecommendations({ maxTravelMinutes: 20, calendarAccessToken: "test-token" })
@@ -278,7 +273,7 @@ describe("buildRecommendations", () => {
     expect(conflict.recommendations[0].score).toBeLessThan(available.recommendations[0].score)
   })
   it("discloses Calendar failure without losing discovery results", async () => {
-    mockIngestSource(async (source) => source.key === "callink-live" ? [] : [liveBerkeleyEvent])
+    mockIngestSource(async (source) => source.key === "graduate-live" ? [] : [liveBerkeleyEvent])
     vi.mocked(fetchNearbyPlaces).mockResolvedValue([])
     vi.mocked(fetchBusyIntervals).mockRejectedValue(new Error("Calendar unavailable"))
     const result = await buildRecommendations({ maxTravelMinutes: 20, calendarAccessToken: "test-token" })

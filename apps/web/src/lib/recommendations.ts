@@ -1,7 +1,7 @@
 import { cacheLiveSource } from "./source-cache"
 import { scoreOpportunity, DEFAULT_WEIGHTS } from "@yums/shared"
 import type { Recommendation } from "@yums/shared"
-import { berkeleyLiveSource, callinkSource, CalLinkSignInRequiredError, ingestSource, type ExtractedFoodEvent } from "@yums/event-ingestion"
+import { berkeleyLiveSource, graduateLiveSource, ingestSource, type ExtractedFoodEvent } from "@yums/event-ingestion"
 import { fetchNearbyPlaces } from "./nearby-places"
 import { haversineMinutes, validCoordinates } from "./geo"
 import { demoFoodEvents } from "./mock-data"
@@ -20,7 +20,7 @@ const BBOX: [number, number, number, number] = [37.83, -122.3, 37.9, -122.22]
 // a successful network response; a failed refresh cannot retain old results
 // indefinitely. Account preferences and Calendar tokens are never cached here.
 const getCachedBerkeleyEvents = cacheLiveSource(() => ingestSource(berkeleyLiveSource), "berkeley-live-events", 120)
-const getCachedCallinkEvents = cacheLiveSource(() => ingestSource(callinkSource), "callink-events", 120)
+const getCachedGraduateEvents = cacheLiveSource(() => ingestSource(graduateLiveSource), "graduate-events", 120)
 const getCachedNearbyPlaces = cacheLiveSource(
   () => fetchNearbyPlaces(BBOX, ["cafe", "restaurant", "fast_food"]),
   `nearby-places:${BBOX.join(",")}`, 600,
@@ -88,7 +88,7 @@ export interface RecommendationParams {
 
 export interface RecommendationsMeta {
   freeFood: { source: "live" | "unavailable" | "demo"; error?: string }
-  callink: { source: "live" | "unavailable" | "demo"; error?: string; reason?: "sign-in-required" }
+  graduate: { source: "live" | "unavailable" | "demo"; error?: string }
   nearbyEats: { source: "live" | "unavailable" | "demo"; error?: string }
   schedule: { source: "live" | "placeholder" | "unavailable"; error?: string }
 }
@@ -105,20 +105,18 @@ export async function buildRecommendations(params: RecommendationParams): Promis
   const recs: Recommendation[] = []
   const meta: RecommendationsMeta = {
     freeFood: { source: "live" },
-    callink: { source: "live" },
+    graduate: { source: "live" },
     nearbyEats: { source: "live" },
     schedule: { source: calendarAccessToken ? "live" : "placeholder" },
   }
 
-  // Free food (two independent live sources), Cal Link club events, nearby
-  // eats, and (when connected) the user's real calendar all hit unrelated
-  // third-party APIs — run them concurrently rather than back-to-back so a
-  // slow/timing-out one doesn't add to the others' latency.
+  // Fetch independent public calendars concurrently so one outage does not
+  // prevent the other publisher's events from appearing.
   const now = new Date()
   const weekAhead = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000)
-  const [foodResult, callinkResult, placesResult, calendarResult] = await Promise.allSettled([
+  const [foodResult, graduateResult, placesResult, calendarResult] = await Promise.allSettled([
     demo ? Promise.resolve([]) : getCachedBerkeleyEvents(),
-    demo ? Promise.resolve([]) : getCachedCallinkEvents(),
+    demo ? Promise.resolve([]) : getCachedGraduateEvents(),
     params.freeFoodOnly ? Promise.resolve([]) : demo ? Promise.resolve([
       { id: "sample-cafe", name: "Sample campus cafe", latitude: 37.8705, longitude: -122.259, address: "Sample listing · no verified prices" },
       { id: "sample-restaurant", name: "Sample nearby restaurant", latitude: 37.869, longitude: -122.26, address: "Sample listing · no verified prices" },
@@ -148,25 +146,19 @@ export async function buildRecommendations(params: RecommendationParams): Promis
     foodEvents = []
   }
 
-  // Cal Link: real club/org events from callink.berkeley.edu, with real
-  // descriptions and an organizer-set "Free Food" benefit tag where
-  // present (see services/event-ingestion/sources/callink-live.ts). No
-  // mock fallback exists for this source — on failure it simply degrades
-  // to "unavailable" with the real error, same as nearbyEats below.
-  if (callinkResult.status === "fulfilled") {
-    foodEvents = foodEvents.concat(callinkResult.value.map(normalizeLiveEvent))
+  if (graduateResult.status === "fulfilled") {
+    foodEvents = foodEvents.concat(graduateResult.value.map(normalizeLiveEvent))
   } else {
-    const err = callinkResult.reason
-    meta.callink = {
+    const err = graduateResult.reason
+    meta.graduate = {
       source: "unavailable", error: err instanceof Error ? err.message : "fetch failed",
-      ...(err instanceof CalLinkSignInRequiredError ? { reason: "sign-in-required" as const } : {}),
     }
   }
 
   if (demo) {
     foodEvents = demoFoodEvents(now).map(normalizeFallbackEvent)
     meta.freeFood = { source: "demo" }
-    meta.callink = { source: "demo" }
+    meta.graduate = { source: "demo" }
     meta.nearbyEats = { source: "demo" }
   }
 

@@ -14,7 +14,7 @@ beforeEach(() => {
   vi.resetAllMocks()
   getUser.mockResolvedValue({ data: { user: null }, error: null })
   build.mockResolvedValue({ recommendations: [], meta: {
-    freeFood: { source: "live" }, callink: { source: "live" }, nearbyEats: { source: "live" },
+    freeFood: { source: "live" }, graduate: { source: "live" }, nearbyEats: { source: "live" },
   } })
 })
 
@@ -28,7 +28,7 @@ describe("public food feed", () => {
   })
   it("requests only food and discloses source outages without raw errors", async () => {
     build.mockResolvedValue({ recommendations: [], meta: {
-      freeFood: { source: "unavailable", error: "internal connection detail" }, callink: { source: "live" },
+      freeFood: { source: "unavailable", error: "internal connection detail" }, graduate: { source: "live" },
     } })
     render(await FeedPage())
     expect(build).toHaveBeenCalledWith({ maxTravelMinutes: 20, freeFoodOnly: true })
@@ -36,18 +36,23 @@ describe("public food feed", () => {
     expect(screen.queryByText(/internal connection detail/)).not.toBeInTheDocument()
     expect(screen.queryByText(/budget|Calendar connection|OpenStreetMap/i)).not.toBeInTheDocument()
   })
-  it("explains CalNet access and links to Cal Link without claiming a temporary outage", async () => {
+  it("links public calendars without prompting for CalNet", async () => {
+    render(await FeedPage())
+    expect(screen.getByRole("link", { name: "Berkeley calendar" })).toHaveAttribute("href", "https://events.berkeley.edu/")
+    expect(screen.getByRole("link", { name: "Graduate Division" })).toHaveAttribute("href", "https://grad.berkeley.edu/events-calendar/")
+    expect(screen.queryByText(/CalNet|requires Berkeley/)).not.toBeInTheDocument()
+  })
+  it("discloses Graduate Division failures without hiding the other calendar", async () => {
     build.mockResolvedValue({ recommendations: [], meta: {
-      freeFood: { source: "live" }, callink: { source: "unavailable", reason: "sign-in-required" },
+      freeFood: { source: "live" }, graduate: { source: "unavailable" },
     } })
     render(await FeedPage())
-    expect(screen.getByRole("status")).toHaveTextContent("Cal Link requires Berkeley CalNet sign-in")
-    expect(screen.getByRole("link", { name: "Browse Cal Link" })).toHaveAttribute("href", "https://callink.berkeley.edu/events")
-    expect(screen.queryByText(/Cal Link is unavailable right now/)).not.toBeInTheDocument()
+    expect(screen.getByRole("status")).toHaveTextContent("Graduate Division calendar is unavailable")
+    expect(screen.getByRole("status")).toHaveTextContent("The other calendar is still being checked")
   })
   it("does not claim other campus sources are available when both imports are unavailable", async () => {
     build.mockResolvedValue({ recommendations: [], meta: {
-      freeFood: { source: "unavailable" }, callink: { source: "unavailable", reason: "sign-in-required" },
+      freeFood: { source: "unavailable" }, graduate: { source: "unavailable" },
     } })
     render(await FeedPage())
     expect(screen.queryByText(/Events from other sources still appear/)).not.toBeInTheDocument()

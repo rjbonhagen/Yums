@@ -29,10 +29,9 @@ export default async function FeedPage() {
     buildRecommendations({ maxTravelMinutes: 20, freeFoodOnly: true }),
     loadCommunityReports(),
   ])
-  const calLinkNeedsSignIn = meta.callink.source === "unavailable" && meta.callink.reason === "sign-in-required"
   const missingSources = [
     meta.freeFood.source === "unavailable" ? "Berkeley calendar" : null,
-    meta.callink.source === "unavailable" && !calLinkNeedsSignIn ? "Cal Link" : null,
+    meta.graduate.source === "unavailable" ? "Graduate Division calendar" : null,
   ].filter(Boolean)
 
   return (
@@ -41,13 +40,8 @@ export default async function FeedPage() {
       <main id="main-content" className="flex-1">
         <RecommendationsView key={userId ?? "guest"} recommendations={recommendations} now={new Date().toISOString()} notices={<>
         {meta.freeFood.source === "demo" && <p role="status" className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">Sample events for preview only. These are not real food offers.</p>}
-        {calLinkNeedsSignIn && <p role="status" className="rounded-xl border bg-secondary/50 p-4 text-sm">
-          Cal Link requires Berkeley CalNet sign-in, so its events can’t be imported here. {" "}
-          <a href="https://callink.berkeley.edu/events" target="_blank" rel="noreferrer" className="font-medium text-primary underline underline-offset-4">Browse Cal Link</a>
-          {localImportsEnabled() && <Link href="/import" prefetch={false} className="ml-3 font-medium text-primary underline underline-offset-4">Review a local export</Link>}
-        </p>}
         {missingSources.length > 0 && <p role="status" className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
-          {missingSources.join(" and ")} {missingSources.length === 1 ? "is" : "are"} unavailable right now. {meta.freeFood.source === "unavailable" && meta.callink.source === "unavailable" ? "Campus events can’t be checked right now." : "Events from other sources still appear."}
+          {missingSources.join(" and ")} {missingSources.length === 1 ? "is" : "are"} unavailable right now. {missingSources.length === 2 ? "Campus events can’t be checked right now." : "The other calendar is still being checked."}
         </p>}
         </>}>
         <section className="border-t pt-8" aria-label="Community tips">
@@ -55,7 +49,11 @@ export default async function FeedPage() {
             : <CommunityReports key={`${userId}:${JSON.stringify(reports)}`} userId={userId} reports={reports} />}
         </section>
         <footer className="flex flex-col justify-between gap-3 border-t pt-5 text-sm text-muted-foreground sm:flex-row">
-          <p>Times are in Berkeley. Check the original post for attendance rules.</p>
+          <div className="space-y-1">
+            <p>Times are in Berkeley. Check the original post for attendance rules.</p>
+            <p>Public sources: <a href="https://events.berkeley.edu/" target="_blank" rel="noreferrer" className="text-primary underline underline-offset-4">Berkeley calendar</a>{" and "}<a href="https://grad.berkeley.edu/events-calendar/" target="_blank" rel="noreferrer" className="text-primary underline underline-offset-4">Graduate Division</a>.</p>
+            {localImportsEnabled() && <Link href="/import" prefetch={false} className="inline-block text-primary underline underline-offset-4">Personal Cal Link imports</Link>}
+          </div>
           <Link href="/report" className="shrink-0 text-primary underline underline-offset-4">Know about free food?</Link>
         </footer>
         </RecommendationsView>

@@ -83,4 +83,18 @@ describe("free food feed", () => {
     expect(screen.getByText("No campus events found")).toBeInTheDocument()
     expect(screen.queryByRole("article")).not.toBeInTheDocument()
   })
+  it("shows a public repost once and lets each publisher be selected", async () => {
+    const user = userEvent.setup()
+    const campus = { ...today, id: "campus", sourceUrl: "https://events.berkeley.edu/live/events/1",
+      subtitle: "UC Berkeley Events Calendar · Soda Hall", seriesKey: "UC Berkeley Events Calendar::Pizza lunch", endTime: "2026-10-14T21:00:00Z" }
+    const graduate = { ...campus, id: "graduate", sourceUrl: "https://grad.berkeley.edu/event/pizza-lunch/",
+      subtitle: "Graduate Assembly · Soda Hall", seriesKey: "Graduate Assembly::Pizza lunch" }
+    render(<RecommendationsView now={now} recommendations={[campus, graduate]} />)
+    expect(screen.getAllByRole("article")).toHaveLength(1)
+    await user.selectOptions(screen.getByRole("combobox", { name: "Filter by campus source" }), "Graduate Division")
+    expect(screen.getAllByRole("article")).toHaveLength(1)
+    expect(screen.getByRole("link", { name: /View announcement/ })).toHaveAttribute("href", graduate.sourceUrl)
+    await user.selectOptions(screen.getByRole("combobox", { name: "Filter by campus source" }), "Berkeley calendar")
+    expect(screen.getByRole("link", { name: /View announcement/ })).toHaveAttribute("href", campus.sourceUrl)
+  })
 })

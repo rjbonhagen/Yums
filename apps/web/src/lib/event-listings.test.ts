@@ -27,8 +27,35 @@ describe("duplicate Cal Link listings", () => {
     { seriesKey: "Another Club::Club kickoff" },
     { endTime: "2026-10-15T19:30:00-07:00" },
     { latitude: 37.88, longitude: -122.26 },
-    { sourceUrl: "https://events.berkeley.edu/event/2" },
+    { sourceUrl: "https://unrelated.example/event/2" },
+    { durationEstimated: true },
   ])("keeps distinct dates, venues, organizers, durations and sources separate", (difference) => {
     expect(collapseDuplicateListings([first, { ...second, ...difference }], new Map())).toHaveLength(2)
+  })
+})
+
+describe("public calendar reposts", () => {
+  const campus: Recommendation = { ...first, id: "campus", sourceUrl: "https://events.berkeley.edu/live/events/1",
+    subtitle: "UC Berkeley Events Calendar · Mulford Hall", seriesKey: "UC Berkeley Events Calendar::Club kickoff" }
+  const graduate: Recommendation = { ...second, id: "graduate", sourceUrl: "https://grad.berkeley.edu/event/club-kickoff/",
+    subtitle: "Graduate Assembly · Mulford Hall", seriesKey: "Graduate Assembly::Club kickoff" }
+  it("collapses matching titles, venues, and actual start/end times across publishers", () => {
+    expect(collapseDuplicateListings([graduate, campus], new Map())).toHaveLength(1)
+  })
+  it("preserves the saved source and fills richer location details", () => {
+    const [result] = collapseDuplicateListings([campus, graduate], new Map([[savedKey(graduate), "saved"]]))
+    expect(savedKey(result)).toBe(savedKey(graduate))
+    expect(result.distanceMinutes).toBe(7)
+    expect(result.sourceUrl).toBe(graduate.sourceUrl)
+  })
+  it.each([
+    { subtitle: "Graduate Assembly · Soda Hall" }, { endTime: "2026-10-15T19:00:00-07:00" },
+    { subtitle: "Graduate Assembly" }, { durationEstimated: true }, { title: "Another kickoff" },
+  ])("retains distinct or insufficiently identified occurrences", (changes) => {
+    expect(collapseDuplicateListings([campus, { ...graduate, ...changes }], new Map())).toHaveLength(2)
+  })
+  it("keeps known different organizers separate even when a generic repost is present", () => {
+    expect(collapseDuplicateListings([campus, graduate, { ...graduate, id: "other", seriesKey: "Other Club::Club kickoff",
+      subtitle: "Other Club · Mulford Hall" }], new Map())).toHaveLength(3)
   })
 })

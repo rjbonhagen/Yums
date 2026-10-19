@@ -14,7 +14,7 @@ vi.mock("next/cache", () => ({
 }))
 vi.mock("@yums/event-ingestion", async (original) => ({
   ...await original<typeof import("@yums/event-ingestion")>(),
-  berkeleyLiveSource: { key: "berkeley-live" }, callinkSource: { key: "callink-live" }, ingestSource: mocks.ingest,
+  berkeleyLiveSource: { key: "berkeley-live" }, graduateLiveSource: { key: "graduate-live" }, ingestSource: mocks.ingest,
 }))
 vi.mock("./nearby-places", () => ({ fetchNearbyPlaces: mocks.places }))
 import { cacheLiveSource } from "./source-cache"
@@ -77,7 +77,7 @@ describe("bounded public-source cache windows", () => {
     const after = await buildRecommendations({ maxTravelMinutes: 20 })
     expect(after.recommendations).toEqual([])
     expect(after.meta.freeFood.source).toBe("unavailable")
-    expect(after.meta.callink.source).toBe("unavailable")
+    expect(after.meta.graduate.source).toBe("unavailable")
     expect(after.meta.nearbyEats.source).toBe("unavailable")
   })
 })
