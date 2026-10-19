@@ -7,10 +7,13 @@ and location, and view the original announcement. Saving is optional.
 ## Current interface
 
 - The homepage and `/feed` show the same food feed.
-- The feed contains free-food events from Berkeley calendar and Cal Link.
+- The feed contains explicit free-food offers from the public Berkeley Events
+  and Graduate Division calendars, including available department and club posts.
 - Events appear in time order, with this week, today, and tomorrow filters.
 - Name and location search, duplicate collapse, and expired-event removal.
 - Original announcement links and honest source-outage messages.
+- No CalNet sign-in is needed for discovery. Cal Link-only events are not
+  included; optional personal calendar imports stay separate from the feed.
 - Browser saves without sign-in; optional account saves across devices.
 - Community tips reviewed before public display, with unverified labeling.
 - Google or email sign-in for saves and submissions; no Calendar consent during

@@ -6,8 +6,8 @@ announcement before heading out.
 
 ## Features
 
-- **One food feed:** available campus sources with explicit food offers, shown
-  in time order. Cal Link imports currently require an approved access path.
+- **One food feed:** public Berkeley Events and Graduate Division calendars,
+  filtered for explicit free-food offers and shown in time order.
 - **Simple filters:** this week, today, tomorrow, and search by name or location.
 - **Saved food:** save in the browser without an account, or sign in to sync new
   saves across devices.
@@ -22,8 +22,9 @@ setup, restaurant browsing, maps, chat, or Calendar connection prompts. Old
 
 ## Status
 
-The invited pilot is hosted at [getyums.food](https://getyums.food). The simplified
-interface is being verified locally before its next release. Public discovery
+The invited pilot is hosted at [getyums.food](https://getyums.food). The updated
+interface and public calendar integration are available locally, awaiting the
+next pilot deployment. Public discovery
 works without signing in; new accounts require an invitation.
 
 Ed Discussion is a proposed source, not an implemented integration. Its board
@@ -75,7 +76,7 @@ cover account isolation, saving, and report submission.
 | Area | Implementation |
 | --- | --- |
 | Website | Next.js, React, TypeScript, Tailwind CSS |
-| Event discovery | Campus-source adapters, food evidence extraction, shared source caching |
+| Event discovery | Public campus calendar adapters, food evidence extraction, shared source caching |
 | Accounts and data | Supabase Auth and PostgreSQL with row-level security |
 | Hosting | Docker, AWS EC2, ECR, Caddy HTTPS, CloudWatch, GitHub Actions |
 
@@ -92,7 +93,9 @@ See [product scope](docs/product.md), [data sources](docs/data-sources.md), and
 
 Coverage is limited to available sources around UC Berkeley. A food announcement
 does not establish eligibility or remaining supplies; check the original post.
-Cal Link currently requires CalNet sign-in, so Yums links to it directly rather
-than importing its events. See [data sources](docs/data-sources.md) for access details.
+Cal Link currently requires CalNet sign-in and is excluded from automatic
+discovery. Its optional local imports remain private snapshots. Public
+calendars can include some of the same events, but their descriptions must
+independently establish a free-food offer. See [data sources](docs/data-sources.md).
 Community reports are user submitted and are labeled accordingly. The pilot
 runs on one server and does not provide high availability.

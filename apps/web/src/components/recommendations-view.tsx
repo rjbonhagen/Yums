@@ -245,7 +245,7 @@ export function RecommendationsView({ recommendations, now: initialNow, notices,
       {saveError && <p role="alert" className="text-destructive text-sm">{saveError}</p>}
       {filtered.length === 0 ? (
         <div className="rounded-2xl border border-dashed bg-muted/30 px-6 py-12 text-center">
-          <h3 className="text-lg font-semibold">{search || source !== "all" ? "No matching food events" : "No campus events found"}</h3>
+          <h3 className="text-lg font-semibold">{search || source !== "all" ? "No matching food events" : "No free-food listings found"}</h3>
           <p className="mt-2 text-sm text-muted-foreground">
             {search || source !== "all" ? "Try another search or campus source." : dateFilter === "week" ? "Check back later or share an opportunity you know about." : "Try This week to see other upcoming events."}
           </p>

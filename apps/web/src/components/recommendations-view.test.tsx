@@ -80,7 +80,7 @@ describe("free food feed", () => {
   })
   it("explains an empty source result without adding sample offers", () => {
     render(<RecommendationsView now={now} recommendations={[]} />)
-    expect(screen.getByText("No campus events found")).toBeInTheDocument()
+    expect(screen.getByText("No free-food listings found")).toBeInTheDocument()
     expect(screen.queryByRole("article")).not.toBeInTheDocument()
   })
   it("shows a public repost once and lets each publisher be selected", async () => {

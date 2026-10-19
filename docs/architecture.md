@@ -3,12 +3,14 @@
 ## Packages and data flow
 
 `apps/web`: Next.js frontend and API routes.
-`services/event-ingestion`: Berkeley/Cal Link adapters and food-evidence extraction.
+`services/event-ingestion`: public Berkeley Events and Graduate Division
+adapters, a separate personal Cal Link calendar parser, and food-evidence extraction.
 `packages/shared`: types and deterministic scoring.
 `packages/database`: Supabase schema and an existing-database save migration.
 
 Public source adapters → conservative food extraction → normalized event
-windows → deterministic scoring → dashboard/feed/homepage/chat.
+windows → deterministic scoring → food feed. The compatibility helpers use
+the same recommendation results.
 `buildRecommendations()` returns recommendations and source status. Source
 fetches run concurrently and are cached independently: event feeds for two
 minutes, restaurant listings for ten minutes. Per-user Calendar data is never
@@ -18,6 +20,13 @@ use no-store so a refresh cannot retain an older cached response during an
 extended outage. Results can be up to one window old; they do not prove that
 food is still available. The homepage is cached; preference-aware
 feed/dashboard pages read cookies and render per request.
+
+Public discovery does not query Cal Link or share a CalNet session. Each public
+calendar refreshes independently on demand within two-minute cache windows.
+Exact reposts can collapse in the feed when title, physical venue, real start
+and end times, and organizer evidence agree. Distinct organizers or conflicting
+coordinates remain separate. Publisher filters run before duplicate collapse,
+and an existing saved source is preferred without changing its save identity.
 
 ## Evidence and timing
 
