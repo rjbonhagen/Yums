@@ -77,8 +77,17 @@ checks passed. The local recommendations endpoint returned HTTP 200 with both
 public calendars live, zero qualifying offers in the current seven-date window,
 and zero sample listings. The homepage and personal-import page returned 200.
 No CalNet prompt appeared in the public-feed HTML. This is a dated coverage
-check, not an uptime or food-availability guarantee. These changes have not
-been deployed to the hosted pilot.
+check, not an uptime or food-availability guarantee.
+
+## Hosted public-feed verification
+
+October 19, 2026: release `effc25e` was deployed to
+[getyums.food](https://getyums.food) after CI and container checks passed.
+Public HTTPS checks confirmed the updated interface, health response, login
+HTML, packaged assets, and callback origin. Both public calendar sources
+reported live status, with zero qualifying offers and no sample listings in
+the current window. The private `/import` route returned 404. These checks
+did not exercise signed-in saving or report submission.
 
 ## OpenStreetMap
 

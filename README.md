@@ -23,9 +23,8 @@ setup, restaurant browsing, maps, chat, or Calendar connection prompts. Old
 ## Status
 
 The invited pilot is hosted at [getyums.food](https://getyums.food). The updated
-interface and public calendar integration are available locally, awaiting the
-next pilot deployment. Public discovery
-works without signing in; new accounts require an invitation.
+interface and public calendar integration were deployed on October 19, 2026.
+Public discovery works without signing in; new accounts require an invitation.
 
 Ed Discussion is a proposed source, not an implemented integration. Its board
 access, audience, and permitted event-sharing workflow need to be established.
