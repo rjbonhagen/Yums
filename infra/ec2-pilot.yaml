@@ -19,7 +19,7 @@ Parameters:
     Default: /aws/service/ami-amazon-linux-latest/al2023-ami-kernel-default-x86_64
   GitHubSubjectPrefix:
     Type: String
-    Default: repo:rjbonhagen@91764983/FoodSavings@1383106560
+    Default: repo:rjbonhagen@91764983/Yums@1383106560
     AllowedPattern: '^repo:[A-Za-z0-9_.-]+@[0-9]+/[A-Za-z0-9_.-]+@[0-9]+$'
     Description: Immutable sub_claim_prefix from the repository GitHub OIDC settings API.
   ExistingGitHubProviderArn:

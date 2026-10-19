@@ -70,6 +70,10 @@ require wildcard resources; image and deployment mutations remain scoped.
 GitHub OIDC eliminates stored AWS access keys. The role trusts the immutable
 `sub_claim_prefix` returned by GitHub's repository OIDC settings API, followed
 by `:environment:pilot`. Keep this prefix aligned with the repository identity.
+After a repository rename, read the current prefix again and update the existing
+stack's `GitHubSubjectPrefix` parameter before deploying. Changing the template's
+default alone does not change an existing parameter value. Review the change set
+and allow only the deployment role's trust update; do not replace the server.
 The `pilot` environment restricts deployment to `pilot-release`. The current
 GitHub plan does not support required reviewers; deployment is an explicit
 manual workflow dispatch. Enable reviewer approval if the plan supports it.
