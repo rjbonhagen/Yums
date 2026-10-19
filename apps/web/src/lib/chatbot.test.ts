@@ -27,7 +27,7 @@ const NEARBY: Recommendation = {
 
 const EMPTY_META = {
   freeFood: { source: "live" as const },
-  callink: { source: "live" as const },
+  graduate: { source: "live" as const },
   nearbyEats: { source: "live" as const },
   schedule: { source: "placeholder" as const },
 }
@@ -51,15 +51,15 @@ describe("isOpenAIConfigured", () => {
 describe("source outages in deterministic chat", () => {
   it("discloses total source failure instead of claiming that no offers exist", async () => {
     vi.mocked(buildRecommendations).mockResolvedValue({ recommendations: [], meta: {
-      ...EMPTY_META, freeFood: { source: "unavailable" }, callink: { source: "unavailable" },
+      ...EMPTY_META, freeFood: { source: "unavailable" }, graduate: { source: "unavailable" },
     } })
     expect(await answerDeterministically("What is free this week?")).toContain("can't confirm")
   })
   it("explains partial coverage when one food source is down", async () => {
     vi.mocked(buildRecommendations).mockResolvedValue({ recommendations: [], meta: {
-      ...EMPTY_META, callink: { source: "unavailable" },
+      ...EMPTY_META, graduate: { source: "unavailable" },
     } })
-    expect(await answerDeterministically("Free food?")).toContain("Cal Link is unavailable")
+    expect(await answerDeterministically("Free food?")).toContain("Graduate Division is unavailable")
   })
 })
 

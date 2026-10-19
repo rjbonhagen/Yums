@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
-import { render, screen, waitFor } from "@testing-library/react"
+import { render, screen } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
 const { getUser, signInWithOtp, signInWithOAuth, linkIdentity, unlinkIdentity, search, maybeSingle } = vi.hoisted(() => ({
   getUser: vi.fn(), signInWithOtp: vi.fn(), signInWithOAuth: vi.fn(), linkIdentity: vi.fn(), unlinkIdentity: vi.fn(), search: vi.fn(), maybeSingle: vi.fn(),
@@ -42,7 +42,7 @@ describe("existing Google login repair", () => {
     getUser.mockResolvedValue({ data: { user: account }, error: null })
     render(<LoginPage />)
     const removeButton = await screen.findByRole("button", { name: "Remove linked login other@gmail.com" })
-    await screen.findByText(/Calendar isn't connected/)
+    await screen.findByText(/Signed in as/)
     getUser.mockResolvedValue({ data: { user: { ...account, email: "another@berkeley.edu" } }, error: null })
     await userEvent.setup().click(removeButton)
     expect(unlinkIdentity).not.toHaveBeenCalled()
@@ -82,52 +82,13 @@ describe("invited pilot sign-in", () => {
     render(<LoginPage />)
     expect(screen.getByRole("alert")).toHaveTextContent("Request a fresh link")
   })
-  it("reconnects an already-linked Google identity with explicit Calendar scopes", async () => {
-    getUser.mockResolvedValue({ data: { user: { email: "person@berkeley.edu", identities: [{ provider: "google", identity_data: { email: "person@berkeley.edu" } }] } }, error: null })
-    const user = userEvent.setup()
-    render(<LoginPage />)
-    await waitFor(() => expect(screen.getByRole("button", { name: "Retry Calendar connection" })).toBeInTheDocument())
-    await user.click(screen.getByRole("button", { name: "Retry Calendar connection" }))
-    expect(signInWithOAuth).toHaveBeenCalledWith(expect.objectContaining({ options: expect.objectContaining({ scopes: "https://www.googleapis.com/auth/calendar.freebusy", redirectTo: expect.stringContaining("?calendar=connect") }) }))
-    expect(linkIdentity).not.toHaveBeenCalled()
-  })
-  it("reports disconnect failures instead of claiming the connection was removed", async () => {
-    maybeSingle.mockResolvedValue({ data: { user_id: "account" }, error: null })
-    getUser.mockResolvedValue({ data: { user: { email: "person@berkeley.edu" } }, error: null })
-    vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ ok: false }))
-    const user = userEvent.setup()
-    render(<LoginPage />)
-    await user.click(await screen.findByRole("button", { name: "Disconnect Google Calendar" }))
-    expect(screen.getByRole("alert")).toHaveTextContent("Couldn't disconnect")
-    expect(screen.queryByRole("status")).not.toBeInTheDocument()
-  })
-  it.each([{ identities: [] }, { identities: [{ provider: "google", identity_data: { email: "other@gmail.com" } }] }])("never links another Google login when connecting Calendar", async ({ identities }) => {
-    getUser.mockResolvedValue({ data: { user: { email: "person@berkeley.edu", identities } }, error: null })
-    render(<LoginPage />)
-    await userEvent.setup().click(await screen.findByRole("button", { name: "Retry Calendar connection" }))
-    expect(screen.getByRole("alert")).toHaveTextContent("Different accounts cannot be linked")
-    expect(signInWithOAuth).not.toHaveBeenCalled()
-    expect(linkIdentity).not.toHaveBeenCalled()
-  })
-  it("requests Calendar consent and an account chooser during Google sign-in", async () => {
+  it("signs in with Google without requesting Calendar or linking accounts", async () => {
     render(<LoginPage />)
     await userEvent.setup().click(screen.getByRole("button", { name: "Continue with Google" }))
-    expect(signInWithOAuth).toHaveBeenCalledWith(expect.objectContaining({ options: expect.objectContaining({ scopes: "https://www.googleapis.com/auth/calendar.freebusy", queryParams: { access_type: "offline", prompt: "consent select_account" } }) }))
+    const options = signInWithOAuth.mock.calls[0][0].options
+    expect(options.queryParams).toEqual({ prompt: "select_account" })
+    expect(options.scopes).toBeUndefined()
     expect(linkIdentity).not.toHaveBeenCalled()
-  })
-  it("shows the saved Calendar connection without offering another connection", async () => {
-    getUser.mockResolvedValue({ data: { user: { id: "account", email: "person@berkeley.edu" } }, error: null })
-    maybeSingle.mockResolvedValue({ data: { user_id: "account" }, error: null })
-    render(<LoginPage />)
-    expect(await screen.findByText("Google Calendar connected.")).toBeInTheDocument()
-    expect(screen.queryByRole("button", { name: "Retry Calendar connection" })).not.toBeInTheDocument()
-    expect(screen.getByRole("button", { name: "Disconnect Google Calendar" })).toBeInTheDocument()
-  })
-  it("does not claim a connection status when the account query fails", async () => {
-    getUser.mockResolvedValue({ data: { user: { id: "account", email: "person@berkeley.edu" } }, error: null })
-    maybeSingle.mockResolvedValue({ data: null, error: new Error("offline") })
-    render(<LoginPage />)
-    expect(await screen.findByText(/Couldn't check your Calendar connection/)).toBeInTheDocument()
-    expect(screen.queryByRole("button", { name: "Disconnect Google Calendar" })).not.toBeInTheDocument()
+    expect(screen.queryByText(/Calendar/)).not.toBeInTheDocument()
   })
 })

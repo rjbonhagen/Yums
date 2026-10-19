@@ -17,7 +17,7 @@ export async function answerDeterministically(message: string): Promise<string> 
     const freeFood = recommendations.filter((r) => r.kind === "free_food")
     if (freeFood.length === 0) {
       const unavailable = [meta.freeFood.source === "unavailable" ? "Berkeley calendar" : null,
-        meta.callink.source === "unavailable" ? "Cal Link" : null].filter(Boolean)
+        meta.graduate.source === "unavailable" ? "Graduate Division" : null].filter(Boolean)
       if (unavailable.length === 2) return "Couldn't reach the campus event sources, so I can't confirm current free-food offers. Try again shortly."
       return `No qualifying free-food offers found in the available ${university.name} source results.${unavailable.length ? ` ${unavailable[0]} is unavailable; its offers may be missing.` : " Source coverage is limited; check the campus calendars too."}`
     }
@@ -27,7 +27,7 @@ export async function answerDeterministically(message: string): Promise<string> 
     const notes = [
       meta.freeFood.source === "unavailable" ? "Berkeley calendar unavailable, its events omitted" : null,
       meta.freeFood.source === "demo" ? "sample demo data, not real offers" : null,
-      meta.callink.source === "unavailable" ? "Cal Link was unreachable, club events omitted" : null,
+      meta.graduate.source === "unavailable" ? "Graduate Division was unreachable, its events omitted" : null,
     ].filter((n): n is string => n != null)
     const note = notes.length > 0 ? ` (${notes.join("; ")})` : ""
     return `Here's what's free near ${university.name} this week${note} (times in Berkeley):\n${lines.join("\n")}`
@@ -47,10 +47,7 @@ export async function answerDeterministically(message: string): Promise<string> 
   }
 
   if (/budget|spend|afford|save|savings/.test(text)) {
-    const { recommendations } = await buildRecommendations({ maxTravelMinutes: 20 })
-    const top = recommendations[0]
-    if (!top) return "Set your budget target on Build My Week. No food opportunities were found right now; actual spending and savings aren't tracked."
-    return `Set your budget target on Build My Week. Actual spending and savings aren't tracked. A current opportunity is: ${top.title}${top.subtitle ? ` (${top.subtitle})` : ""}${top.distanceMinutes != null ? `, approximately ${top.distanceMinutes} minutes from campus center` : ""}.`
+    return "Yums focuses on free food. Browse the feed for upcoming events and save the ones you want to visit. Actual spending and savings aren't tracked."
   }
 
   return "I can tell you about free food happening today or nearby eats — ask me about either of those."

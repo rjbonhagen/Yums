@@ -28,7 +28,10 @@ beforeEach(() => {
 async function fillReport() {
   await screen.findByLabelText("What's free?")
   fireEvent.change(screen.getByLabelText("What's free?"), { target: { value: "Free pizza" } })
-  fireEvent.change(screen.getByLabelText("When (your local time)"), { target: { value: new Date(Date.now() + 86400000).toISOString().slice(0, 16) } })
+  const tomorrow = new Date(Date.now() + 86400000)
+  const date = `${tomorrow.getFullYear()}-${String(tomorrow.getMonth() + 1).padStart(2, "0")}-${String(tomorrow.getDate()).padStart(2, "0")}`
+  fireEvent.change(screen.getByLabelText("Date"), { target: { value: date } })
+  fireEvent.change(screen.getByLabelText("Time"), { target: { value: "12:00" } })
 }
 
 describe("report submission account and error handling", () => {
@@ -57,7 +60,7 @@ describe("report submission account and error handling", () => {
   it("shows future-date validation before sending a report", async () => {
     render(<ReportPage />)
     await fillReport()
-    fireEvent.change(screen.getByLabelText("When (your local time)"), { target: { value: "2000-01-01T12:00" } })
+    fireEvent.change(screen.getByLabelText("Date"), { target: { value: "2000-01-01" } })
     await userEvent.setup().click(screen.getByRole("button", { name: "Submit for review" }))
     expect(screen.getByRole("alert")).toHaveTextContent("future event within the next seven days")
     expect(mocks.submit).not.toHaveBeenCalled()
@@ -94,7 +97,8 @@ describe("report submission account and error handling", () => {
     await fillReport()
     await act(async () => notify("SIGNED_IN", { user: { id: "author-b" } }))
     expect(screen.getByLabelText("What's free?")).toHaveValue("")
-    expect(screen.getByLabelText("When (your local time)")).toHaveValue("")
+    expect(screen.getByLabelText("Date")).toHaveValue("")
+    expect(screen.getByLabelText("Time")).toHaveValue("")
   })
   it("ignores a delayed initial account lookup after sign-out", async () => {
     let finish: (value: unknown) => void = () => {}

@@ -7,9 +7,9 @@
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans), Arial, sans-serif;
+  --font-sans: var(--font-dm-sans), Arial, sans-serif;
   --font-mono: var(--font-geist-mono);
-  --font-heading: var(--font-geist-sans), Arial, sans-serif;
+  --font-heading: var(--font-barlow-condensed), Impact, sans-serif;
   --color-sidebar-ring: var(--sidebar-ring);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
@@ -49,25 +49,25 @@
 }
 
 :root {
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.18 0.03 255);
+  --background: #f9fafc;
+  --foreground: #142a4b;
   --card: oklch(1 0 0);
-  --card-foreground: oklch(0.18 0.03 255);
+  --card-foreground: #142a4b;
   --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.18 0.03 255);
-  --primary: #003262; /* Berkeley Blue */
+  --popover-foreground: #142a4b;
+  --primary: #002676;
   --primary-foreground: oklch(0.985 0 0);
-  --secondary: oklch(0.96 0.01 255);
-  --secondary-foreground: #003262;
-  --muted: oklch(0.96 0.01 255);
-  --muted-foreground: oklch(0.5 0.02 255);
-  --accent: #fdb515; /* California Gold */
-  --accent-foreground: #1a1a1a;
+  --secondary: #eaf0fb;
+  --secondary-foreground: #002676;
+  --muted: #edf0f5;
+  --muted-foreground: #57657b;
+  --accent: #fdb515;
+  --accent-foreground: #002676;
   --destructive: oklch(0.577 0.245 27.325);
-  --border: oklch(0.9 0.01 255);
-  --input: oklch(0.9 0.01 255);
-  --ring: #003262;
-  --chart-1: #003262;
+  --border: #dce2ed;
+  --input: #dce2ed;
+  --ring: #002676;
+  --chart-1: #002676;
   --chart-2: #fdb515;
   --chart-3: oklch(0.556 0 0);
   --chart-4: oklch(0.439 0 0);
@@ -75,12 +75,12 @@
   --radius: 0.625rem;
   --sidebar: oklch(0.985 0 0);
   --sidebar-foreground: oklch(0.145 0 0);
-  --sidebar-primary: #003262;
+  --sidebar-primary: #002676;
   --sidebar-primary-foreground: oklch(0.985 0 0);
   --sidebar-accent: #fdb515;
-  --sidebar-accent-foreground: #1a1a1a;
+  --sidebar-accent-foreground: #002676;
   --sidebar-border: oklch(0.922 0 0);
-  --sidebar-ring: #003262;
+  --sidebar-ring: #002676;
 }
 
 .dark {
@@ -96,7 +96,7 @@
   --secondary-foreground: oklch(0.985 0 0);
   --muted: oklch(0.27 0.02 255);
   --muted-foreground: oklch(0.708 0 0);
-  --accent: #003262;
+  --accent: #002676;
   --accent-foreground: oklch(0.985 0 0);
   --destructive: oklch(0.704 0.191 22.216);
   --border: oklch(1 0 0 / 10%);
@@ -126,5 +126,8 @@
   }
   html {
     @apply font-sans;
+  }
+  a, button, input, select {
+    @apply focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-primary;
   }
 }

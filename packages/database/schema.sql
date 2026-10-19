@@ -201,6 +201,18 @@ alter table user_preferences enable row level security;
 alter table recommendations enable row level security;
 alter table calendar_connections enable row level security;
 alter table user_reported_events enable row level security;
+alter table universities enable row level security;
+alter table event_sources enable row level security;
+alter table events enable row level security;
+alter table businesses enable row level security;
+alter table deals enable row level security;
+
+-- Catalog data is public to read; writes require a privileged operator.
+create policy "public read" on universities for select using (true);
+create policy "public read" on event_sources for select using (true);
+create policy "public read" on events for select using (true);
+create policy "public read" on businesses for select using (true);
+create policy "public read" on deals for select using (true);
 
 create policy "users manage own row" on users
   for all using (auth.uid() = id);

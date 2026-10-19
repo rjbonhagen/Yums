@@ -10,6 +10,12 @@ subnet, a hostname controlled by the operator, and an optional existing GitHub
 OIDC provider ARN. Deploying the template incurs ongoing costs. Preparation
 and template validation do not launch a server.
 
+`ImageId` is an explicit regional AMI ID. For a new server, resolve the current
+Amazon Linux 2023 image from the public Systems Manager parameter
+`/aws/service/ami-amazon-linux-latest/al2023-ami-kernel-default-x86_64`. For an
+existing server, preserve its current image during unrelated stack updates.
+Image upgrades are separate changes because they can replace the instance.
+
 ## Cost and validation status
 
 October 14, 2026 pricing for `us-west-1`, assuming 730 hours per month:
@@ -70,6 +76,10 @@ require wildcard resources; image and deployment mutations remain scoped.
 GitHub OIDC eliminates stored AWS access keys. The role trusts the immutable
 `sub_claim_prefix` returned by GitHub's repository OIDC settings API, followed
 by `:environment:pilot`. Keep this prefix aligned with the repository identity.
+After a repository rename, read the current prefix again and update the existing
+stack's `GitHubSubjectPrefix` parameter before deploying. Changing the template's
+default alone does not change an existing parameter value. Review the change set
+and allow only the deployment role's trust update; do not replace the server.
 The `pilot` environment restricts deployment to `pilot-release`. The current
 GitHub plan does not support required reviewers; deployment is an explicit
 manual workflow dispatch. Enable reviewer approval if the plan supports it.

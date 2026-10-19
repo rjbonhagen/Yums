@@ -25,7 +25,9 @@ export default function ReportPage() {
   const [signedInUserId, setSignedInUserId] = useState<string | null | undefined>(() => isSupabaseConfigured() ? undefined : null)
   const [title, setTitle] = useState("")
   const [locationName, setLocationName] = useState("")
-  const [startTime, setStartTime] = useState("")
+  const [eventDate, setEventDate] = useState("")
+  const [eventTime, setEventTime] = useState("")
+  const startTime = eventDate && eventTime ? `${eventDate}T${eventTime}` : ""
   const [description, setDescription] = useState("")
   const [sourceUrl, setSourceUrl] = useState("")
   const [status, setStatus] = useState<"idle" | "submitting" | "error">("idle")
@@ -59,7 +61,7 @@ export default function ReportPage() {
       currentAccount = account
       accountState.version++
       setSignedInUserId(account)
-      setTitle(""); setLocationName(""); setStartTime(""); setDescription(""); setSourceUrl("")
+      setTitle(""); setLocationName(""); setEventDate(""); setEventTime(""); setDescription(""); setSourceUrl("")
       setStatus("idle")
       setError(null)
     })
@@ -102,11 +104,11 @@ export default function ReportPage() {
 
   return (
     <div className="flex flex-1 flex-col">
-      <Nav />
+      <Nav active="share" />
       <main className="flex flex-1 items-center justify-center px-4 py-12">
         <Card className="w-full max-w-md">
           <CardHeader>
-            <CardTitle className="text-2xl">Report free food</CardTitle>
+            <CardTitle className="text-2xl">Share free food</CardTitle>
             <p className="text-muted-foreground text-sm">
               Found free food that isn&apos;t on the feed? Share it — shown on{" "}
               <Link href="/feed" className="underline underline-offset-4">
@@ -149,14 +151,29 @@ export default function ReportPage() {
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="startTime">When (your local time)</Label>
-                  <Input
-                    id="startTime"
-                    type="datetime-local"
-                    required
-                    value={startTime}
-                    onChange={(e) => setStartTime(e.target.value)}
-                  />
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-2">
+                      <Label htmlFor="eventDate">Date</Label>
+                      <Input
+                        id="eventDate"
+                        type="date"
+                        required
+                        value={eventDate}
+                        onChange={(e) => setEventDate(e.target.value)}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="eventTime">Time</Label>
+                      <Input
+                        id="eventTime"
+                        type="time"
+                        required
+                        value={eventTime}
+                        onChange={(e) => setEventTime(e.target.value)}
+                      />
+                    </div>
+                  </div>
+                  <p className="text-xs text-muted-foreground">Uses your local time.</p>
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="description">Details (optional)</Label>

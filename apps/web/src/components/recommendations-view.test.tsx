@@ -4,128 +4,97 @@ import userEvent from "@testing-library/user-event"
 import type { Recommendation } from "@yums/shared"
 import { RecommendationsView } from "./recommendations-view"
 
-function rec(overrides: Partial<Recommendation>): Recommendation {
-  return {
-    id: "id",
-    kind: "free_food",
-    title: "title",
-    estimatedSavings: 0,
-    score: 1,
-    ...overrides,
-  }
+const now = "2026-10-14T18:00:00Z"
+function rec(id: string, startTime: string, overrides: Partial<Recommendation> = {}): Recommendation {
+  return { id, kind: "free_food", title: `Food ${id}`, subtitle: "Club · Soda Hall", startTime,
+    sourceUrl: `https://callink.berkeley.edu/event/${id}`, estimatedSavings: 0, score: 1, ...overrides }
 }
+const today = rec("1", "2026-10-14T20:00:00Z", { title: "Pizza lunch" })
+const tomorrow = rec("2", "2026-10-15T20:00:00Z", { title: "Free boba" })
 
-const FREE_EVENT = rec({ id: "1", kind: "free_food", title: "Free pizza", subtitle: "ACM · Soda Hall" })
-const NEARBY_PLACE = rec({ id: "2", kind: "nearby_eats", title: "Caffé Strada", subtitle: "2300 College Avenue" })
-
-describe("RecommendationsView", () => {
-  it("renders every recommendation by default", () => {
-    render(<RecommendationsView recommendations={[FREE_EVENT, NEARBY_PLACE]} />)
-    expect(screen.getByText("Free pizza")).toBeInTheDocument()
-    expect(screen.getByText("Caffé Strada")).toBeInTheDocument()
+describe("free food feed", () => {
+  it("shows only upcoming food and orders events by time", () => {
+    render(<RecommendationsView now={now} recommendations={[
+      tomorrow, rec("old", "2026-10-13T20:00:00Z"), today,
+      { ...today, id: "place", kind: "nearby_eats", title: "A restaurant" },
+    ]} />)
+    expect(screen.getAllByRole("heading", { level: 3 }).map((item) => item.textContent)).toEqual(["Pizza lunch", "Free boba"])
+    expect(screen.queryByText("A restaurant")).not.toBeInTheDocument()
+    expect(screen.queryByRole("tab", { name: "Map" })).not.toBeInTheDocument()
+    expect(screen.getAllByRole("link", { name: /Cal Link/ }).map((link) => link.getAttribute("href"))).toContain(today.sourceUrl)
   })
-
-  it("shows an empty-state message when there are no recommendations at all", () => {
-    render(<RecommendationsView recommendations={[]} />)
-    expect(screen.getByText(/nothing found right now/i)).toBeInTheDocument()
-  })
-
-  it("filters to free food only", async () => {
+  it("filters today and tomorrow using Berkeley dates", async () => {
     const user = userEvent.setup()
-    render(<RecommendationsView recommendations={[FREE_EVENT, NEARBY_PLACE]} />)
-
-    await user.click(screen.getByRole("button", { name: "Free food" }))
-
-    expect(screen.getByText("Free pizza")).toBeInTheDocument()
-    expect(screen.queryByText("Caffé Strada")).not.toBeInTheDocument()
+    render(<RecommendationsView now={now} recommendations={[today, tomorrow]} />)
+    await user.click(screen.getByRole("button", { name: "Today" }))
+    expect(screen.getByText("Pizza lunch")).toBeInTheDocument()
+    expect(screen.queryByText("Free boba")).not.toBeInTheDocument()
+    await user.click(screen.getByRole("button", { name: "Tomorrow" }))
+    expect(screen.getByText("Free boba")).toBeInTheDocument()
+    expect(screen.queryByText("Pizza lunch")).not.toBeInTheDocument()
   })
-
-  it("filters to nearby eats only", async () => {
+  it("keeps an ongoing event from the previous day in Today", async () => {
+    render(<RecommendationsView now="2026-10-15T07:15:00Z" recommendations={[
+      rec("late", "2026-10-15T06:30:00Z", { endTime: "2026-10-15T08:00:00Z" }),
+    ]} />)
+    await userEvent.setup().click(screen.getByRole("button", { name: "Today" }))
+    expect(screen.getByText("Food late")).toBeInTheDocument()
+  })
+  it("searches event names and locations with a useful empty state", async () => {
     const user = userEvent.setup()
-    render(<RecommendationsView recommendations={[FREE_EVENT, NEARBY_PLACE]} />)
-
-    await user.click(screen.getByRole("button", { name: "Nearby eats" }))
-
-    expect(screen.getByText("Caffé Strada")).toBeInTheDocument()
-    expect(screen.queryByText("Free pizza")).not.toBeInTheDocument()
+    render(<RecommendationsView now={now} recommendations={[today, tomorrow]} />)
+    const search = screen.getByRole("textbox", { name: "Search free food" })
+    await user.type(search, "boba")
+    expect(screen.queryByText("Pizza lunch")).not.toBeInTheDocument()
+    await user.clear(search)
+    await user.type(search, "Soda Hall")
+    expect(screen.getByText("Pizza lunch")).toBeInTheDocument()
+    await user.clear(search)
+    await user.type(search, "no match")
+    expect(screen.getByText("No matching food events")).toBeInTheDocument()
   })
-
-  it("searches by title", async () => {
+  it("keeps recurring dates separate and collapses duplicate announcements", () => {
+    const duplicate = { ...today, id: "duplicate", sourceUrl: "https://callink.berkeley.edu/event/3" }
+    render(<RecommendationsView now={now} recommendations={[
+      { ...today, endTime: "2026-10-14T21:00:00Z", seriesKey: "same series" },
+      { ...duplicate, endTime: "2026-10-14T21:00:00Z", seriesKey: "same series" },
+      { ...tomorrow, seriesKey: "same series" },
+    ]} />)
+    expect(screen.getAllByRole("article")).toHaveLength(2)
+    expect(screen.getAllByRole("button", { name: "Save" })).toHaveLength(2)
+  })
+  it("combines campus source, date, and search filters", async () => {
     const user = userEvent.setup()
-    render(<RecommendationsView recommendations={[FREE_EVENT, NEARBY_PLACE]} />)
-
-    await user.type(screen.getByPlaceholderText(/search by name/i), "strada")
-
-    expect(screen.getByText("Caffé Strada")).toBeInTheDocument()
-    expect(screen.queryByText("Free pizza")).not.toBeInTheDocument()
+    render(<RecommendationsView now={now} recommendations={[
+      today, tomorrow,
+      rec("calendar", "2026-10-15T21:00:00Z", { title: "Pizza social", sourceUrl: "https://events.berkeley.edu/event/1" }),
+    ]} />)
+    await user.selectOptions(screen.getByRole("combobox", { name: "Filter by campus source" }), "Berkeley calendar")
+    expect(screen.queryByText("Pizza lunch")).not.toBeInTheDocument()
+    expect(screen.getByText("Pizza social")).toBeInTheDocument()
+    await user.click(screen.getByRole("button", { name: "Today" }))
+    expect(screen.getByText("No matching food events")).toBeInTheDocument()
+    await user.click(screen.getByRole("button", { name: "Tomorrow" }))
+    await user.type(screen.getByRole("textbox", { name: "Search free food" }), "Soda Hall")
+    expect(screen.getByText("Pizza social")).toBeInTheDocument()
   })
-
-  it("searches by subtitle", async () => {
+  it("explains an empty source result without adding sample offers", () => {
+    render(<RecommendationsView now={now} recommendations={[]} />)
+    expect(screen.getByText("No free-food listings found")).toBeInTheDocument()
+    expect(screen.queryByRole("article")).not.toBeInTheDocument()
+  })
+  it("shows a public repost once and lets each publisher be selected", async () => {
     const user = userEvent.setup()
-    render(<RecommendationsView recommendations={[FREE_EVENT, NEARBY_PLACE]} />)
-
-    await user.type(screen.getByPlaceholderText(/search by name/i), "soda hall")
-
-    expect(screen.getByText("Free pizza")).toBeInTheDocument()
-    expect(screen.queryByText("Caffé Strada")).not.toBeInTheDocument()
-  })
-
-  it("shows a distinct empty-state message when a filter/search excludes everything", async () => {
-    const user = userEvent.setup()
-    render(<RecommendationsView recommendations={[FREE_EVENT, NEARBY_PLACE]} />)
-
-    await user.type(screen.getByPlaceholderText(/search by name/i), "nonexistent place")
-
-    expect(screen.getByText(/nothing matches your filter\/search/i)).toBeInTheDocument()
-  })
-
-  describe("recurring-event grouping", () => {
-    const MEETING_1 = rec({
-      id: "m1",
-      kind: "free_food",
-      title: "Free pizza",
-      subtitle: "ACM · Soda Hall",
-      seriesKey: "ACM at UC Berkeley::Weekly General Meeting",
-      startTime: "2026-09-01T18:00:00Z",
-      sourceUrl: "https://events.berkeley.edu/1",
-    })
-    const MEETING_2 = rec({
-      id: "m2",
-      kind: "free_food",
-      title: "Free pizza",
-      subtitle: "ACM · Soda Hall",
-      seriesKey: "ACM at UC Berkeley::Weekly General Meeting",
-      startTime: "2026-09-08T18:00:00Z",
-      sourceUrl: "https://events.berkeley.edu/2",
-    })
-
-    it("collapses two instances of the same exact seriesKey into one card", () => {
-      render(<RecommendationsView recommendations={[MEETING_1, MEETING_2]} />)
-
-      expect(screen.getByText(/matching event titles · 2 upcoming/i)).toBeInTheDocument()
-      // Both dates still show, individually, inside the group.
-      expect(screen.getByText(/Sep 1/)).toBeInTheDocument()
-      expect(screen.getByText(/Sep 8/)).toBeInTheDocument()
-    })
-
-    it("does not group a lone free_food item even if it has a seriesKey", () => {
-      render(<RecommendationsView recommendations={[MEETING_1, NEARBY_PLACE]} />)
-      expect(screen.queryByText(/recurring/i)).not.toBeInTheDocument()
-    })
-
-    it("never groups items with different seriesKeys, even with the same display title", () => {
-      const differentClub = rec({
-        id: "m3",
-        kind: "free_food",
-        title: "Free pizza", // same displayed title as MEETING_1 — must not cause a false merge
-        subtitle: "Different Club · Elsewhere",
-        seriesKey: "Different Club::Totally Unrelated Event",
-        startTime: "2026-09-03T18:00:00Z",
-      })
-
-      render(<RecommendationsView recommendations={[MEETING_1, differentClub]} />)
-
-      expect(screen.queryByText(/recurring/i)).not.toBeInTheDocument()
-    })
+    const campus = { ...today, id: "campus", sourceUrl: "https://events.berkeley.edu/live/events/1",
+      subtitle: "UC Berkeley Events Calendar · Soda Hall", seriesKey: "UC Berkeley Events Calendar::Pizza lunch", endTime: "2026-10-14T21:00:00Z" }
+    const graduate = { ...campus, id: "graduate", sourceUrl: "https://grad.berkeley.edu/event/pizza-lunch/",
+      subtitle: "Graduate Assembly · Soda Hall", seriesKey: "Graduate Assembly::Pizza lunch" }
+    render(<RecommendationsView now={now} recommendations={[campus, graduate]} />)
+    expect(screen.getAllByRole("article")).toHaveLength(1)
+    await user.selectOptions(screen.getByRole("combobox", { name: "Filter by campus source" }), "Graduate Division")
+    expect(screen.getAllByRole("article")).toHaveLength(1)
+    expect(screen.getByRole("link", { name: /View announcement/ })).toHaveAttribute("href", graduate.sourceUrl)
+    await user.selectOptions(screen.getByRole("combobox", { name: "Filter by campus source" }), "Berkeley calendar")
+    expect(screen.getByRole("link", { name: /View announcement/ })).toHaveAttribute("href", campus.sourceUrl)
   })
 })
