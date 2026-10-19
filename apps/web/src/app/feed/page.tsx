@@ -36,7 +36,7 @@ export default async function FeedPage() {
 
   return (
     <div className="flex flex-1 flex-col">
-      <Nav tone="teal" active="discover" />
+      <Nav tone="brand" active="discover" />
       <main id="main-content" className="flex-1">
         <RecommendationsView key={userId ?? "guest"} recommendations={recommendations} now={new Date().toISOString()} notices={<>
         {meta.freeFood.source === "demo" && <p role="status" className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">Sample events for preview only. These are not real food offers.</p>}
