@@ -4,6 +4,8 @@ Free food at UC Berkeley, collected in one feed from campus calendars and
 community tips. See when an event happens, where to go, and the original
 announcement before heading out.
 
+![Yums live homepage with campus source filters and free-food discovery](docs/screenshots/home-live.png)
+
 ## Features
 
 - **One food feed:** public Berkeley Events and Graduate Division calendars,
@@ -85,8 +87,9 @@ are removed from the visible list. Saved items retain a snapshot of the event.
 Existing experimental backend helpers and tables remain for compatibility;
 they do not add steps to the current interface.
 
-See [product scope](docs/product.md), [data sources](docs/data-sources.md), and
-[EC2 deployment](docs/ec2-pilot.md).
+See [product scope](docs/product.md), [data sources](docs/data-sources.md),
+[EC2 deployment](docs/ec2-pilot.md), and the dated
+[security review](docs/security-review.md).
 
 ## Limits
 
