@@ -1,7 +1,8 @@
 import { cacheLiveSource } from "./source-cache"
 import { scoreOpportunity, DEFAULT_WEIGHTS } from "@yums/shared"
 import type { Recommendation } from "@yums/shared"
-import { berkeleyLiveSource, graduateLiveSource, ingestSource, type ExtractedFoodEvent } from "@yums/event-ingestion"
+import type { ExtractedFoodEvent } from "@yums/event-ingestion"
+import { getCachedBerkeleyEvents, getCachedGraduateEvents } from "./public-calendar-cache"
 import { fetchNearbyPlaces } from "./nearby-places"
 import { haversineMinutes, validCoordinates } from "./geo"
 import { demoFoodEvents } from "./mock-data"
@@ -19,8 +20,6 @@ const BBOX: [number, number, number, number] = [37.83, -122.3, 37.9, -122.22]
 // Shared public sources have bounded cache windows. Each new window needs
 // a successful network response; a failed refresh cannot retain old results
 // indefinitely. Account preferences and Calendar tokens are never cached here.
-const getCachedBerkeleyEvents = cacheLiveSource(() => ingestSource(berkeleyLiveSource), "berkeley-live-events", 120)
-const getCachedGraduateEvents = cacheLiveSource(() => ingestSource(graduateLiveSource), "graduate-events", 120)
 const getCachedNearbyPlaces = cacheLiveSource(
   () => fetchNearbyPlaces(BBOX, ["cafe", "restaurant", "fast_food"]),
   `nearby-places:${BBOX.join(",")}`, 600,

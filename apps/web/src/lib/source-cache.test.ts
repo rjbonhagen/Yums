@@ -19,6 +19,7 @@ vi.mock("@yums/event-ingestion", async (original) => ({
 vi.mock("./nearby-places", () => ({ fetchNearbyPlaces: mocks.places }))
 import { cacheLiveSource } from "./source-cache"
 import { buildRecommendations } from "./recommendations"
+import { GET as getLiveEvents } from "../app/api/events/live/route"
 
 beforeEach(() => {
   mocks.records.clear()
@@ -30,6 +31,19 @@ beforeEach(() => {
 afterEach(() => { vi.useRealTimers(); vi.unstubAllEnvs() })
 
 describe("bounded public-source cache windows", () => {
+  it("shares Berkeley reads between the legacy endpoint and feed, including expired failures", async () => {
+    mocks.ingest.mockResolvedValue([])
+    expect((await getLiveEvents()).status).toBe(200)
+    await buildRecommendations({ maxTravelMinutes: 20, freeFoodOnly: true })
+    expect((await getLiveEvents()).status).toBe(200)
+    expect(mocks.ingest.mock.calls.filter(([source]) => source.key === "berkeley-live")).toHaveLength(1)
+
+    vi.advanceTimersByTime(120000)
+    mocks.ingest.mockRejectedValue(new Error("source unavailable"))
+    const failed = await getLiveEvents()
+    expect(failed.status).toBe(502)
+    expect((await failed.json()).events).toEqual([])
+  })
   it("shares successful reads within the window and refreshes at its boundary", async () => {
     const fetchSource = vi.fn().mockResolvedValueOnce("first").mockResolvedValueOnce("updated")
     const read = cacheLiveSource(fetchSource, "test-source", 120)

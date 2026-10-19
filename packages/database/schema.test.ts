@@ -31,6 +31,8 @@ beforeAll(async () => {
     grant select, insert, update, delete on public.users, public.user_preferences,
       public.recommendations, public.calendar_connections, public.user_reported_events to authenticated;
     grant select on public.user_reported_events to anon;
+    grant select, insert, update, delete on public.universities, public.event_sources,
+      public.events, public.businesses, public.deals to authenticated, anon;
     insert into auth.users values ('${A}', 'a@example.test'), ('${B}', 'b@example.test');
     insert into public.user_preferences (user_id) values ('${A}'), ('${B}');
     insert into public.recommendations (user_id, kind, title, save_key, source_url)
@@ -54,6 +56,27 @@ beforeEach(async () => {
 afterAll(async () => { await db?.close() })
 
 describe("database constraints and account isolation", () => {
+  it("keeps catalog data readable but blocks client writes even with broad table grants", async () => {
+    await db.exec(`reset role;
+      insert into public.event_sources (name, adapter_key) values ('Campus source', 'test');
+      insert into public.events (organization, title, start_time, source_url)
+        values ('Campus', 'Public event', now(), 'https://example.test/event');
+      insert into public.businesses (name) values ('Public business');
+      insert into public.deals (description, discount_type) values ('Public deal', 'other');`)
+    for (const role of ["anon", "authenticated"]) {
+      await db.exec(`reset role; set request.jwt.claim.sub = '${role === "authenticated" ? A : ""}'; set role ${role};`)
+      for (const [table, column] of [["universities", "name"], ["event_sources", "name"], ["events", "title"], ["businesses", "name"], ["deals", "description"]]) {
+        expect((await db.query(`select * from public.${table}`)).rows.length).toBeGreaterThan(0)
+        expect((await db.query(`update public.${table} set ${column} = 'Changed' returning id`)).rows).toHaveLength(0)
+        expect((await db.query(`delete from public.${table} returning id`)).rows).toHaveLength(0)
+      }
+      await expect(db.query("insert into public.universities (name, slug) values ('Untrusted', 'untrusted')")).rejects.toThrow(/row-level security/i)
+      await expect(db.query("insert into public.event_sources (name, adapter_key) values ('Untrusted', 'untrusted')")).rejects.toThrow(/row-level security/i)
+      await expect(db.query("insert into public.events (organization, title, start_time, source_url) values ('Untrusted', 'Untrusted', now(), 'https://example.test/untrusted')")).rejects.toThrow(/row-level security/i)
+      await expect(db.query("insert into public.businesses (name) values ('Untrusted')")).rejects.toThrow(/row-level security/i)
+      await expect(db.query("insert into public.deals (description, discount_type) values ('Untrusted', 'other')")).rejects.toThrow(/row-level security/i)
+    }
+  })
   it("denies anonymous quota execution even when project defaults explicitly grant it", async () => {
     const { rows } = await db.query("select has_function_privilege('anon', 'public.consume_chat_allowance()', 'EXECUTE') as anon_execute, has_function_privilege('authenticated', 'public.consume_chat_allowance()', 'EXECUTE') as authenticated_execute")
     expect(rows).toEqual([{ anon_execute: false, authenticated_execute: true }])
