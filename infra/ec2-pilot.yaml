@@ -15,8 +15,8 @@ Parameters:
     Default: t3.small
     AllowedValues: [t3.micro, t3.small, t3.medium]
   ImageId:
-    Type: AWS::SSM::Parameter::Value<AWS::EC2::Image::Id>
-    Default: /aws/service/ami-amazon-linux-latest/al2023-ami-kernel-default-x86_64
+    Type: AWS::EC2::Image::Id
+    Description: Explicit Amazon Linux 2023 AMI. Keep the current image for role-only stack updates.
   GitHubSubjectPrefix:
     Type: String
     Default: repo:rjbonhagen@91764983/Yums@1383106560

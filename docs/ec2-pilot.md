@@ -10,6 +10,12 @@ subnet, a hostname controlled by the operator, and an optional existing GitHub
 OIDC provider ARN. Deploying the template incurs ongoing costs. Preparation
 and template validation do not launch a server.
 
+`ImageId` is an explicit regional AMI ID. For a new server, resolve the current
+Amazon Linux 2023 image from the public Systems Manager parameter
+`/aws/service/ami-amazon-linux-latest/al2023-ami-kernel-default-x86_64`. For an
+existing server, preserve its current image during unrelated stack updates.
+Image upgrades are separate changes because they can replace the instance.
+
 ## Cost and validation status
 
 October 14, 2026 pricing for `us-west-1`, assuming 730 hours per month:
