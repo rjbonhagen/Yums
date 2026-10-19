@@ -1,5 +1,4 @@
-// FALLBACK DATA — used only where a live source doesn't exist or fails.
-// See docs/data-sources.md for exactly what's live vs. reference-only.
+// Sample fixtures for local demos and tests.
 
 import type { FreeFoodEvent } from "@yums/shared"
 
@@ -15,11 +14,6 @@ export const university = {
   slug: "berkeley",
 }
 
-/**
- * Fallback only — recommendations.ts uses this when the live
- * events.berkeley.edu fetch fails (network error, upstream down), not as
- * the default path. See docs/data-sources.md.
- */
 export const freeFoodEvents: FreeFoodEvent[] = [
   {
     id: "evt-1",

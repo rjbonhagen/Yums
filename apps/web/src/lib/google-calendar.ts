@@ -104,12 +104,6 @@ export async function refreshAccessToken(refreshToken: string): Promise<{ access
 }
 
 /**
- * Deterministic overlap check — not an estimate. An event is scored low
- * (busy) only if a real calendar block overlaps its [start, end) window;
- * otherwise it's scored high (free). No LLM, no guessing, matching this
- * app's scoring philosophy (docs/architecture.md's "Scoring" section).
- */
-/**
  * Server-only: resolves the signed-in user's Google Calendar access token
  * from calendar_connections (see packages/database/schema.sql), refreshing
  * it first if expired. Returns null whenever a real token isn't available

@@ -3,9 +3,9 @@
 Find free food around UC Berkeley. Yums brings campus announcements and community
 tips into one feed with event times, locations, and links to the original posts.
 
-[Live site](https://getyums.food) · [Architecture](docs/architecture.md) · [Data sources](docs/data-sources.md)
+[Live site](https://getyums.food)
 
-![Yums homepage](docs/screenshots/home-live.png)
+![Yums homepage](.github/images/homepage.png)
 
 ## Features
 
@@ -16,14 +16,18 @@ tips into one feed with event times, locations, and links to the original posts.
 
 Browsing works without an account. New accounts require an invitation.
 
-## Tech stack
+## Architecture
 
-| Area | Technology |
-| --- | --- |
-| Website | Next.js, React, TypeScript, Tailwind CSS |
-| Event discovery | Calendar adapters, food evidence extraction, caching, deduplication |
-| Accounts and data | Supabase Auth, PostgreSQL, row-level security |
-| Hosting | AWS EC2, ECR, Docker, Caddy HTTPS, CloudWatch, GitHub Actions |
+```text
+Yums
+├── apps/web                 Next.js + React interface and API
+├── services/event-ingestion Campus calendar adapters
+├── packages
+│   ├── database             Supabase schema and migrations
+│   └── shared               Types and ranking helpers
+├── infra                    EC2 and HTTPS setup
+└── .github/workflows        Tests and container releases
+```
 
 ## Run locally
 
@@ -37,8 +41,8 @@ npm run dev
 Open [localhost:3000](http://localhost:3000).
 
 To enable account saves and submissions, copy `apps/web/.env.example` to
-`apps/web/.env.local` and configure the Supabase public settings. See
-[setup instructions](docs/pilot-setup.md) for database and sign-in configuration.
+`apps/web/.env.local` and configure the Supabase public settings. Database schema
+and migrations are in `packages/database/`.
 
 ## Checks
 
@@ -47,10 +51,5 @@ npm test
 npm run lint
 npm run build
 ```
-
-## Documentation
-
-- [Deployment](docs/ec2-pilot.md)
-- [Security review](docs/security-review.md)
 
 Check original announcements for attendance requirements and food availability.

@@ -42,13 +42,7 @@ function guessFoodPhrase(text: string): string | undefined {
   return found.length > 0 ? found.join(", ") : undefined
 }
 
-/**
- * NOT IMPLEMENTED. This is where an LLM call should replace/augment
- * extractDeterministic to pull out food descriptions and set confidence
- * from free-text event descriptions (per docs/architecture.md AI
- * responsibilities: "extracting food information from event descriptions").
- * Left unimplemented until an API key / provider is wired up.
- */
+/** Reserved extraction backend; currently unimplemented. */
 export async function extractWithLLM(_event: CampusEvent): Promise<ExtractedFoodEvent> {
   throw new Error("extractWithLLM is not implemented yet — see services/event-ingestion/extract.ts")
 }

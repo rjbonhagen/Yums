@@ -29,12 +29,7 @@ export function normalizePreferences(value: unknown): WeeklyPreferences {
   }
 }
 
-/**
- * Client-side persistence with zero configuration required. /start uses
- * this when there's no Supabase project configured or no signed-in user —
- * see savePreferencesToSupabase below for the authenticated path, wired in
- * at /start via the /login magic-link flow (docs/architecture.md).
- */
+/** Store guest preferences in the browser. */
 export function saveLocalPreferences(prefs: WeeklyPreferences): void {
   if (typeof window === "undefined") return
   const serialized = JSON.stringify(normalizePreferences(prefs))

@@ -1,9 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 
-// buildRecommendations()'s entire job is "never fabricate, always disclose
-// degradation" (docs/architecture.md) — these tests exercise that guarantee
-// directly by controlling which of the three live sources succeed/fail,
-// rather than hitting real network.
+// Exercise source failures without network requests.
 
 vi.mock("next/cache", () => ({
   // unstable_cache is only a cross-request persistence layer in a real

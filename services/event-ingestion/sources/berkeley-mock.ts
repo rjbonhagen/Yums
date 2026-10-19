@@ -1,12 +1,6 @@
 import type { CampusEvent, CampusEventSource } from "../types"
 
-/**
- * MOCK adapter. Stands in for a real UC Berkeley event source (e.g. the
- * campus events calendar, ASUC club portal, or a department newsletter
- * feed) until that integration is built. Shape matches what a real adapter
- * must return so swapping this out is a drop-in change — see
- * docs/data-sources.md.
- */
+/** Sample events matching the campus source interface. */
 export const berkeleyMockSource: CampusEventSource = {
   key: "berkeley-mock",
   async fetchEvents(): Promise<CampusEvent[]> {

@@ -1,10 +1,4 @@
-// Real businesses near campus from OpenStreetMap's Overpass API — public,
-// keyless, community-maintained map data. This replaced a set of made-up
-// business names ("Local Poke Shop", "Burrito Corner") that this app used
-// to show as fake "student deals." No public source exists for real
-// student-discount data (see docs/data-sources.md), so rather than fake
-// discount percentages on real places, this is presented honestly as
-// "nearby eats" with no savings claim.
+// Named places from OpenStreetMap; listings do not include verified discounts.
 
 // Two independent public Overpass instances — both free community
 // infrastructure, so occasional 5xx/timeouts are expected under load. We

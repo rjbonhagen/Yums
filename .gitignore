@@ -8,6 +8,8 @@ node_modules/
 *.p12
 *.log
 .DS_Store
+/docs/
+/apps/web/README.md
 
 # Local development configuration
 .agents/
